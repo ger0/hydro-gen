@@ -1,5 +1,5 @@
-#ifndef RGL_TYPES_HPP
-#define RGL_TYPES_HPP
+#ifndef HYDR_TYPES_HPP
+#define HYDR_TYPES_HPP
 
 #include <GLFW/glfw3.h>
 #include <cstdint>
@@ -54,5 +54,5 @@ template <class F> deferrer<F> operator*(defer_dummy, F f) { return {f}; }
 #define LOG_DBG(...) ;
 #endif
 
-#endif // RGL_TYPES_HPP
+#endif // HYDR_TYPES_HPP
 

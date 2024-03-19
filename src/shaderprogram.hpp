@@ -1,18 +1,25 @@
-#pragma once
+#ifndef HYDR_SHAD_HPP
+#define HYDR_SHAD_HPP
 
 #include <GL/glew.h>
 
-class ShaderProgram {
+class Shader_program {
 private:
-    GLuint shaderProgram;
-    GLuint vertexShader;
-    GLuint fragmentShader;
-    char* readFile(const char* fileName);
-    GLuint loadShader(GLenum shaderType, const char* fileName);
+    GLuint program;
+    GLuint vertex;
+    GLuint fragment;
+    char* read_file(const char* filename);
+    GLuint load_shader(GLenum shader_type, const char* filename);
 public:
-    ShaderProgram(const char* vShaderFile, const char* fShaderFile);
-    ~ShaderProgram();
+    Shader_program(const char* vert_file, const char* frag_file);
+    ~Shader_program();
     void use();
-    GLuint u(const char* varName);
-    GLuint a(const char* attName);
+    GLuint u(const char* variable);
+    GLuint a(const char* attribute);
 };
+
+void destroy_shader(Shader_program* sp);
+
+Shader_program* create_shader(const char* vert, const char* frag);
+
+#endif // HYDR_SHAD_HPP 

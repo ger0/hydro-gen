@@ -85,18 +85,18 @@ GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title) {
     }
     glEnable(GL_DEBUG_OUTPUT);
     glDebugMessageCallback(gl_error_callback, 0);
-	
-	/* IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	ImGuiIO& io = ImGui::GetIO();
-	ImGui::StyleColorsClassic();
-	ImGui_ImplGlfw_InitForOpenGL(window.get(), true);
-	ImGui_ImplOpenGL3_Init(glsl_version); */
+    
+    /* IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    ImGui::StyleColorsClassic();
+    ImGui_ImplGlfw_InitForOpenGL(window.get(), true);
+    ImGui_ImplOpenGL3_Init(glsl_version); */
 
     return win;
 }
 
 void destroy_window(GLFWwindow* win) {
-	glfwDestroyWindow(win);
-	glfwTerminate();
+    glfwDestroyWindow(win);
+    glfwTerminate();
 };

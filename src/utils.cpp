@@ -5,6 +5,9 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "utils.hpp"
+#include "imgui.h"
+#include "backends/imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
 
 void GLAPIENTRY gl_error_callback(
     GLenum source,
@@ -75,7 +78,7 @@ GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title) {
         return nullptr;
     }
     glfwMakeContextCurrent(win);
-    glfwSetInputMode(win, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    // glfwSetInputMode(win, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSwapInterval(1);
     glViewport(0, 0, window_size.x, window_size.y);
 
@@ -86,14 +89,17 @@ GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title) {
     glEnable(GL_DEBUG_OUTPUT);
     glDebugMessageCallback(gl_error_callback, 0);
     
-    /* IMGUI_CHECKVERSION();
+    return win;
+}
+
+void init_imgui(GLFWwindow* window) {
+    IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     ImGui::StyleColorsClassic();
-    ImGui_ImplGlfw_InitForOpenGL(window.get(), true);
-    ImGui_ImplOpenGL3_Init(glsl_version); */
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 460");
 
-    return win;
 }
 
 void destroy_window(GLFWwindow* win) {

@@ -1,5 +1,9 @@
 #include <glm/glm.hpp>
 
+#include "imgui.h"
+#include "backends/imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+
 #include "shaderprogram.hpp"
 #include "utils.hpp"
 
@@ -25,6 +29,8 @@ int main(int argc, char* argv[]) {
         );
 
     assert(window.get() != nullptr);
+
+    init_imgui(window.get());
 
     Uq_ptr<Shader_program, decltype(&destroy_shader)> shader(
             create_shader(vert_shader, frag_shader),
@@ -56,13 +62,17 @@ int main(int argc, char* argv[]) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // imgui
-        // ImGui_ImplOpenGL3_NewFrame();
-        // ImGui_ImplGlfw_NewFrame();
-        // ImGui::NewFrame();
-        // ImGui::End();
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
 
-        // ImGui::Render();
-        // ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        ImGui::Begin("TEST");
+        ImGui::Text("Hello");
+
+        ImGui::End();
+
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         glfwSwapBuffers(window.get());
     }

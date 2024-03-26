@@ -30,6 +30,7 @@ template <typename T>
 using Vec = std::vector<T>;
 
 GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title);
+void init_imgui(GLFWwindow* window);
 void destroy_window(GLFWwindow* win);
 
 // defer

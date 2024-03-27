@@ -26,15 +26,14 @@ set(IMGUI_SRC_FILES
     submodules/imgui/backends/imgui_impl_opengl3.cpp
 )
 
-#file(GLOB IMGUI_SRC_FILES submodules/imgui/*.cpp)
-
-#include_directories(submodules/imgui)
+if(CMAKE_BUILD_TYPE MATCHES DEBUG)
+    add_definitions(-DDEBUG)
+endif()
 
 add_executable(hydro-gen ${SRC_FILES} ${IMGUI_SRC_FILES})
 target_include_directories(hydro-gen PRIVATE submodules/imgui)
 target_include_directories(hydro-gen PRIVATE submodules/imgui/backends)
 
-# target_compile_features(hydro-gen PUBLIC cxx_std_17)
 target_link_libraries(hydro-gen fmt::fmt)
 target_link_libraries(hydro-gen glfw)
 target_link_libraries(hydro-gen GLEW::GLEW)

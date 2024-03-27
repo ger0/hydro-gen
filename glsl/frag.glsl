@@ -13,6 +13,8 @@ uniform vec3 sunDir;
 const vec3 lightColor = vec3(0.6, 0.6, 0.5);
 const float screenGamma = 2.2; // Assume the monitor is calibrated to the sRGB color space
 
+out vec4 frag_color;
+
 void main() {
 	vec3 ambient = lightColor * 0.1;
 	vec3 normal = normalize(iNormal);
@@ -43,5 +45,5 @@ void main() {
 	vec3 colorLinear = (ambient + diff + specular) * iColor.rgb;
 	vec3 colorCorrect = pow(colorLinear, vec3(1.0 / screenGamma));
 	vec3 outColor = mix(skyColor, colorCorrect, visibility);
-	gl_FragColor = vec4(outColor, iColor.a);
+	frag_color = vec4(outColor, iColor.a);
 }

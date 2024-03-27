@@ -51,8 +51,11 @@ template <class F> deferrer<F> operator*(defer_dummy, F f) { return {f}; }
 #ifdef DEBUG 
 #define LOG_DBG(...) \
     fmt::print(stderr, "\033[1;33m{}\033[0m\n", fmt::format(__VA_ARGS__))
+#define LOG_NOFORMAT_DBG(...) \
+    fmt::print(stderr, "\033[1;33m{}\033[0m\n", __VA_ARGS__)
 #else 
 #define LOG_DBG(...) ;
+#define LOG_NOFORMAT_DBG(...) ;
 #endif
 
 #endif // HYDR_TYPES_HPP

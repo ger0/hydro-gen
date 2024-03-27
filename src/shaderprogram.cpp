@@ -1,7 +1,16 @@
 #include "shaderprogram.hpp"
 #include "utils.hpp"
 
-char* Shader_program::read_file(const char* filename) {
+char* read_file(const char* filename);
+
+enum Log_type {
+    SHADER,
+    PROGRAM
+};
+
+void err_log_shader(GLuint program, Log_type type);
+
+char* read_file(const char* filename) {
     int f_size;
     FILE *file;
     char *data;
@@ -21,7 +30,7 @@ char* Shader_program::read_file(const char* filename) {
     return NULL;
 }
 
-GLuint Shader_program::load_shader(GLenum shader_type, const char* filename) {
+GLuint Shader_core::load_shader(GLenum shader_type, const char* filename) {
     // handle
     GLuint shader = glCreateShader(shader_type);
     const GLchar* shader_source = read_file(filename);
@@ -30,19 +39,45 @@ GLuint Shader_program::load_shader(GLenum shader_type, const char* filename) {
 
     delete []shader_source;
 
-    // error handling 
+    err_log_shader(shader, SHADER);
+    return shader;
+}
+
+void err_log_shader(GLuint handle, Log_type type) {
+    // error handling x2
     int info_log_len = 0;
     int chars_written = 0;
     char *info_log;
 
-    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &info_log_len);
+    if (type == SHADER) {
+        glGetShaderiv(handle, GL_INFO_LOG_LENGTH, &info_log_len);
+    } else if (type == PROGRAM) {
+        glGetProgramiv(handle, GL_INFO_LOG_LENGTH, &info_log_len);
+    }
     if (info_log_len > 1) {
         info_log = new char[info_log_len];
-        glGetShaderInfoLog(shader, info_log_len, &chars_written, info_log);
-        LOG_DBG(infoLog);
+        if (type == SHADER) {
+            glGetShaderInfoLog(handle, info_log_len, &chars_written, info_log);
+        } else if (type == PROGRAM) {
+            glGetProgramInfoLog(handle, info_log_len, &chars_written, info_log);
+        }
+        LOG_NOFORMAT_DBG(info_log);
         delete []info_log;
     }
-    return shader;
+
+}
+
+Compute_program::Compute_program(const char* comput_file) {
+    LOG_DBG("Loading compute shader...");
+    compute = load_shader(GL_COMPUTE_SHADER, comput_file);
+
+    program = glCreateProgram();
+
+    glAttachShader(program, compute);
+    glLinkProgram(program);
+
+    err_log_shader(program, PROGRAM);
+    LOG_DBG("Compute shader program created");
 }
 
 Shader_program::Shader_program(const char* vert_file, const char* frag_file) {
@@ -58,19 +93,8 @@ Shader_program::Shader_program(const char* vert_file, const char* frag_file) {
     glAttachShader(program, fragment);
     glLinkProgram(program);
 
-    // error handling x2
-    int info_log_len = 0;
-    int chars_written = 0;
-    char *info_log;
-
-    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &info_log_len);
-    if (info_log_len > 1) {
-        info_log = new char[info_log_len];
-        glGetProgramInfoLog(program, info_log_len, &chars_written, info_log);
-        LOG_DBG(infoLog);
-        delete []info_log;
-    }
-    LOG_DBG("Shader program created");
+    err_log_shader(program, PROGRAM);
+    LOG_DBG("Shader pipeline created");
 }
 
 Shader_program::~Shader_program() {
@@ -84,15 +108,15 @@ Shader_program::~Shader_program() {
     LOG_DBG("Shader program deleted");
 }
 
-void Shader_program::use() {
+void Shader_core::use() {
     glUseProgram(program);
 }
 
-GLuint Shader_program::u(const char* variable) {
+GLuint Shader_core::u(const char* variable) {
     return glGetUniformLocation(program, variable);
 }
 
-GLuint Shader_program::a(const char* attribute) {
+GLuint Shader_core::a(const char* attribute) {
     return glGetAttribLocation(program, attribute);
 }
 

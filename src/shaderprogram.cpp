@@ -1,7 +1,7 @@
 #include "shaderprogram.hpp"
 #include "utils.hpp"
 
-char* read_file(const char* filename);
+std::string read_file(const char* filename);
 
 enum Log_type {
     SHADER,
@@ -10,7 +10,7 @@ enum Log_type {
 
 void err_log_shader(GLuint program, Log_type type);
 
-char* read_file(const char* filename) {
+std::string read_file(const char* filename) {
     int f_size;
     FILE *file;
     char *data;
@@ -30,14 +30,18 @@ char* read_file(const char* filename) {
     return NULL;
 }
 
-GLuint Shader_core::load_shader(GLenum shader_type, const char* filename) {
+GLuint Shader_core::load_shader(GLenum shader_type, std::initializer_list<std::string> filenames) {
     // handle
     GLuint shader = glCreateShader(shader_type);
-    const GLchar* shader_source = read_file(filename);
+
+    std::string source_str = "";
+    for (const auto& filename: filenames) {
+        std::string append_str = read_file(filename.c_str());
+        source_str += '\n' + append_str;
+    }
+    const GLchar* shader_source = source_str.c_str();
     glShaderSource(shader, 1, &shader_source, NULL);
     glCompileShader(shader);
-
-    delete []shader_source;
 
     err_log_shader(shader, SHADER);
     return shader;
@@ -67,9 +71,9 @@ void err_log_shader(GLuint handle, Log_type type) {
 
 }
 
-Compute_program::Compute_program(const char* comput_file) {
+Compute_program::Compute_program(std::initializer_list<std::string> comput_files) {
     LOG_DBG("Loading compute shader...");
-    compute = load_shader(GL_COMPUTE_SHADER, comput_file);
+    compute = load_shader(GL_COMPUTE_SHADER, comput_files);
 
     program = glCreateProgram();
 
@@ -82,10 +86,10 @@ Compute_program::Compute_program(const char* comput_file) {
 
 Shader_program::Shader_program(const char* vert_file, const char* frag_file) {
     LOG_DBG("Loading vertex shader...");
-    vertex = load_shader(GL_VERTEX_SHADER, vert_file);
+    vertex = load_shader(GL_VERTEX_SHADER, {vert_file});
 
     LOG_DBG("Loading fragment shader...");
-    fragment = load_shader(GL_FRAGMENT_SHADER, frag_file);
+    fragment = load_shader(GL_FRAGMENT_SHADER, {frag_file});
 
     program = glCreateProgram();
 
@@ -108,6 +112,15 @@ Shader_program::~Shader_program() {
     LOG_DBG("Shader program deleted");
 }
 
+Compute_program::~Compute_program() {
+    glDetachShader(program, compute);
+
+    glDeleteShader(compute);
+
+    glDeleteProgram(program);
+    LOG_DBG("Compute shader program deleted");
+}
+
 void Shader_core::use() {
     glUseProgram(program);
 }
@@ -119,12 +132,3 @@ GLuint Shader_core::u(const char* variable) {
 GLuint Shader_core::a(const char* attribute) {
     return glGetAttribLocation(program, attribute);
 }
-
-void destroy_shader(Shader_program* sp) {
-    delete sp;
-};
-
-Shader_program* create_shader(const char* vert, const char* frag) {
-    Shader_program *sp = new Shader_program(vert, frag);
-    return sp;
-};

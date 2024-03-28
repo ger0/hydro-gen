@@ -1,5 +1,3 @@
-#version 460 core
-
 layout (local_size_x = 16, local_size_y = 16) in;
 
 layout (binding = 0, rgba32f) uniform image2D destTex;
@@ -10,11 +8,15 @@ float rand(vec2 co) {
 }
 
 void main() {
-    ivec2 storePos = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 store_pos = ivec2(gl_GlobalInvocationID.xy);
+
+    gln_tFBMOpts opts = gln_tFBMOpts(0,0.5,2,0.01,1,7,false,false);
 
     // Generate random color values
-    vec4 color = vec4(rand(storePos), rand(storePos * 0.5), rand(storePos * 0.25), 1.0);
+    // vec4 color = vec4(rand(storePos), rand(storePos * 0.5), rand(storePos * 0.25), 1.0);
+    float col = (gln_sfbm(store_pos, opts) + 1) / 4;
+    vec4 color = vec4(col, col, col, 1.0);
 
     // Store the generated color in the output buffer
-    imageStore(destTex, storePos, color);
+    imageStore(destTex, store_pos, color);
 }

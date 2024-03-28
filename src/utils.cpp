@@ -99,7 +99,11 @@ void init_imgui(GLFWwindow* window) {
     ImGui::StyleColorsClassic();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 460");
-
+}
+void destroy_imgui() {
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
 }
 
 void destroy_window(GLFWwindow* win) {

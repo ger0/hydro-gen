@@ -2,11 +2,13 @@
 #define HYDR_SHAD_HPP
 
 #include <GL/glew.h>
+#include <initializer_list>
+#include <string>
 
 class Shader_core {
 protected:
     GLuint program;
-    GLuint load_shader(GLenum shader_type, const char* filename);
+    GLuint load_shader(GLenum shader_type, std::initializer_list<std::string> filename);
 public:
     void use();
     GLuint u(const char* variable);
@@ -26,12 +28,8 @@ class Compute_program : public Shader_core {
 private:
     GLuint compute;
 public:
-    Compute_program(const char* file);
+    Compute_program(std::initializer_list<std::string> comput_files);
     ~Compute_program();
 };
-
-Shader_program* create_shader(const char* vert, const char* frag);
-Compute_program* create_shader(const char* comput);
-void destroy_shader(Shader_program* sp);
 
 #endif // HYDR_SHAD_HPP 

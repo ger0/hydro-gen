@@ -10,8 +10,10 @@
 constexpr u32 WINDOW_W = 800;
 constexpr u32 WINDOW_H = 600;
 
-constexpr auto vert_shader = "../glsl/vert.glsl";
-constexpr auto frag_shader = "../glsl/frag.glsl";
+constexpr auto vert_shader_file = "../glsl/vert.glsl";
+constexpr auto frag_shader_file = "../glsl/frag.glsl";
+constexpr auto compute_shader_file = "../glsl/compute.glsl";
+constexpr auto simplex_noise_file = "../glsl/simplex_noise.glsl";
 
 int main(int argc, char* argv[]) { 
     uint seed;
@@ -31,13 +33,43 @@ int main(int argc, char* argv[]) {
     assert(window.get() != nullptr);
 
     init_imgui(window.get());
+    defer {
+        destroy_imgui();
+    };
 
-    Uq_ptr<Shader_program, decltype(&destroy_shader)> shader(
-            create_shader(vert_shader, frag_shader),
-            destroy_shader
-        );
+    Shader_program shader(vert_shader_file, frag_shader_file);
+    Compute_program compute_shader({simplex_noise_file, compute_shader_file});
 
-    shader->use();
+    shader.use();
+
+    GLuint noise_buffer;
+    glGenBuffers(1, &noise_buffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, noise_buffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, 800 * sizeof(float) * 600, nullptr, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, noise_buffer);
+
+    GLuint noise_texture;
+    glGenTextures(1, &noise_texture);
+    glBindTexture(GL_TEXTURE_2D, noise_texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 800, 600, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glBindImageTexture(0, noise_texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+
+    compute_shader.use();
+    glDispatchCompute(800, 600, 1);
+
+    GLuint framebuffer;
+    glGenFramebuffers(1, &framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, noise_texture, 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        return EXIT_FAILURE;
+    }    
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    defer {
+        glDeleteFramebuffers(1, &framebuffer);
+        glDeleteTextures(1, &noise_texture);
+        glDeleteBuffers(1, &noise_buffer);
+    };
 
     float delta_time = 0.f;
     float last_frame = 0.f;
@@ -60,6 +92,9 @@ int main(int argc, char* argv[]) {
         // 2 rendering pass
         glViewport(0, 0, WINDOW_W, WINDOW_H);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+        glBlitFramebuffer(0, 0, 800, 600, 0, 0, 800, 600, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
         // imgui
         ImGui_ImplOpenGL3_NewFrame();

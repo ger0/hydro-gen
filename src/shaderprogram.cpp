@@ -1,7 +1,7 @@
 #include "shaderprogram.hpp"
 #include "utils.hpp"
 
-std::string read_file(const char* filename);
+std::string read_file(const std::string& filename);
 
 enum Log_type {
     SHADER,
@@ -10,12 +10,12 @@ enum Log_type {
 
 void err_log_shader(GLuint program, Log_type type);
 
-std::string read_file(const char* filename) {
+std::string read_file(const std::string& filename) {
     int f_size;
     FILE *file;
     char *data;
 
-    file = fopen(filename, "rb");
+    file = fopen(filename.c_str(), "rb");
     if (file != NULL) {
         fseek(file, 0, SEEK_END);
         f_size = ftell(file);
@@ -36,7 +36,7 @@ GLuint Shader_core::load_shader(GLenum shader_type, std::initializer_list<std::s
 
     std::string source_str = "";
     for (const auto& filename: filenames) {
-        std::string append_str = read_file(filename.c_str());
+        std::string append_str = read_file(filename);
         source_str += '\n' + append_str;
     }
     const GLchar* shader_source = source_str.c_str();

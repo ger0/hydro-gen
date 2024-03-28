@@ -14,8 +14,8 @@ void main() {
 
     // Generate random color values
     // vec4 color = vec4(rand(storePos), rand(storePos * 0.5), rand(storePos * 0.25), 1.0);
-    float col = (gln_sfbm(store_pos, opts) + 1) / 4;
-    vec4 color = vec4(col, col, col, 1.0);
+    float r = (gln_sfbm(store_pos, opts) + 1) / (2);
+    vec4 color = vec4(r, r, r, 1.0);
 
     // Store the generated color in the output buffer
     imageStore(destTex, store_pos, color);

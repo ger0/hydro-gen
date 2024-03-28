@@ -45,17 +45,17 @@ int main(int argc, char* argv[]) {
     GLuint noise_buffer;
     glGenBuffers(1, &noise_buffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, noise_buffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, 800 * sizeof(float) * 600, nullptr, GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, WINDOW_W * sizeof(float) * WINDOW_H, nullptr, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, noise_buffer);
 
     GLuint noise_texture;
     glGenTextures(1, &noise_texture);
     glBindTexture(GL_TEXTURE_2D, noise_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 800, 600, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, WINDOW_W, WINDOW_H, 0, GL_RGBA, GL_FLOAT, nullptr);
     glBindImageTexture(0, noise_texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
     compute_shader.use();
-    glDispatchCompute(800, 600, 1);
+    glDispatchCompute(WINDOW_W, WINDOW_H, 1);
 
     GLuint framebuffer;
     glGenFramebuffers(1, &framebuffer);
@@ -94,7 +94,7 @@ int main(int argc, char* argv[]) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-        glBlitFramebuffer(0, 0, 800, 600, 0, 0, 800, 600, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        glBlitFramebuffer(0, 0, WINDOW_W, WINDOW_H, 0, 0, WINDOW_W, WINDOW_H, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
         // imgui
         ImGui_ImplOpenGL3_NewFrame();

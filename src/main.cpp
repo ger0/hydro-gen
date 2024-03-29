@@ -7,12 +7,13 @@
 #include "shaderprogram.hpp"
 #include "utils.hpp"
 
-constexpr u32 WINDOW_W = 800;
-constexpr u32 WINDOW_H = 600;
+constexpr u32 WINDOW_W = 1280;
+constexpr u32 WINDOW_H = 720;
 
 constexpr auto vert_shader_file = "../glsl/vert.glsl";
 constexpr auto frag_shader_file = "../glsl/frag.glsl";
-constexpr auto compute_shader_file = "../glsl/compute.glsl";
+constexpr auto compute_noise_file = "../glsl/compute.glsl";
+constexpr auto compute_verts_file = "../glsl/compute_vertices.glsl";
 constexpr auto simplex_noise_file = "../glsl/simplex_noise.glsl";
 
 int main(int argc, char* argv[]) { 
@@ -38,9 +39,8 @@ int main(int argc, char* argv[]) {
     };
 
     Shader_program shader(vert_shader_file, frag_shader_file);
-    Compute_program compute_shader({simplex_noise_file, compute_shader_file});
-
-    shader.use();
+    Compute_program compute_noise({simplex_noise_file, compute_noise_file});
+    //Compute_program compute_verts({compute_verts_file});
 
     GLuint noise_buffer;
     glGenBuffers(1, &noise_buffer);
@@ -54,8 +54,8 @@ int main(int argc, char* argv[]) {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, WINDOW_W, WINDOW_H, 0, GL_RGBA, GL_FLOAT, nullptr);
     glBindImageTexture(0, noise_texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
-    compute_shader.use();
-    glDispatchCompute(WINDOW_W, WINDOW_H, 1);
+    compute_noise.use();
+    glDispatchCompute(WINDOW_W / 8, WINDOW_H / 8, 1);
 
     GLuint framebuffer;
     glGenFramebuffers(1, &framebuffer);
@@ -73,6 +73,8 @@ int main(int argc, char* argv[]) {
 
     float delta_time = 0.f;
     float last_frame = 0.f;
+
+    shader.use();
 
     while (!glfwWindowShouldClose(window.get())) {
         float current_frame = glfwGetTime();

@@ -1,7 +1,9 @@
 #version 460 core
 layout (location = 0)in vec3 vertex;
-layout (location = 1)in vec3 normal;
-layout (location = 2)in vec4 color;
+layout (location = 1)in vec3 normal_old;
+vec3 normal = vec3(0.0, 1.0, 0.0);
+// layout (location = 2)in vec4 color;
+vec4 color = vec4(1.0, 1.0, 1.0, 1.0);
 //layout (location = 2)in unsigned blockType;
 
 uniform mat4 P, V, M;

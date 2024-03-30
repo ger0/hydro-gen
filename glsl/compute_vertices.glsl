@@ -1,38 +1,39 @@
 #version 460
 
-layout (std430, binding = 0) buffer dims {
-    ivec2 dims;
+layout (local_size_x = 8, local_size_y = 8) in;
+layout (std140, binding = 0) uniform config {
+    ivec2 hmap_dims;
+    uint vert_buff_size;
 };
-
-// Textures
-uniform sampler2D heightmap;  // heightmap texture
-
-// Buffer for storing vertex data (replace with your actual binding point)
-buffer VertexBuffer {
-    vec4 data[];
-} vertices;
+struct Vertex {
+    vec4 pos;
+    vec4 norm;
+};
+layout (std140, binding = 1) buffer Vertex_buffer {
+    Vertex verts[];
+};
+layout (rgba32f, binding = 2) uniform readonly image2D heightmap;
 
 void main() {
-    // Calculate index into the output vertex buffer based on thread ID
-    uint idx = gl_LocalInvocationID.x + gl_LocalInvocationID.y * HEIGHTMAP_WIDTH;
+    uint idx = gl_LocalInvocationID.x + gl_LocalInvocationID.y * hmap_dims.x;
 
     // Check for out-of-bounds access
-    if (idx >= vertices.data.length()) {
+    if (idx >= verts.length()) {
         return;
     }
 
     // Sample height from the heightmap texture
-    float height = texture(heightmap, vec2(gl_LocalInvocationID.xy) / vec2(HEIGHTMAP_WIDTH - 1, HEIGHTMAP_HEIGHT - 1)).r;
+    float height = imageLoad(heightmap, ivec2(gl_LocalInvocationID.xy) / ivec2(hmap_dims.x - 1, hmap_dims.y - 1)).r;
 
     // Calculate vertex position based on thread ID and heightmap value
-    float x = float(gl_LocalInvocationID.x) / (HEIGHTMAP_WIDTH - 1.0f);
+    float x = float(gl_LocalInvocationID.x) / (hmap_dims.x - 1.0f);
     float y = 0.0f;  // Assuming flat terrain for simplicity, adjust for uneven terrain
-    float z = float(gl_LocalInvocationID.y) / (HEIGHTMAP_HEIGHT - 1.0f);
-    float worldY = height;  // Scale heightmap value to world space
+    float z = float(gl_LocalInvocationID.y) / (hmap_dims.y - 1.0f);
+    float world_y = height;  // Scale heightmap value to world space
 
-    // Create vertex data
-    vertexData.position = vec4(x, worldY, z, 1.0f);  // 1.0f for w component (homogeneous clip space)
+    Vertex vert;
+    vert.pos = vec4(x, world_y, z, 1.0f);  // 1.0f for w component (homogeneous clip space)
+    // create vert.norm
 
-    // Write vertex data to output buffer
-    vertices.data[idx] = vertexData.position;
+    verts[idx] = vert;
 }

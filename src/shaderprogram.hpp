@@ -28,6 +28,7 @@ class Compute_program : public Shader_core {
 private:
     GLuint compute;
 public:
+    void ub_bind(GLchar* variable, GLint bind); // uniform block bind
     Compute_program(std::initializer_list<std::string> comput_files);
     ~Compute_program();
 };

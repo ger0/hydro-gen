@@ -129,6 +129,11 @@ GLuint Shader_core::u(const char* variable) {
     return glGetUniformLocation(program, variable);
 }
 
+void Compute_program::ub_bind(GLchar* variable, GLint bind) {
+    GLuint idx = glGetUniformBlockIndex(program, variable);
+    glUniformBlockBinding(program, idx, bind);
+}
+
 GLuint Shader_core::a(const char* attribute) {
     return glGetAttribLocation(program, attribute);
 }

@@ -2,12 +2,11 @@
 
 layout (local_size_x = 8, local_size_y = 8) in;
 
-layout (std140, binding = 0) uniform config {
-    ivec2   hmap_dims;
+layout (binding = 0) uniform config {
+    ivec2 hmap_dims;
+    vec3 sky_color;
+    uint clip_range;
 };
-
-uniform uint    clip_range;
-uniform vec3    sky_color;
 
 uniform mat4 perspective;
 uniform mat4 view;
@@ -47,10 +46,9 @@ void main() {
     vec3 ray_dir = normalize(ray_end.xyz / ray_end.w - ray_start.xyz / ray_start.w);
 
     vec4 color = raymarch(ray_start.xyz / ray_start.w, ray_dir);
-    /* color = imageLoad(heightmap, pixel);
+    color = imageLoad(heightmap, pixel);
     color.r *= dir.x;
     color.g *= dir.y;
-    color.b *= dir.z; */
-
+    color.b *= dir.z; 
     imageStore(out_tex, pixel, color);
 }

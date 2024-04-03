@@ -11,7 +11,6 @@ protected:
     GLuint load_shader(GLenum shader_type, std::initializer_list<std::string> filename);
 public:
     void use();
-    GLuint u(const char* variable);
     GLuint a(const char* attribute);
 
     template<typename T>
@@ -31,7 +30,7 @@ class Compute_program : public Shader_core {
 private:
     GLuint compute;
 public:
-    void ub_bind(GLchar* variable, GLint bind); // uniform block bind
+    void ub_bind(const char* variable, GLuint bind);
     Compute_program(std::initializer_list<std::string> comput_files);
     ~Compute_program();
 };

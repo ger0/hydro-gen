@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
@@ -181,33 +182,30 @@ int main(int argc, char* argv[]) {
 
     compute_output.use();
 
+    // configuration
+    struct Compute_config {
+        alignas(16) ivec2 dims = ivec2(WINDOW_W, WINDOW_H);
+        alignas(16) vec3 sky_color = vec3(0.45, 0.716, 0.914);
+        alignas(16) glm::uint clip_range= Z_FAR;
+    } conf_buff;
+
+    LOG_DBG("size of dims: {}", sizeof(conf_buff.dims));
+    LOG_DBG("offset of 1: {}", offsetof(Compute_config, dims));
+    LOG_DBG("offset of 2: {}", offsetof(Compute_config, sky_color));
+    LOG_DBG("offset of 3: {}", offsetof(Compute_config, clip_range));
+
     GLuint ubo_config;
     glGenBuffers(1, &ubo_config);
     defer { glDeleteBuffers(1, &ubo_config); };
 
-    // configuration
-    struct Compute_config {
-        ivec2 dims      = ivec2(total_size, total_size);
-    } comput_conf;
-
     glBindBuffer(GL_UNIFORM_BUFFER, ubo_config);
     glBufferData(
         GL_UNIFORM_BUFFER, 
-        sizeof(comput_conf), &comput_conf, 
+        sizeof(conf_buff), &conf_buff, 
         GL_STATIC_DRAW
     );
-    compute_output.ub_bind((GLchar*)"config", ubo_config);
-
-    vec3 sky_color  = vec3(0.45, 0.716, 0.914);
-    glm::uint clip_range= Z_FAR;
-	compute_output.set_uniform("sky_color", sky_color);
-	compute_output.set_uniform("clip_range", clip_range);
-
-    GLuint ubo_camera;
-    glGenBuffers(1, &ubo_camera);
-    defer { glDeleteBuffers(1, &ubo_camera); };
-
-    glBindBuffer(GL_UNIFORM_BUFFER, ubo_camera);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    compute_output.ub_bind("config", ubo_config);
 
     using glm::lookAt, glm::perspective, glm::radians;
 
@@ -293,8 +291,6 @@ int main(int argc, char* argv[]) {
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
-        auto out_tex = compute_output.u("out_tex");
-
         glm::mat4 view = lookAt(
 	        camera.pos, 
 	        camera.pos + camera.dir, 
@@ -311,24 +307,7 @@ int main(int argc, char* argv[]) {
 	    compute_output.set_uniform("dir", camera.dir);
 	    compute_output.set_uniform("pos", camera.pos);
 
-        glUniform1i(out_tex, 3);
-        glBindImageTexture(
-            3, 
-            output_texture, 0, 
-            GL_FALSE, 
-            0, 
-            GL_WRITE_ONLY, 
-            GL_RGBA32F
-        );
-
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-        glFramebufferTexture2D(
-            GL_FRAMEBUFFER, 
-            GL_COLOR_ATTACHMENT0, 
-            GL_TEXTURE_2D, 
-            output_texture, 
-            0
-        );
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER)
                 != GL_FRAMEBUFFER_COMPLETE) {
             LOG_ERR("FRAMEBUFFER INCOMPLETE!");

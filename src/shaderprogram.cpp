@@ -127,13 +127,13 @@ void Shader_core::use() {
     glUseProgram(program);
 }
 
-GLuint Shader_core::u(const char* variable) {
-    return glGetUniformLocation(program, variable);
-}
-
-void Compute_program::ub_bind(GLchar* variable, GLint bind) {
+void Compute_program::ub_bind(const char* variable, GLuint bind) {
     GLuint idx = glGetUniformBlockIndex(program, variable);
-    glUniformBlockBinding(program, idx, bind);
+    if (idx == GL_INVALID_INDEX) {
+        LOG_ERR("ERROR: Invalid buffer block index");
+    }
+    // glUniformBlockBinding(program, idx, bind);
+    glBindBufferBase(GL_UNIFORM_BUFFER, idx, bind);
 }
 
 GLuint Shader_core::a(const char* attribute) {

@@ -80,20 +80,21 @@ void key_callback(GLFWwindow *window,
         int key, int scancode, 
         int act, int mod) {
 	float speed = 20.f * delta_time * (camera.boost ? 4.f : 1.f);
-	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+	constexpr auto& gkey = glfwGetKey;
+	if (gkey(window, GLFW_KEY_W) == GLFW_PRESS)
 		camera.pos += speed * camera.dir;
-	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+	if (gkey(window, GLFW_KEY_S) == GLFW_PRESS)
 		camera.pos -= speed * camera.dir;
-	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+	if (gkey(window, GLFW_KEY_A) == GLFW_PRESS)
 		camera.pos -= 
 			normalize(cross(camera.dir, camera.up)) * speed;
-	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+	if (gkey(window, GLFW_KEY_D) == GLFW_PRESS)
     	camera.pos += 
     		normalize(cross(camera.dir, camera.up)) * speed;
-	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+	if (gkey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
 		camera.boost = true;
 	}
-	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE) {
+	if (gkey(window, GLFW_KEY_SPACE) == GLFW_RELEASE) {
 		camera.boost = false;
 	}
 }
@@ -109,9 +110,9 @@ int main(int argc, char* argv[]) {
     }
 
     Uq_ptr<GLFWwindow, decltype(&destroy_window)> window(
-            init_window(glm::uvec2{WINDOW_W, WINDOW_H}, "Game"),
-            destroy_window
-        );
+        init_window(glm::uvec2{WINDOW_W, WINDOW_H}, "Game"),
+        destroy_window
+    );
 
 	glfwSetInputMode(window.get(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	glfwSetCursorPosCallback(window.get(), mouse_callback);
@@ -173,31 +174,21 @@ int main(int argc, char* argv[]) {
     defer { glDeleteFramebuffers(1, &framebuffer); };
 
     // ---------- output framebuffer  ---------------
-    compute_output.use();
-    GLuint ubo_config, ubo_camera;
-    glGenBuffers(1, &ubo_config);
-    defer { glDeleteBuffers(1, &ubo_config); };
-    glGenBuffers(1, &ubo_camera);
-    defer { glDeleteBuffers(1, &ubo_camera); };
 
     constexpr u32 group_size = 8;
     constexpr u32 chunk_size = 8;
     constexpr u32 total_size = group_size * chunk_size;
 
+    compute_output.use();
+
+    GLuint ubo_config;
+    glGenBuffers(1, &ubo_config);
+    defer { glDeleteBuffers(1, &ubo_config); };
+
     // configuration
     struct Compute_config {
         ivec2 dims      = ivec2(total_size, total_size);
-        vec3 sky_color  = vec3(0.45, 0.716, 0.914);
-        glm::uint clip_range= Z_FAR;
     } comput_conf;
-
-    struct Compute_camera {
-        glm::mat4 perspective;
-        glm::mat4 view;
-
-        vec3 dir;
-        vec3 pos;
-    } comput_cam;
 
     glBindBuffer(GL_UNIFORM_BUFFER, ubo_config);
     glBufferData(
@@ -206,30 +197,19 @@ int main(int argc, char* argv[]) {
         GL_STATIC_DRAW
     );
     compute_output.ub_bind((GLchar*)"config", ubo_config);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo_config);
+
+    vec3 sky_color  = vec3(0.45, 0.716, 0.914);
+    glm::uint clip_range= Z_FAR;
+	compute_output.set_uniform("sky_color", sky_color);
+	compute_output.set_uniform("clip_range", clip_range);
+
+    GLuint ubo_camera;
+    glGenBuffers(1, &ubo_camera);
+    defer { glDeleteBuffers(1, &ubo_camera); };
 
     glBindBuffer(GL_UNIFORM_BUFFER, ubo_camera);
 
     using glm::lookAt, glm::perspective, glm::radians;
-	comput_cam.view = lookAt(
-	    camera.pos, 
-	    camera.pos + camera.dir, 
-	    camera.up
-	);
-	comput_cam.perspective = perspective(
-	    radians(FOV), 
-	    ASPECT_RATIO, 
-	    Z_NEAR, Z_FAR
-	);
-
-    glBufferData(
-        GL_UNIFORM_BUFFER, 
-        sizeof(comput_cam), &comput_cam, 
-        GL_STATIC_DRAW
-    );
-
-    compute_output.ub_bind((GLchar*)"camera", ubo_camera);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo_config);
 
     glBindTexture(GL_TEXTURE_2D, noise_texture);
     glTexImage2D(
@@ -276,7 +256,8 @@ int main(int argc, char* argv[]) {
         GL_RGBA, GL_FLOAT, 
         nullptr
     );
-    glBindImageTexture(3, 
+    glBindImageTexture(
+        3, 
         output_texture, 0, 
         GL_FALSE, 
         0, 
@@ -308,23 +289,36 @@ int main(int argc, char* argv[]) {
 
         glfwPollEvents();
 
-	    comput_cam.view = glm::lookAt(
+        compute_output.use();
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+        auto out_tex = compute_output.u("out_tex");
+
+        glm::mat4 view = lookAt(
 	        camera.pos, 
 	        camera.pos + camera.dir, 
 	        camera.up
 	    );
-	    comput_cam.dir = camera.dir;
-	    comput_cam.pos = camera.pos;
+        glm::mat4 projection = perspective(
+	        radians(FOV), 
+	        ASPECT_RATIO, 
+	        Z_NEAR, Z_FAR
+	    );
+	    compute_output.set_uniform("view", view);
+	    compute_output.set_uniform("projection", projection);
 
-        compute_output.use();
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+	    compute_output.set_uniform("dir", camera.dir);
+	    compute_output.set_uniform("pos", camera.pos);
 
-        compute_output.ub_bind((GLchar*)"camera", ubo_camera);
-        glBindBuffer(GL_UNIFORM_BUFFER, ubo_camera);
-        glBufferData(
-            GL_SHADER_STORAGE_BUFFER, 
-            sizeof(comput_cam), &comput_cam, 
-            GL_DYNAMIC_DRAW
+        glUniform1i(out_tex, 3);
+        glBindImageTexture(
+            3, 
+            output_texture, 0, 
+            GL_FALSE, 
+            0, 
+            GL_WRITE_ONLY, 
+            GL_RGBA32F
         );
 
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
@@ -342,7 +336,9 @@ int main(int argc, char* argv[]) {
         }    
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glDispatchCompute(WINDOW_W / 8, WINDOW_H / 8, 1);
+
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
         glClear(GL_COLOR_BUFFER_BIT);
 

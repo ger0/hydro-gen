@@ -1,6 +1,8 @@
 #include "shaderprogram.hpp"
 #include "utils.hpp"
+#include <glm/gtc/type_ptr.hpp>
 
+using namespace glm;
 std::string read_file(const std::string& filename);
 
 enum Log_type {
@@ -136,4 +138,84 @@ void Compute_program::ub_bind(GLchar* variable, GLint bind) {
 
 GLuint Shader_core::a(const char* attribute) {
     return glGetAttribLocation(program, attribute);
+}
+
+template<>
+void Shader_core::set_uniform(const char* id, bool const& v) {
+    glUniform1i(glGetUniformLocation(program, id), v);
+}
+
+template<>
+void Shader_core::set_uniform(const char* id, uint const& v) {
+    glUniform1ui(glGetUniformLocation(program, id), v);
+}
+
+template<>
+void Shader_core::set_uniform(const char* id, uvec2 const& v) {
+    glUniform2uiv(glGetUniformLocation(program, id), 1, glm::value_ptr(v));
+}
+
+template<>
+void Shader_core::set_uniform(const char* id, uvec3 const& v) {
+    glUniform3uiv(glGetUniformLocation(program, id), 1, glm::value_ptr(v));
+}
+
+template<>
+void Shader_core::set_uniform(const char* id, uvec4 const& v) {
+    glUniform4uiv(glGetUniformLocation(program, id), 1, glm::value_ptr(v));
+}
+
+template<>
+void Shader_core::set_uniform(const char* id, int const& v) {
+    glUniform1i(glGetUniformLocation(program, id), v);
+}
+
+template<>
+void Shader_core::set_uniform(const char* id, ivec2 const& v) {
+    glUniform2iv(glGetUniformLocation(program, id), 1, glm::value_ptr(v));
+}
+
+template<>
+void Shader_core::set_uniform(const char* id, ivec3 const& v) {
+    glUniform3iv(glGetUniformLocation(program, id), 1, glm::value_ptr(v));
+}
+
+template<>
+void Shader_core::set_uniform(const char* id, ivec4 const& v) {
+    glUniform4iv(glGetUniformLocation(program, id), 1, glm::value_ptr(v));
+}
+
+template<>
+void Shader_core::set_uniform(const char* id, float const& v) {
+    glUniform1f(glGetUniformLocation(program, id), v);
+}
+
+template<>
+void Shader_core::set_uniform(const char* id, vec2 const& v) {
+    glUniform2fv(glGetUniformLocation(program, id), 1, glm::value_ptr(v));
+}
+
+template<>
+void Shader_core::set_uniform(const char* id, vec3 const& v) {
+    glUniform3fv(glGetUniformLocation(program, id), 1, glm::value_ptr(v));
+}
+
+template<>
+void Shader_core::set_uniform(const char* id, vec4 const& v) {
+    glUniform4fv(glGetUniformLocation(program, id), 1, glm::value_ptr(v));
+}
+
+template<>
+void Shader_core::set_uniform(const char* id, mat2 const& v) {
+    glUniformMatrix2fv(glGetUniformLocation(program, id), 1, GL_FALSE, glm::value_ptr(v));
+}
+
+template<>
+void Shader_core::set_uniform(const char* id, mat3 const& v) {
+    glUniformMatrix3fv(glGetUniformLocation(program, id), 1, GL_FALSE, glm::value_ptr(v));
+}
+
+template<>
+void Shader_core::set_uniform(const char* id, mat4 const& v) {
+    glUniformMatrix4fv(glGetUniformLocation(program, id), 1, GL_FALSE, glm::value_ptr(v));
 }

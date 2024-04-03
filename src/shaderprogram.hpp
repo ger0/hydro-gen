@@ -13,6 +13,9 @@ public:
     void use();
     GLuint u(const char* variable);
     GLuint a(const char* attribute);
+
+    template<typename T>
+    void set_uniform(const char* id, T const& v);
 };
 
 class Shader_program : public Shader_core {

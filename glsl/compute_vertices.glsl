@@ -2,23 +2,18 @@
 
 layout (local_size_x = 8, local_size_y = 8) in;
 
-float rand(vec2 co) {
-    return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
-}
-
 layout (std140, binding = 0) uniform config {
     ivec2   hmap_dims;
-    vec3    sky_color;
-    uint    clip_range;
 };
 
-layout (std140, binding = 1) uniform camera {
-    mat4 perspective;
-    mat4 view;
+uniform uint    clip_range;
+uniform vec3    sky_color;
 
-    vec3 dir;
-    vec3 pos;
-};
+uniform mat4 perspective;
+uniform mat4 view;
+
+uniform vec3 dir;
+uniform vec3 pos;
 
 layout (rgba32f, binding = 2) uniform readonly image2D heightmap;
 
@@ -52,10 +47,10 @@ void main() {
     vec3 ray_dir = normalize(ray_end.xyz / ray_end.w - ray_start.xyz / ray_start.w);
 
     vec4 color = raymarch(ray_start.xyz / ray_start.w, ray_dir);
-    color = imageLoad(heightmap, pixel);
-    color.r = dir.x;
-    //color.g += dir.y;
-    //color.b += dir.z;
+    /* color = imageLoad(heightmap, pixel);
+    color.r *= dir.x;
+    color.g *= dir.y;
+    color.b *= dir.z; */
 
     imageStore(out_tex, pixel, color);
 }

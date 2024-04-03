@@ -30,6 +30,7 @@ static float last_frame = 0.f;
 
 using glm::normalize, glm::cross;
 using glm::vec2, glm::vec3, glm::ivec2, glm::ivec3;
+using glm::vec4, glm::ivec4;
 
 // mouse position
 static vec2 mouse_last;
@@ -166,6 +167,8 @@ int main(int argc, char* argv[]) {
         GL_WRITE_ONLY, 
         GL_RGBA32F
     );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     compute_noise.use();
     glDispatchCompute(WINDOW_W / 8, WINDOW_H / 8, 1);
@@ -280,6 +283,8 @@ int main(int argc, char* argv[]) {
 
     glDispatchCompute(WINDOW_W / 8, WINDOW_H / 8, 1);
 
+
+
     while (!glfwWindowShouldClose(window.get())) {
         float current_frame = glfwGetTime();
         delta_time = current_frame - last_frame;
@@ -291,18 +296,60 @@ int main(int argc, char* argv[]) {
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
-        glm::mat4 view = lookAt(
+        glm::mat4 mat_v = lookAt(
 	        camera.pos, 
 	        camera.pos + camera.dir, 
 	        camera.up
 	    );
-        glm::mat4 projection = perspective(
+        glm::mat4 mat_p = perspective(
 	        radians(FOV), 
 	        ASPECT_RATIO, 
 	        Z_NEAR, Z_FAR
 	    );
-	    compute_output.set_uniform("view", view);
-	    compute_output.set_uniform("projection", projection);
+
+        // vec4 ray_start = vec4(camera.pos, 1.f);
+
+        vec4 ray_start = 
+            vec4(0.0, 0.0, -1.0, 1.f);
+        vec4 ray_end = 
+            vec4(0.0, 0.0, 1.0, 1.f);
+        
+        ray_start = 
+            inverse(mat_p) * ray_start;
+        ray_end = 
+            inverse(mat_p) * ray_end;
+
+        ray_start /= ray_start.w;
+        ray_end /= ray_end.w;
+
+        ray_start = inverse(mat_v) * ray_start;
+        ray_end = inverse(mat_v) * ray_end;
+
+        ray_start /= ray_start.w;
+        ray_end /= ray_end.w;
+
+        vec3 ray_dir = 
+            normalize(vec3(ray_end) - vec3(ray_start));
+
+        LOG_DBG("start:: {:.2f} {:.2f} {:.2f}", 
+            ray_start.x,
+            ray_start.y,
+            ray_start.z
+        );
+
+        LOG_DBG("end:: {:.2f} {:.2f} {:.2f}", 
+            ray_end.x,
+            ray_end.y,
+            ray_end.z
+        );
+        LOG_DBG("ray dir:   {:.2f} {:.2f} {:.2f}", 
+            ray_dir.x,
+            ray_dir.y,
+            ray_dir.z
+        );
+
+	    compute_output.set_uniform("view", mat_v);
+	    compute_output.set_uniform("perspective", mat_p);
 
 	    compute_output.set_uniform("dir", camera.dir);
 	    compute_output.set_uniform("pos", camera.pos);

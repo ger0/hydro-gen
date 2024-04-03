@@ -35,7 +35,7 @@ using glm::vec4, glm::ivec4;
 // mouse position
 static vec2 mouse_last;
 static struct Camera {
-	vec3 pos    = vec3(0.f, 3.f, 3.f);
+	vec3 pos    = vec3(100.f, 3.f, 100.f);
 	vec3 dir    = vec3(0.f, 3.f, 0.f);
 
 	vec3 _def_dir = normalize(pos - dir);
@@ -81,7 +81,10 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
 void key_callback(GLFWwindow *window, 
         int key, int scancode, 
         int act, int mod) {
+    constexpr float speed_cap = 4.0f;
 	float speed = 20.f * delta_time * (camera.boost ? 4.f : 1.f);
+	speed = speed > speed_cap ? speed_cap : speed;
+    
 	constexpr auto& gkey = glfwGetKey;
 	if (gkey(window, GLFW_KEY_W) == GLFW_PRESS)
 		camera.pos += speed * camera.dir;
@@ -133,6 +136,7 @@ int main(int argc, char* argv[]) {
     );
 
     // ----------- noise generation ---------------
+    constexpr GLuint noise_size = 4096;
     GLuint noise_buffer;
     glGenBuffers(1, &noise_buffer);
     defer { glDeleteBuffers(1, &noise_buffer); };
@@ -154,7 +158,7 @@ int main(int argc, char* argv[]) {
         GL_TEXTURE_2D,
         0,
         GL_RGBA32F,
-        WINDOW_W, WINDOW_H,
+        noise_size, noise_size,
         0, 
         GL_RGBA, GL_FLOAT,
         nullptr
@@ -171,7 +175,7 @@ int main(int argc, char* argv[]) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     compute_noise.use();
-    glDispatchCompute(WINDOW_W / 8, WINDOW_H / 8, 1);
+    glDispatchCompute(noise_size / 8, noise_size / 8, 1);
 
     GLuint framebuffer;
     glGenFramebuffers(1, &framebuffer);
@@ -187,15 +191,10 @@ int main(int argc, char* argv[]) {
 
     // configuration
     struct Compute_config {
-        alignas(16) ivec2 dims = ivec2(WINDOW_W, WINDOW_H);
-        alignas(16) vec3 sky_color = vec3(0.45, 0.716, 0.914);
-        alignas(16) glm::uint clip_range= Z_FAR;
+        alignas(16) ivec2 dims          = ivec2(noise_size, noise_size);
+        alignas(16) vec4 sky_color      = vec4(0.45, 0.716, 0.914, 1);
+        alignas(16) vec4 water_color    = vec4(0.15, 0.216, 0.614, 1);
     } conf_buff;
-
-    LOG_DBG("size of dims: {}", sizeof(conf_buff.dims));
-    LOG_DBG("offset of 1: {}", offsetof(Compute_config, dims));
-    LOG_DBG("offset of 2: {}", offsetof(Compute_config, sky_color));
-    LOG_DBG("offset of 3: {}", offsetof(Compute_config, clip_range));
 
     GLuint ubo_config;
     glGenBuffers(1, &ubo_config);
@@ -217,7 +216,7 @@ int main(int argc, char* argv[]) {
         GL_TEXTURE_2D, 
         0, 
         GL_RGBA32F, 
-        WINDOW_W, WINDOW_H, 
+        noise_size, noise_size, 
         0, 
         GL_RGBA, GL_FLOAT, 
         nullptr
@@ -283,8 +282,6 @@ int main(int argc, char* argv[]) {
 
     glDispatchCompute(WINDOW_W / 8, WINDOW_H / 8, 1);
 
-
-
     while (!glfwWindowShouldClose(window.get())) {
         float current_frame = glfwGetTime();
         delta_time = current_frame - last_frame;
@@ -306,47 +303,6 @@ int main(int argc, char* argv[]) {
 	        ASPECT_RATIO, 
 	        Z_NEAR, Z_FAR
 	    );
-
-        // vec4 ray_start = vec4(camera.pos, 1.f);
-
-        vec4 ray_start = 
-            vec4(0.0, 0.0, -1.0, 1.f);
-        vec4 ray_end = 
-            vec4(0.0, 0.0, 1.0, 1.f);
-        
-        ray_start = 
-            inverse(mat_p) * ray_start;
-        ray_end = 
-            inverse(mat_p) * ray_end;
-
-        ray_start /= ray_start.w;
-        ray_end /= ray_end.w;
-
-        ray_start = inverse(mat_v) * ray_start;
-        ray_end = inverse(mat_v) * ray_end;
-
-        ray_start /= ray_start.w;
-        ray_end /= ray_end.w;
-
-        vec3 ray_dir = 
-            normalize(vec3(ray_end) - vec3(ray_start));
-
-        LOG_DBG("start:: {:.2f} {:.2f} {:.2f}", 
-            ray_start.x,
-            ray_start.y,
-            ray_start.z
-        );
-
-        LOG_DBG("end:: {:.2f} {:.2f} {:.2f}", 
-            ray_end.x,
-            ray_end.y,
-            ray_end.z
-        );
-        LOG_DBG("ray dir:   {:.2f} {:.2f} {:.2f}", 
-            ray_dir.x,
-            ray_dir.y,
-            ray_dir.z
-        );
 
 	    compute_output.set_uniform("view", mat_v);
 	    compute_output.set_uniform("perspective", mat_p);

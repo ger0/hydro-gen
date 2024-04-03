@@ -68,7 +68,7 @@ GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title) {
     glfwInit();
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
@@ -86,9 +86,11 @@ GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title) {
         LOG_ERR("Failed to initialise GLEW!");
         return nullptr;
     }
+#ifdef DEBUG
     glEnable(GL_DEBUG_OUTPUT);
     glDebugMessageCallback(gl_error_callback, 0);
-    
+#endif
+
     return win;
 }
 

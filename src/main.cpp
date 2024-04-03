@@ -18,8 +18,6 @@ constexpr float Z_FAR = 128.f;
 constexpr float FOV = 90.f;
 constexpr float ASPECT_RATIO = float(WINDOW_W) / WINDOW_H;
 
-constexpr auto vert_shader_file = "../glsl/vert.glsl";
-constexpr auto frag_shader_file = "../glsl/frag.glsl";
 constexpr auto compute_noise_file = "../glsl/compute.glsl";
 constexpr auto compute_verts_file = "../glsl/compute_vertices.glsl";
 constexpr auto simplex_noise_file = "../glsl/simplex_noise.glsl";
@@ -29,22 +27,25 @@ constexpr auto simplex_noise_file = "../glsl/simplex_noise.glsl";
 static float delta_time = 0.f;
 static float last_frame = 0.f;
 
+using glm::normalize, glm::cross;
+using glm::vec2, glm::vec3, glm::ivec2, glm::ivec3;
+
 // mouse position
-static glm::vec2 mouse_last;
+static vec2 mouse_last;
 static struct Camera {
-	glm::vec3 pos       = glm::vec3(0.f, 3.f, 3.f);
-	glm::vec3 target    = glm::vec3(0.f, 3.f, 0.f);
-	glm::vec3 dir       = glm::normalize(pos - target);
+	vec3 pos    = vec3(0.f, 3.f, 3.f);
+	vec3 dir    = vec3(0.f, 3.f, 0.f);
 
-	const float speed = 0.05f;
+	vec3 _def_dir = normalize(pos - dir);
+	static constexpr float speed = 0.05f;
 
-	bool boost = false;	
-
-	glm::vec3 right     = glm::normalize(glm::cross(glm::vec3(0,1,0), dir));
-	glm::vec3 up        = glm::cross(dir, right);
+	vec3 right  = normalize(cross(vec3(0,1,0), _def_dir));
+	vec3 up     = cross(_def_dir, right);
 
 	float yaw   = -90.f;
 	float pitch = 0.f;
+
+	bool boost  = false;	
 } camera;
 
 void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
@@ -66,25 +67,29 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
 	if (camera.pitch < -89.f) {
 		camera.pitch = -89.f;
 	}
-	glm::vec3 direction;
-	direction.x = cos(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
+	vec3 direction;
+	direction.x = cos(glm::radians(camera.yaw)) 
+	    * cos(glm::radians(camera.pitch));
 	direction.y = sin(glm::radians(camera.pitch));
-	direction.z = sin(glm::radians(camera.yaw)) * cos(glm::radians(camera.pitch));
-	camera.target = glm::normalize(direction);
+	direction.z = sin(glm::radians(camera.yaw)) 
+	    * cos(glm::radians(camera.pitch));
+	camera.dir = normalize(direction);
 }
 
-void key_callback(GLFWwindow *window, int key, int scancode, int act, int mod) {
+void key_callback(GLFWwindow *window, 
+        int key, int scancode, 
+        int act, int mod) {
 	float speed = 20.f * delta_time * (camera.boost ? 4.f : 1.f);
 	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-		camera.pos += speed * camera.target;
+		camera.pos += speed * camera.dir;
 	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-		camera.pos -= speed * camera.target;
+		camera.pos -= speed * camera.dir;
 	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
 		camera.pos -= 
-			glm::normalize(glm::cross(camera.target, camera.up)) * speed;
+			normalize(cross(camera.dir, camera.up)) * speed;
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
     	camera.pos += 
-    		glm::normalize(glm::cross(camera.target, camera.up)) * speed;
+    		normalize(cross(camera.dir, camera.up)) * speed;
 	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
 		camera.boost = true;
 	}
@@ -117,9 +122,12 @@ int main(int argc, char* argv[]) {
     init_imgui(window.get());
     defer { destroy_imgui(); };
 
-    Shader_program shader(vert_shader_file, frag_shader_file);
-    Compute_program compute_noise({simplex_noise_file, compute_noise_file});
-    Compute_program compute_verts({compute_verts_file});
+    Compute_program compute_noise(
+        {simplex_noise_file, compute_noise_file}
+    );
+    Compute_program compute_output(
+        {compute_verts_file}
+    );
 
     // ----------- noise generation ---------------
     GLuint noise_buffer;
@@ -127,7 +135,11 @@ int main(int argc, char* argv[]) {
     defer { glDeleteBuffers(1, &noise_buffer); };
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, noise_buffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, WINDOW_W * sizeof(float) * WINDOW_H, nullptr, GL_STATIC_DRAW);
+    glBufferData(
+        GL_SHADER_STORAGE_BUFFER, 
+        WINDOW_W * sizeof(float) * WINDOW_H, nullptr, 
+        GL_STATIC_DRAW
+    );
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, noise_buffer);
 
     GLuint noise_texture;
@@ -135,8 +147,23 @@ int main(int argc, char* argv[]) {
     defer { glDeleteTextures(1, &noise_texture); };
 
     glBindTexture(GL_TEXTURE_2D, noise_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, WINDOW_W, WINDOW_H, 0, GL_RGBA, GL_FLOAT, nullptr);
-    glBindImageTexture(0, noise_texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    glTexImage2D(
+        GL_TEXTURE_2D,
+        0,
+        GL_RGBA32F,
+        WINDOW_W, WINDOW_H,
+        0, 
+        GL_RGBA, GL_FLOAT,
+        nullptr
+    );
+    glBindImageTexture(
+        0, 
+        noise_texture, 0, 
+        GL_FALSE, 
+        0, 
+        GL_WRITE_ONLY, 
+        GL_RGBA32F
+    );
 
     compute_noise.use();
     glDispatchCompute(WINDOW_W / 8, WINDOW_H / 8, 1);
@@ -146,7 +173,7 @@ int main(int argc, char* argv[]) {
     defer { glDeleteFramebuffers(1, &framebuffer); };
 
     // ---------- output framebuffer  ---------------
-    compute_verts.use();
+    compute_output.use();
     GLuint ubo_config, ubo_camera;
     glGenBuffers(1, &ubo_config);
     defer { glDeleteBuffers(1, &ubo_config); };
@@ -159,53 +186,120 @@ int main(int argc, char* argv[]) {
 
     // configuration
     struct Compute_config {
-        glm::vec2 dims = glm::ivec2(total_size, total_size);
-        glm::vec3 sky_color = glm::vec3(0.45, 0.716, 0.914);
-        float clip_range = Z_FAR;
+        ivec2 dims      = ivec2(total_size, total_size);
+        vec3 sky_color  = vec3(0.45, 0.716, 0.914);
+        glm::uint clip_range= Z_FAR;
     } comput_conf;
 
     struct Compute_camera {
         glm::mat4 perspective;
         glm::mat4 view;
 
-        glm::vec3 dir;
-        glm::vec3 pos;
+        vec3 dir;
+        vec3 pos;
     } comput_cam;
 
     glBindBuffer(GL_UNIFORM_BUFFER, ubo_config);
-    glBufferData(GL_UNIFORM_BUFFER, sizeof(comput_conf), &comput_conf, GL_STATIC_DRAW);
-    compute_verts.ub_bind((GLchar*)"config", ubo_config);
+    glBufferData(
+        GL_UNIFORM_BUFFER, 
+        sizeof(comput_conf), &comput_conf, 
+        GL_STATIC_DRAW
+    );
+    compute_output.ub_bind((GLchar*)"config", ubo_config);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo_config);
 
     glBindBuffer(GL_UNIFORM_BUFFER, ubo_camera);
-    glBufferData(GL_UNIFORM_BUFFER, sizeof(comput_cam), &comput_cam, GL_STATIC_DRAW);
-    compute_verts.ub_bind((GLchar*)"config", ubo_camera);
 
-	comput_cam.view = glm::lookAt(camera.pos, camera.pos + camera.target, camera.up);
-	comput_cam.perspective = glm::perspective(glm::radians(FOV), ASPECT_RATIO, Z_NEAR, Z_FAR);
+    using glm::lookAt, glm::perspective, glm::radians;
+	comput_cam.view = lookAt(
+	    camera.pos, 
+	    camera.pos + camera.dir, 
+	    camera.up
+	);
+	comput_cam.perspective = perspective(
+	    radians(FOV), 
+	    ASPECT_RATIO, 
+	    Z_NEAR, Z_FAR
+	);
+
+    glBufferData(
+        GL_UNIFORM_BUFFER, 
+        sizeof(comput_cam), &comput_cam, 
+        GL_STATIC_DRAW
+    );
+
+    compute_output.ub_bind((GLchar*)"camera", ubo_camera);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo_config);
 
     glBindTexture(GL_TEXTURE_2D, noise_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, WINDOW_W, WINDOW_H, 0, GL_RGBA, GL_FLOAT, nullptr);
-    glBindImageTexture(2, noise_texture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+    glTexImage2D(
+        GL_TEXTURE_2D, 
+        0, 
+        GL_RGBA32F, 
+        WINDOW_W, WINDOW_H, 
+        0, 
+        GL_RGBA, GL_FLOAT, 
+        nullptr
+    );
+    glBindImageTexture(
+        2, 
+        noise_texture, 0, 
+        GL_FALSE, 
+        0, 
+        GL_READ_ONLY, 
+        GL_RGBA32F
+    );
+
+    GLuint output_buffer;
+    glGenBuffers(1, &output_buffer);
+    defer { glDeleteBuffers(1, &output_buffer); };
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, output_buffer);
+    glBufferData(
+        GL_SHADER_STORAGE_BUFFER, 
+        WINDOW_W * sizeof(float) * WINDOW_H, nullptr, 
+        GL_STATIC_DRAW
+    );
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, output_buffer);
 
     GLuint output_texture;
     glGenTextures(1, &output_texture);
     defer { glDeleteTextures(1, &output_texture); };
 
     glBindTexture(GL_TEXTURE_2D, output_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, WINDOW_W, WINDOW_H, 0, GL_RGBA, GL_FLOAT, nullptr);
-    glBindImageTexture(3, output_texture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    glTexImage2D(
+        GL_TEXTURE_2D, 
+        0, 
+        GL_RGBA32F, 
+        WINDOW_W, WINDOW_H, 
+        0, 
+        GL_RGBA, GL_FLOAT, 
+        nullptr
+    );
+    glBindImageTexture(3, 
+        output_texture, 0, 
+        GL_FALSE, 
+        0, 
+        GL_WRITE_ONLY, 
+        GL_RGBA32F
+    );
 
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, output_texture, 0);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    glFramebufferTexture2D(
+        GL_FRAMEBUFFER,
+        GL_COLOR_ATTACHMENT0, 
+        GL_TEXTURE_2D, 
+        output_texture, 
+        0
+    );
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER)
+            != GL_FRAMEBUFFER_COMPLETE) {
         LOG_ERR("FRAMEBUFFER INCOMPLETE!");
         return EXIT_FAILURE;
     }    
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     glDispatchCompute(WINDOW_W / 8, WINDOW_H / 8, 1);
-
-	float near_plane = 1.0f, far_plane = 7.f;
 
     while (!glfwWindowShouldClose(window.get())) {
         float current_frame = glfwGetTime();
@@ -214,13 +308,50 @@ int main(int argc, char* argv[]) {
 
         glfwPollEvents();
 
-        glDispatchCompute(WINDOW_W / 8, WINDOW_H / 8, 1);
+	    comput_cam.view = glm::lookAt(
+	        camera.pos, 
+	        camera.pos + camera.dir, 
+	        camera.up
+	    );
+	    comput_cam.dir = camera.dir;
+	    comput_cam.pos = camera.pos;
 
-        glViewport(0, 0, WINDOW_W, WINDOW_H);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer);
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-        glBlitFramebuffer(0, 0, WINDOW_W, WINDOW_H, 0, 0, WINDOW_W, WINDOW_H, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        compute_output.use();
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+        compute_output.ub_bind((GLchar*)"camera", ubo_camera);
+        glBindBuffer(GL_UNIFORM_BUFFER, ubo_camera);
+        glBufferData(
+            GL_SHADER_STORAGE_BUFFER, 
+            sizeof(comput_cam), &comput_cam, 
+            GL_DYNAMIC_DRAW
+        );
+
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+        glFramebufferTexture2D(
+            GL_FRAMEBUFFER, 
+            GL_COLOR_ATTACHMENT0, 
+            GL_TEXTURE_2D, 
+            output_texture, 
+            0
+        );
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER)
+                != GL_FRAMEBUFFER_COMPLETE) {
+            LOG_ERR("FRAMEBUFFER INCOMPLETE!");
+            return EXIT_FAILURE;
+        }    
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glDispatchCompute(WINDOW_W / 8, WINDOW_H / 8, 1);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        glBlitNamedFramebuffer(
+            framebuffer, 0, 
+            0, 0, WINDOW_W, WINDOW_H, 
+            0, 0, WINDOW_W, WINDOW_H, 
+            GL_COLOR_BUFFER_BIT, GL_NEAREST
+        );
 
         // imgui
         ImGui_ImplOpenGL3_NewFrame();
@@ -229,9 +360,15 @@ int main(int argc, char* argv[]) {
 
         ImGui::Begin("Debug");
         ImGui::Text("camera_pos: {%.2f %.2f %.2f}", 
-                camera.pos.x, camera.pos.y, camera.pos.z);
+            camera.pos.x, 
+            camera.pos.y, 
+            camera.pos.z
+        );
         ImGui::Text("camera_tgt: {%.2f %.2f %.2f}", 
-                camera.target.x, camera.target.y, camera.target.z);
+            camera.dir.x, 
+            camera.dir.y, 
+            camera.dir.z
+        );
 
         ImGui::End();
 

@@ -11,11 +11,11 @@
 #include "shaderprogram.hpp"
 #include "utils.hpp"
 
-constexpr u32 WINDOW_W = 1280;
-constexpr u32 WINDOW_H = 720;
+constexpr u32 WINDOW_W = 800;
+constexpr u32 WINDOW_H = 600;
 
 constexpr float Z_NEAR = 0.1f;
-constexpr float Z_FAR = 128.f;
+constexpr float Z_FAR = 256.f;
 constexpr float FOV = 90.f;
 constexpr float ASPECT_RATIO = float(WINDOW_W) / WINDOW_H;
 

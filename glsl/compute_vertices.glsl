@@ -50,7 +50,7 @@ float get_height(vec3 sample_pos) {
 }
 
 vec4 raymarch(vec3 origin, vec3 direction) {
-    const float max_dist = 256.0;
+    const float max_dist = 486.0;
     const int   max_steps = 300;
 
     float blue_bits = 0.0;
@@ -73,7 +73,8 @@ vec4 raymarch(vec3 origin, vec3 direction) {
             if (blue_bits >= 0.99) break;
         }
         // hitting the ground
-        if (sample_pos.y <= height) {
+        float d_height = sample_pos.y - height;
+        if (d_height <= (0.15 * d_dist)) {
             vec4 outp = mix(
                 vec4(0.95, 0.95, 0.95, 1.0), 
                 sky_color, 
@@ -87,8 +88,8 @@ vec4 raymarch(vec3 origin, vec3 direction) {
             return outp;
         }
 
-        fog_buildup += incr;
-        dist += d_dist;
+        dist += 0.4 * d_height;
+        fog_buildup += (0.4 * d_height) / max_dist;
         if (dist > max_dist) break;
     }
     // no hit

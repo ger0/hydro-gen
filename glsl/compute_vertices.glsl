@@ -4,8 +4,6 @@ layout (local_size_x = 8, local_size_y = 8) in;
 
 layout (binding = 0) uniform config {
     ivec2 hmap_dims;
-    vec3 _sky_color;
-    vec3 _water_color;
 };
 
 uniform mat4 perspective;
@@ -17,18 +15,36 @@ uniform vec3 pos;
 layout (rgba32f, binding = 2) uniform readonly image2D heightmap;
 layout (rgba32f, binding = 3) uniform writeonly image2D out_tex;
 
+const float y_scale     = 48.0; // max height
+const float water_lvl   = 18.0; // base water level
 
-const float y_scale   = 48.0; // max height
-const float water_lvl = 18.0; // base water level
+const vec3 light_dir    = vec3(0.0, -1.0, -0.21);     
 
 // diffuse colours
-const vec3 sky_color      = vec3(0.45, 0.716, 0.914);
-const vec3 water_color    = vec3(0.15, 0.216, 0.614);
+const vec3 sky_color    = vec3(0.22, 0.606, 0.964);
+const vec3 water_color  = vec3(0.22, 0.606, 0.964);
 
-const vec3 grass_color    = vec3(0.014, 0.084, 0.018);
-const vec3 rock_color     = vec3(0.20,  0.20,  0.20);
-const vec3 dirt_color     = vec3(0.09,  0.04,  0.02);
-const vec3 sand_color     = vec3(0.15,  0.15,  0.041);
+const vec3 grass_ambient  = vec3(0.014, 0.084, 0.018);
+const vec3 rock_ambient   = vec3(0.20,  0.20,  0.20);
+const vec3 dirt_ambient   = vec3(0.09,  0.04,  0.02);
+const vec3 sand_ambient   = vec3(0.15,  0.15,  0.041);
+
+struct Ray {
+    vec3 pos;
+    float dist; 
+};
+
+// functions
+float fog_mix(float fog);
+float water_mix(float water);
+vec3 get_material_color(vec3 pos, vec3 norm);
+vec4 cubic(float v);
+float img_bilinear(readonly image2D img, vec2 sample_pos);
+vec3 get_img_normal(readonly image2D img, vec2 pos);
+float img_bicubic(readonly image2D img, vec2 img_coords);
+vec3 get_pixel_color(vec3 origin, vec3 direction);
+Ray raymarch(vec3 orig, vec3 dir, const float max_dst, const int max_iter);
+vec4 to_world(vec4 coord);
 
 float fog_mix(float fog) {
     return clamp(fog * fog * fog, 0.0, 1.0); 
@@ -44,17 +60,17 @@ vec3 get_material_color(vec3 pos, vec3 norm) {
 	float angle = dot(norm, up);
 
 	if (pos.y < (water_lvl + 0.3)) {
-	    return sand_color;
+	    return sand_ambient;
     } else if (angle < 0.2 || pos.y > (y_scale * 0.75)) {
-        return rock_color;
+        return rock_ambient;
 	} else if (angle < 0.35 || pos.y > (y_scale * 0.65)) {
-	    return dirt_color;
+	    return dirt_ambient;
 	} else {
-	    return grass_color;
+	    return grass_ambient;
 	}
 }
 
-vec4 cubic(float v){
+vec4 cubic(float v) {
     vec4 n = vec4(1.0, 2.0, 3.0, 4.0) - v;
     vec4 s = n * n * n;
     float x = s.x;
@@ -134,59 +150,79 @@ float img_bicubic(readonly image2D img, vec2 img_coords) {
     );
 }
 
-vec3 raymarch(vec3 origin, vec3 direction) {
+vec3 get_pixel_color(vec3 origin, vec3 direction) {
     const float max_dist = 486.0;
     const int   max_steps = 300;
 
-    float blue_bits = 0.0;
+    Ray ray = raymarch(origin, direction, max_dist, max_steps);
+    float fog_buildup = ray.dist / max_dist;
 
-    float dist = 0.001;
-    float fog_buildup = 0.0;
-    float d_dist = 1.0;
-    float incr = (1.0 / max_dist) / d_dist;
-
-    for (int i = 0; i < max_steps; ++i) {
-        vec3 sample_pos = origin + direction * dist;
-        float height = img_bilinear(heightmap, sample_pos.xz) * y_scale;
-
-        // water
-        if (sample_pos.y <= water_lvl) {
-            blue_bits += incr;
-            if (blue_bits >= 0.99) break;
-        }
-        // hitting the ground ??
-        float d_height = sample_pos.y - height;
-        if (d_height <= (0.05 * d_dist)) {
-            vec3 normal = get_img_normal(
-                heightmap, 
-                sample_pos.xz - (0.05 * d_dist * direction.xz)
-            );
-            vec3 diffuse = get_material_color(sample_pos, normal);
-            vec3 outp = mix(
-                diffuse, 
-                sky_color, 
-                fog_mix(fog_buildup)
-            );
-            outp = mix(
-                outp, 
-                water_color, 
-                water_mix(blue_bits)
-            );
-            return outp;
-        }
-
-        dist += 0.4 * d_height;
-        fog_buildup += (0.4 * d_height) / max_dist;
-        if (dist > max_dist) break;
+    float water_vol = 0.0;
+    // finding the intersection between the ray and the surface of water
+    if (origin.y >= water_lvl && ray.pos.y <= water_lvl) {
+        const float water_step = 0.1;
+        float diff = (water_lvl - ray.pos.y);
+        float scale = diff / direction.y;
+        water_vol = clamp((length(direction * scale) * water_step), 0.0, 1.0);
     }
-    // no hit
-    vec3 outp = sky_color;
+    if (ray.dist >= max_dist) {
+        // no hit
+        vec3 outp = sky_color;
+        return mix(
+            outp, 
+            water_color, 
+            water_mix(water_vol)
+        );
+    }
+    // else hit
+    vec3 normal = get_img_normal(
+        heightmap, 
+        ray.pos.xz 
+    );
+    vec3 ambient = get_material_color(ray.pos.xyz, normal);
+    vec3 outp = mix(
+        ambient, 
+        sky_color, 
+        fog_mix(fog_buildup)
+    );
     outp = mix(
         outp, 
         water_color, 
-        water_mix(blue_bits)
+        water_mix(water_vol)
     );
     return outp;
+}
+
+Ray raymarch(vec3 origin, vec3 direction, 
+              const float max_dist, const int max_steps) {
+    float dist = 0.001;
+    float d_dist = 1.0;
+
+    Ray ret_val;
+
+    for (int i = 0; i < max_steps; ++i) {
+        vec3 sample_pos = origin + direction * dist;
+
+        float height = img_bilinear(heightmap, sample_pos.xz) * y_scale;
+
+        // hitting the ground ??
+        float d_height = sample_pos.y - height;
+        if (d_height <= (0.05)) {
+            return Ray(
+                sample_pos - (0.05 * direction),
+                dist - (0.05)
+            );
+        }
+        if (dist > max_dist) {
+            return Ray(sample_pos, max_dist);
+        }
+        /* dist can't be higher than max slope approximation 
+            + accounting for base water level
+        */
+        d_dist = 0.4 * d_height;
+        dist += d_dist;
+    }
+    return Ray(origin + direction * max_dist, max_dist);
 }
 
 vec4 to_world(vec4 coord) {
@@ -209,7 +245,7 @@ void main() {
     vec3 ray_dir = 
         normalize(ray_end.xyz - ray_start.xyz);
 
-    vec3 color = raymarch(pos, ray_dir);
+    vec3 color = get_pixel_color(pos, ray_dir);
     // gamma correction
     color = pow(color, vec3(1.0/2.2));
     imageStore(out_tex, pixel, vec4(color, 1));

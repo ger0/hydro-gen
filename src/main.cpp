@@ -192,8 +192,8 @@ int main(int argc, char* argv[]) {
     // configuration
     struct Compute_config {
         alignas(16) ivec2 dims          = ivec2(noise_size, noise_size);
-        alignas(16) vec4 sky_color      = vec4(0.45, 0.716, 0.914, 1);
-        alignas(16) vec4 water_color    = vec4(0.15, 0.216, 0.614, 1);
+        /* alignas(16) vec4 sky_color      = vec4(0.45, 0.716, 0.914, 1);
+        alignas(16) vec4 water_color    = vec4(0.15, 0.216, 0.614, 1); */
     } conf_buff;
 
     GLuint ubo_config;

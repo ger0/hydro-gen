@@ -12,7 +12,7 @@
 #include "utils.hpp"
 
 constexpr u32 WINDOW_W = 800;
-constexpr u32 WINDOW_H = 600;
+constexpr u32 WINDOW_H = 450;
 
 constexpr float Z_NEAR = 0.1f;
 constexpr float Z_FAR = 256.f;
@@ -35,7 +35,7 @@ using glm::vec4, glm::ivec4;
 // mouse position
 static vec2 mouse_last;
 static struct Camera {
-	vec3 pos    = vec3(100.f, 3.f, 100.f);
+	vec3 pos    = vec3(1248.f, 48.f, 1248.f);
 	vec3 dir    = vec3(0.f, 3.f, 0.f);
 
 	vec3 _def_dir = normalize(pos - dir);

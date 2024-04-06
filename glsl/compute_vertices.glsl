@@ -160,10 +160,10 @@ vec3 get_sky_color(vec3 direction, float ray_dist, float sundot) {
         0.85 * vec3(0.7,0.75,0.85),
         pow(1.0 - max(diry, 0.0), 4.0)
     );
-    // // sun
-    // col += 0.25 * vec3(1.0,0.7,0.4) * pow(sundot, 5.0);
-    // col += 0.25 * vec3(1.0,0.8,0.6) * pow(sundot, 64.0);
-    // col += 0.2  * vec3(1.0,0.8,0.6) * pow(sundot, 512.0);
+    // sun
+    col += 0.25 * vec3(1.0,0.7,0.4) * pow(sundot, 5.0);
+    col += 0.25 * vec3(1.0,0.8,0.6) * pow(sundot, 64.0);
+    col += 0.2  * vec3(1.0,0.8,0.6) * pow(sundot, 512.0);
     /* // clouds
 	vec2 sc = origin.xz + direction.xz*(SC*1000.0-origin.y)/diry;
 	col = mix( col, vec3(1.0,0.95,1.0), 0.5*smoothstep(0.5,0.8,fbm(0.0005*sc/SC)) ); */
@@ -216,7 +216,7 @@ vec4 calc_water(Ray ray, vec3 direction, float sundot) {
 
     // the point where the ray hit the water surface
     vec3 w_orig = ray.pos + (direction * scale);
-    float w_ray_len = ray.dist - length(direction * scale);
+    float rdist_to_w = ray.dist - length(direction * scale);
 
     // normal 0,1,0 
     // a ray out of water's surface
@@ -243,13 +243,13 @@ vec4 calc_water(Ray ray, vec3 direction, float sundot) {
         );
         water_col = get_fog_color(
             water_col, 
-            w_ray.dist + w_ray_len, 
+            w_ray.dist + rdist_to_w, 
             sundot
         );
         water_col = mix(
             water_col,
             col,
-            fog_mix((w_ray.dist + w_ray_len) / max_dist)
+            fog_mix((w_ray.dist + rdist_to_w) / max_dist)
         );
     }
     return vec4(water_col, water_vol);
@@ -257,7 +257,7 @@ vec4 calc_water(Ray ray, vec3 direction, float sundot) {
 
 vec3 get_pixel_color(vec3 origin, vec3 direction) {
     Ray ray = raymarch(origin, direction, max_dist, max_steps);
-	float sundot = clamp(dot(direction, light_dir), 0.0, 1.0);
+	float sundot = clamp(dot(direction, -light_dir), 0.0, 1.0);
 
     // water buildup
     float water_vol = 0.0;
@@ -286,14 +286,14 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
     vec3 outp = get_shade_terr(ray.pos, normal);
     outp = get_fog_color(outp, ray.dist, sundot);
     outp = mix(
-        outp,
-        get_sky_color(direction, ray.dist, sundot),
-        fog_mix(ray.dist / max_dist)
-    );
-    outp = mix(
         outp, 
         water_col, 
         water_mix(water_vol)
+    );
+    outp = mix(
+        outp,
+        get_sky_color(direction, ray.dist, sundot),
+        fog_mix(ray.dist / max_dist)
     );
     return outp;
 }

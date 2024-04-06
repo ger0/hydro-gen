@@ -2,6 +2,8 @@
 
 layout (local_size_x = 8, local_size_y = 8) in;
 
+#define SC (250.0)
+
 layout (binding = 0) uniform config {
     ivec2 hmap_dims;
 };
@@ -16,12 +18,13 @@ layout (rgba32f, binding = 2) uniform readonly image2D heightmap;
 layout (rgba32f, binding = 3) uniform writeonly image2D out_tex;
 
 const float y_scale     = 48.0; // max height
-const float water_lvl   = 18.0; // base water level
+const float water_lvl   = 0.0; // base water level
 
-const vec3 light_dir    = vec3(0.0, -1.0, -0.21);     
+const vec3 light_dir    = normalize(vec3(0.0, -0.6, -1.0));
+const vec3 light_color  = normalize(vec3(0.09, 0.075, 0.04));
 
 // diffuse colours
-const vec3 sky_color    = vec3(0.22, 0.606, 0.964);
+//const vec3 sky_color    = vec3(0.22, 0.606, 0.964);
 const vec3 water_color  = vec3(0.22, 0.606, 0.964);
 
 const vec3 grass_ambient  = vec3(0.014, 0.084, 0.018);
@@ -164,12 +167,28 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
         float diff = (water_lvl - ray.pos.y);
         float scale = diff / direction.y;
         water_vol = clamp((length(direction * scale) * water_step), 0.0, 1.0);
-    }
+    }    
+    // no hit
+	float sundot = clamp(dot(direction, light_dir), 0.0, 1.0);
     if (ray.dist >= max_dist) {
-        // no hit
-        vec3 outp = sky_color;
+        //vec3 outp = sky_color;
+
+        // sky		
+        float diry = min(direction.y, 0.78);
+        vec3 col = vec3(0.3,0.5,0.85) - diry * diry * 0.5;
+        col = mix( col, 0.85*vec3(0.7,0.75,0.85), pow(1.0 - max(diry, 0.0), 4.0 ) );
+        // sun
+		col += 0.25 * vec3(1.0,0.7,0.4) * pow(sundot, 5.0);
+		col += 0.25 * vec3(1.0,0.8,0.6) * pow(sundot, 64.0);
+		col += 0.2  * vec3(1.0,0.8,0.6) * pow(sundot, 512.0);
+        /* // clouds
+		vec2 sc = origin.xz + direction.xz*(SC*1000.0-origin.y)/diry;
+		col = mix( col, vec3(1.0,0.95,1.0), 0.5*smoothstep(0.5,0.8,fbm(0.0005*sc/SC)) ); */
+        // horizon
+        col = mix(col, 0.68*vec3(0.4,0.65,1.0), pow( 1.0-max(diry, 0.0), 16.0 ) );
+
         return mix(
-            outp, 
+            col, 
             water_color, 
             water_mix(water_vol)
         );
@@ -179,17 +198,47 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
         heightmap, 
         ray.pos.xz 
     );
-    vec3 ambient = get_material_color(ray.pos.xyz, normal);
-    vec3 outp = mix(
+
+    // shadow 
+    // difference to the point above which there's no possible surface
+    float shadow_diff = y_scale - ray.pos.y;
+    float shadow_scale = shadow_diff / -light_dir.y;
+    float shadow_max = length(light_dir * shadow_scale);
+    Ray shadow = raymarch(ray.pos, -light_dir, shadow_max, 128);
+
+    vec3 ambient = get_material_color(ray.pos.xyz, normal) * 0.01;
+
+    vec3 outp = ambient;
+    /* vec3 outp = mix(
         ambient, 
         sky_color, 
         fog_mix(fog_buildup)
-    );
+    );	
+*/
+    if (shadow.dist == shadow_max) {
+	    float lambrt = max(dot(light_dir, normal), 0.0);
+        vec3 diffuse = ambient * 100 * lambrt;
+
+	    //vec3 refl = reflect(light_dir, normal);
+	    //float spec = sqrt(max(dot(direction, refl), 0.0));
+	    //vec3 specular = 0.01 * spec * light_color;
+	    //outp += specular;
+        outp += diffuse;
+    }
+
+    // fog
+    float fo = 1.0 - exp(-pow(0.15 * ray.dist / SC, 1.5));
+    vec3 fco = 0.65 * vec3(0.4,0.65,1.0) + 0.1 * vec3(1.0,0.8,0.5) * pow(sundot, 4.0);
+    outp = mix(outp, fco, fo);
+
+    outp = mix(outp, 0.68*vec3(0.4,0.65,1.0), fog_mix(ray.dist / max_dist));
+
     outp = mix(
         outp, 
         water_color, 
         water_mix(water_vol)
     );
+
     return outp;
 }
 
@@ -216,10 +265,8 @@ Ray raymarch(vec3 origin, vec3 direction,
         if (dist > max_dist) {
             return Ray(sample_pos, max_dist);
         }
-        /* dist can't be higher than max slope approximation 
-            + accounting for base water level
-        */
-        d_dist = 0.4 * d_height;
+        // TODO: dist can't be higher than max slope approximation 
+        d_dist = 0.35 * d_height;
         dist += d_dist;
     }
     return Ray(origin + direction * max_dist, max_dist);

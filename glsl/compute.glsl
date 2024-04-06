@@ -10,7 +10,7 @@ float rand(vec2 co) {
 void main() {
     ivec2 store_pos = ivec2(gl_GlobalInvocationID.xy);
 
-    gln_tFBMOpts opts = gln_tFBMOpts(0, 0.5, 2, 0.01, 1, 7, false, false);
+    gln_tFBMOpts opts = gln_tFBMOpts(0, 0.5, 2, 0.007, 1, 7, false, false);
     float col = (gln_sfbm(store_pos, opts) + 1) / 2;
     vec4 color = vec4(col, col, col, 1.0);
 

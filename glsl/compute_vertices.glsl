@@ -18,9 +18,9 @@ layout (rgba32f, binding = 2) uniform readonly image2D heightmap;
 layout (rgba32f, binding = 3) uniform writeonly image2D out_tex;
 
 const float y_scale     = 48.0; // max height
-const float water_lvl   = 20.0; // base water level
+const float water_lvl   = 14.0; // base water level
 
-const vec3 light_dir    = normalize(vec3(0.0, -0.6, -1.0));
+const vec3 light_dir    = normalize(vec3(0.0, -1.0, -1.0));
 const vec3 light_color  = normalize(vec3(0.09, 0.075, 0.04));
 
 // diffuse colours
@@ -32,22 +32,27 @@ struct Material_colors {
     vec3 rock;
     vec3 dirt;
     vec3 sand;
+    vec3 snow;
 };
 
 // ambient colors
 const Material_colors ambient_cols = Material_colors(
     vec3(0.00014, 0.00084, 0.00018),
-    vec3(0.0020,  0.002,  0.002),
+    vec3(0.0002,  0.0002,  0.0002),
     vec3(0.0009,  0.0004,  0.0002),
-    vec3(0.0015,  0.0015,  0.00041)
+    vec3(0.0015,  0.0015,  0.00041),
+    vec3(0.004, 0.0038, 0.0039)
 );
 
 // diffuse colors
 const Material_colors diffuse_cols = Material_colors(
-    vec3(0.014, 0.084, 0.018) / 2.0,
-    vec3(0.20,  0.20,  0.20),
-    vec3(0.09,  0.04,  0.02) / 2.0,
-    vec3(0.15,  0.15,  0.041)
+    //vec3(0.014, 0.074, 0.009) / 1.5,
+    vec3(0.2068, 0.279, 0.01) * 1.3 / 5,
+    vec3(0.30,  0.29,  0.17) * 1.3 / 6,
+    //vec3(0.07,  0.04,  0.02) / 2.0,
+    vec3(0.2068, 0.179, 0.00) * 1.3 / 6,
+    vec3(0.15,  0.15,  0.041) / 5,
+    vec3(0.5, 0.48, 0.49) * 2 / 3
 );
 
 const float max_dist    = 486.0;
@@ -98,9 +103,13 @@ vec3 get_material_color(vec3 pos, vec3 norm, Material_colors material) {
 	float angle = dot(norm, up);
 	if (pos.y < (water_lvl + 0.3)) {
 	    return material.sand;
-    } else if (angle < 0.2 || pos.y > (y_scale * 0.75)) {
+	/* } else if (angle > 0.50 && pos.y > (y_scale * 0.55)) {
+	    return material.snow; */
+    } else if (angle < 0.45 && pos.y > (y_scale * 0.55)) {
         return material.rock;
-	} else if (angle < 0.35 || pos.y > (y_scale * 0.65)) {
+    } else if (angle < 0.25) {
+        return material.rock;
+	} else if (angle < 0.65 && pos.y > (y_scale * 0.45)) {
 	    return material.dirt;
 	} else {
 	    return material.grass;
@@ -192,7 +201,9 @@ vec4 get_shade(vec3 ray_pos, vec3 normal, bool is_water) {
     vec4 outp = vec4(ambient, 0.04);
     // no shadow
     if (shadow.dist == shadow_max) {
-	    float lambrt = max(dot(light_dir, normal), 0.0);
+        vec3 light_diff = light_dir;
+        light_diff.y = -light_diff.y;
+	    float lambrt = max(dot(light_diff, normal), 0.0);
         vec3 diffuse = lambrt * get_material_color(
             ray_pos.xyz, 
             normal, 

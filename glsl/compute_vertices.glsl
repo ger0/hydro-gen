@@ -18,7 +18,7 @@ layout (rgba32f, binding = 2) uniform readonly image2D heightmap;
 layout (rgba32f, binding = 3) uniform writeonly image2D out_tex;
 
 const float y_scale     = 48.0; // max height
-const float water_lvl   = 0.0; // base water level
+const float water_lvl   = 20.0; // base water level
 
 const vec3 light_dir    = normalize(vec3(0.0, -0.6, -1.0));
 const vec3 light_color  = normalize(vec3(0.09, 0.075, 0.04));
@@ -31,6 +31,8 @@ const vec3 grass_ambient  = vec3(0.014, 0.084, 0.018);
 const vec3 rock_ambient   = vec3(0.20,  0.20,  0.20);
 const vec3 dirt_ambient   = vec3(0.09,  0.04,  0.02);
 const vec3 sand_ambient   = vec3(0.15,  0.15,  0.041);
+
+const float max_dist = 486.0;
 
 struct Ray {
     vec3 pos;
@@ -153,43 +155,113 @@ float img_bicubic(readonly image2D img, vec2 img_coords) {
     );
 }
 
+vec3 get_fog_color(vec3 col, float ray_dist, float sundot) {
+    // fog
+    float fo = 1.0 - exp(-pow(0.15 * ray_dist / SC, 1.5));
+    vec3 fco = 0.65 * vec3(0.4,0.65,1.0) + 0.1 * vec3(1.0,0.8,0.5) * pow(sundot, 4.0);
+    return mix(col, fco, fo);
+}
+
+vec3 get_sky_color(vec3 direction, float ray_dist, float sundot) {
+    // sky		
+    float diry = min(direction.y, 0.78);
+    vec3 col = vec3(0.3,0.5,0.85) - diry * diry * 0.5;
+    col = mix(col, 0.85 * vec3(0.7,0.75,0.85), pow(1.0 - max(diry, 0.0), 4.0 ) );
+   // // sun
+   // col += 0.25 * vec3(1.0,0.7,0.4) * pow(sundot, 5.0);
+   // col += 0.25 * vec3(1.0,0.8,0.6) * pow(sundot, 64.0);
+   // col += 0.2  * vec3(1.0,0.8,0.6) * pow(sundot, 512.0);
+    /* // clouds
+	vec2 sc = origin.xz + direction.xz*(SC*1000.0-origin.y)/diry;
+	col = mix( col, vec3(1.0,0.95,1.0), 0.5*smoothstep(0.5,0.8,fbm(0.0005*sc/SC)) ); */
+    // horizon
+    return mix(col, 0.68*vec3(0.4,0.65,1.0), pow( 1.0-max(diry, 0.0), 16.0 ) );
+}
+
+vec4 get_shadow_water_color(vec3 ray_pos, vec3 normal, bool is_water) {
+    // shadow 
+    // difference to the point above which there's no possible surface
+    float shadow_diff = y_scale - ray_pos.y;
+    float shadow_scale = shadow_diff / -light_dir.y;
+    float shadow_max = length(light_dir * shadow_scale);
+    Ray shadow = raymarch(ray_pos, -light_dir, shadow_max, 128);
+
+    vec3 ambient;
+    if (is_water) {
+        ambient = vec3(0.007, 0.008, 0.009);
+    } else {
+        ambient = get_material_color(ray_pos.xyz, normal) * 0.01;
+    }
+
+    vec4 outp = vec4(ambient, 0.1);
+    if (shadow.dist == shadow_max) {
+	    float lambrt = max(dot(light_dir, normal), 0.0);
+        vec3 diffuse = ambient * 100 * lambrt;
+        outp.rgb += diffuse;
+        outp.w = 0.9;
+    }
+    return outp;
+}
+
+vec3 get_shadow_terr_color(vec3 ray_pos, vec3 normal) {
+    return get_shadow_water_color(ray_pos, normal, false).xyz;
+}
+
 vec3 get_pixel_color(vec3 origin, vec3 direction) {
-    const float max_dist = 486.0;
     const int   max_steps = 300;
 
     Ray ray = raymarch(origin, direction, max_dist, max_steps);
     float fog_buildup = ray.dist / max_dist;
 
+	float sundot = clamp(dot(direction, light_dir), 0.0, 1.0);
+
+    vec3 water_col = vec3(0,0,0);
+
     float water_vol = 0.0;
     // finding the intersection between the ray and the surface of water
     if (origin.y >= water_lvl && ray.pos.y <= water_lvl) {
-        const float water_step = 0.1;
+        const float water_step = 0.01;
         float diff = (water_lvl - ray.pos.y);
         float scale = diff / direction.y;
         water_vol = clamp((length(direction * scale) * water_step), 0.0, 1.0);
+
+        vec3 water_orig = ray.pos + (direction * scale);
+        // normal 0,1,0 
+
+        // a ray out of water's surface
+        vec3 water_refl = reflect(direction, -vec3(0, 1, 0));
+        Ray w_ray = raymarch(water_orig, water_refl, max_dist / 4.0, max_steps / 2);
+
+        // is there a shadow?
+        vec4 water_shad = get_shadow_water_color(water_orig, vec3(0, 1, 0), true);
+        water_col = water_shad.rgb;
+        vec3 col = get_sky_color(water_refl, ray.dist, sundot); 
+
+        // bouncing off to the sky
+        if (w_ray.dist >= (max_dist / 4.0)) {
+            water_col = col;
+            water_col = mix(water_shad.rgb, water_col, water_shad.w);
+        } else {
+            vec3 norm = get_img_normal(heightmap, w_ray.pos.xz);
+            // get shadow of the sampled terrain
+            water_col = mix(
+                water_shad.rgb, 
+                get_shadow_terr_color(w_ray.pos, norm), 
+                water_shad.w
+            );
+            vec3 water_fog = get_fog_color(
+                water_col, 
+                w_ray.dist, 
+                sundot
+            );
+        }
     }    
     // no hit
-	float sundot = clamp(dot(direction, light_dir), 0.0, 1.0);
     if (ray.dist >= max_dist) {
-        //vec3 outp = sky_color;
-
-        // sky		
-        float diry = min(direction.y, 0.78);
-        vec3 col = vec3(0.3,0.5,0.85) - diry * diry * 0.5;
-        col = mix( col, 0.85*vec3(0.7,0.75,0.85), pow(1.0 - max(diry, 0.0), 4.0 ) );
-        // sun
-		col += 0.25 * vec3(1.0,0.7,0.4) * pow(sundot, 5.0);
-		col += 0.25 * vec3(1.0,0.8,0.6) * pow(sundot, 64.0);
-		col += 0.2  * vec3(1.0,0.8,0.6) * pow(sundot, 512.0);
-        /* // clouds
-		vec2 sc = origin.xz + direction.xz*(SC*1000.0-origin.y)/diry;
-		col = mix( col, vec3(1.0,0.95,1.0), 0.5*smoothstep(0.5,0.8,fbm(0.0005*sc/SC)) ); */
-        // horizon
-        col = mix(col, 0.68*vec3(0.4,0.65,1.0), pow( 1.0-max(diry, 0.0), 16.0 ) );
-
+        vec3 col = get_sky_color(direction, ray.dist, sundot);
         return mix(
             col, 
-            water_color, 
+            water_col, 
             water_mix(water_vol)
         );
     }
@@ -198,44 +270,16 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
         heightmap, 
         ray.pos.xz 
     );
-
-    // shadow 
-    // difference to the point above which there's no possible surface
-    float shadow_diff = y_scale - ray.pos.y;
-    float shadow_scale = shadow_diff / -light_dir.y;
-    float shadow_max = length(light_dir * shadow_scale);
-    Ray shadow = raymarch(ray.pos, -light_dir, shadow_max, 128);
-
-    vec3 ambient = get_material_color(ray.pos.xyz, normal) * 0.01;
-
-    vec3 outp = ambient;
-    /* vec3 outp = mix(
-        ambient, 
-        sky_color, 
-        fog_mix(fog_buildup)
-    );	
-*/
-    if (shadow.dist == shadow_max) {
-	    float lambrt = max(dot(light_dir, normal), 0.0);
-        vec3 diffuse = ambient * 100 * lambrt;
-
-	    //vec3 refl = reflect(light_dir, normal);
-	    //float spec = sqrt(max(dot(direction, refl), 0.0));
-	    //vec3 specular = 0.01 * spec * light_color;
-	    //outp += specular;
-        outp += diffuse;
-    }
-
-    // fog
-    float fo = 1.0 - exp(-pow(0.15 * ray.dist / SC, 1.5));
-    vec3 fco = 0.65 * vec3(0.4,0.65,1.0) + 0.1 * vec3(1.0,0.8,0.5) * pow(sundot, 4.0);
-    outp = mix(outp, fco, fo);
-
-    outp = mix(outp, 0.68*vec3(0.4,0.65,1.0), fog_mix(ray.dist / max_dist));
-
+    vec3 outp = get_shadow_terr_color(ray.pos, normal);
+    outp = get_fog_color(outp, ray.dist, sundot);
+    outp = mix(
+        outp,
+        get_sky_color(direction, ray.dist, sundot),
+        fog_mix(ray.dist / max_dist)
+    );
     outp = mix(
         outp, 
-        water_color, 
+        water_col, 
         water_mix(water_vol)
     );
 

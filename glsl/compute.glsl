@@ -1,3 +1,6 @@
+#version 460
+
+#include "simplex_noise.glsl"
 layout (local_size_x = 8, local_size_y = 8) in;
 
 layout (binding = 0, rgba32f)   uniform image2D dest_tex;
@@ -11,7 +14,7 @@ float rand(vec2 co) {
 void main() {
     ivec2 store_pos = ivec2(gl_GlobalInvocationID.xy);
 
-    gln_tFBMOpts opts = gln_tFBMOpts(0, 0.5, 2, 0.007, 1, 7, false, false);
+    gln_tFBMOpts opts = gln_tFBMOpts(0, 0.5, 2.0, 0.0035, 1, 9, false, false);
     float col = (gln_sfbm(store_pos, opts) + 1) / 2;
     vec4 color = vec4(col, col, col, 1.0);
 

@@ -11,17 +11,17 @@
 #include "shaderprogram.hpp"
 #include "utils.hpp"
 
-constexpr u32 WINDOW_W = 800;
-constexpr u32 WINDOW_H = 450;
+constexpr u32 WINDOW_W = 1920;
+constexpr u32 WINDOW_H = 1080;
 
 constexpr float Z_NEAR = 0.1f;
-constexpr float Z_FAR = 256.f;
+constexpr float Z_FAR = 2048.f;
 constexpr float FOV = 90.f;
 constexpr float ASPECT_RATIO = float(WINDOW_W) / WINDOW_H;
 
-constexpr auto compute_noise_file = "../glsl/compute.glsl";
-constexpr auto compute_verts_file = "../glsl/compute_vertices.glsl";
-constexpr auto simplex_noise_file = "../glsl/simplex_noise.glsl";
+constexpr auto compute_noise_file = "compute.glsl";
+constexpr auto compute_verts_file = "compute_vertices.glsl";
+constexpr auto simplex_noise_file = "simplex_noise.glsl";
 
 // ----------------------
 
@@ -35,8 +35,8 @@ using glm::vec4, glm::ivec4;
 // mouse position
 static vec2 mouse_last;
 static struct Camera {
-	vec3 pos    = vec3(1248.f, 48.f, 1248.f);
-	vec3 dir    = vec3(0.f, 3.f, 0.f);
+	vec3 pos    = vec3(0.f, 38.f, 0.f);
+	vec3 dir    = vec3(0.f, 38.f, -1.f);
 
 	vec3 _def_dir = normalize(pos - dir);
 	static constexpr float speed = 0.05f;
@@ -128,12 +128,8 @@ int main(int argc, char* argv[]) {
     init_imgui(window.get());
     defer { destroy_imgui(); };
 
-    Compute_program compute_noise(
-        {simplex_noise_file, compute_noise_file}
-    );
-    Compute_program compute_output(
-        {compute_verts_file}
-    );
+    Compute_program compute_noise(compute_noise_file);
+    Compute_program compute_output(compute_verts_file);
 
     // ----------- noise generation ---------------
     constexpr GLuint noise_size = 4096;
@@ -144,7 +140,7 @@ int main(int argc, char* argv[]) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, noise_buffer);
     glBufferData(
         GL_SHADER_STORAGE_BUFFER, 
-        WINDOW_W * sizeof(float) * WINDOW_H, nullptr, 
+        sizeof(float) * 4 * noise_size  * noise_size, nullptr, 
         GL_STATIC_DRAW
     );
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, noise_buffer);
@@ -210,6 +206,9 @@ int main(int argc, char* argv[]) {
     );
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // Set texture wrapping behavior
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
     compute_noise.use();
     glDispatchCompute(noise_size / 8, noise_size / 8, 1);
@@ -338,9 +337,19 @@ int main(int argc, char* argv[]) {
 
     glDispatchCompute(WINDOW_W / 8, WINDOW_H / 8, 1);
 
+    u32 frame_count = 0;
+    float last_frame_rounded = 0.0;
+    double frame_time = 0.0;
     while (!glfwWindowShouldClose(window.get())) {
+        frame_count += 1;
+
         float current_frame = glfwGetTime();
         delta_time = current_frame - last_frame;
+        if (current_frame - last_frame_rounded >= 1.f) {
+            frame_time = 1000.0 / (double)frame_count;
+            frame_count = 0;
+            last_frame_rounded += 1.f;
+        }
         last_frame = current_frame;
 
         glfwPollEvents();
@@ -387,23 +396,24 @@ int main(int argc, char* argv[]) {
             0, 0, WINDOW_W, WINDOW_H, 
             GL_COLOR_BUFFER_BIT, GL_NEAREST
         );
-
         // imgui
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::Begin("Debug");
-        ImGui::Text("camera_pos: {%.2f %.2f %.2f}", 
+        ImGui::Begin("Info");
+        ImGui::Text("camera pos: {%.2f %.2f %.2f}", 
             camera.pos.x, 
             camera.pos.y, 
             camera.pos.z
         );
-        ImGui::Text("camera_tgt: {%.2f %.2f %.2f}", 
+        ImGui::Text("camera dir: {%.2f %.2f %.2f}", 
             camera.dir.x, 
             camera.dir.y, 
             camera.dir.z
         );
+        ImGui::Text("frame time (ms): {%.2f}", frame_time);
+        ImGui::Text("fps: {%.2f}", 1000.0 / frame_time);
 
         ImGui::End();
 

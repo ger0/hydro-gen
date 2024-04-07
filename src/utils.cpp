@@ -25,9 +25,7 @@ void GLAPIENTRY gl_error_callback(
     if(severity == GL_DEBUG_SEVERITY_NOTIFICATION) {
         return;
     }
-
     const char* type_str;
-
     switch(type) {
         case GL_DEBUG_TYPE_ERROR: type_str = "ERROR"; break;
         case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: type_str = "DEPRECATED"; break;
@@ -60,7 +58,6 @@ void GLAPIENTRY gl_error_callback(
 
 GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title) {
     glfwInit();
-
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -68,7 +65,6 @@ GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title) {
 #ifdef DEBUG
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);  
 #endif
-
     GLFWwindow* win = glfwCreateWindow(window_size.x, window_size.y, window_title, NULL, NULL);
     if (win == nullptr) {
         LOG_ERR("Failed to create window.");
@@ -88,7 +84,6 @@ GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title) {
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
     glDebugMessageCallback(gl_error_callback, nullptr);
 #endif
-
     return win;
 }
 

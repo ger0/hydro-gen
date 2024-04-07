@@ -3,7 +3,8 @@
 #include <glm/gtc/type_ptr.hpp>
 
 using namespace glm;
-std::string read_file(const std::string& filename);
+std::string load_shader_file(std::string filename);
+void resolve_includes(std::string& buff);
 
 enum Log_type {
     SHADER,
@@ -12,35 +13,78 @@ enum Log_type {
 
 void err_log_shader(GLuint program, Log_type type);
 
-std::string read_file(const std::string& filename) {
-    int f_size;
-    FILE *file;
-    char *data;
+std::string load_shader_file(std::string filename) {
+    LOG_DBG("Loading shader {}", filename);
+    char path[1 << 8];
+    snprintf(path, sizeof(path), "../glsl/%s", filename.c_str());
 
-    file = fopen(filename.c_str(), "rb");
-    if (file != NULL) {
-        fseek(file, 0, SEEK_END);
-        f_size = ftell(file);
-        fseek(file, 0, SEEK_SET);
-        data = new char[f_size + 1];
-        int readSize = fread(data, 1, f_size, file);
-        data[f_size] = 0;
-        fclose(file);
+    FILE* file = fopen(path, "r");
+    assert(file != nullptr);
+    defer { fclose(file); };
 
-        return data;
-    }
-    return NULL;
+    assert(fseek(file, 0, SEEK_END) == 0);
+    long int size = ftell(file);
+    assert(size > 0);
+
+    std::string buffer;
+    buffer.resize(size);
+
+    assert(fseek(file, 0, SEEK_SET) == 0);
+    assert(fread(&buffer[0], size, 1, file) == 1);
+
+    resolve_includes(buffer);
+
+    return buffer;
 }
 
-GLuint Shader_core::load_shader(GLenum shader_type, std::initializer_list<std::string> filenames) {
+void resolve_includes(std::string& buff) {
+    for(uint i = 0; buff[i] != '\0'; i++) {
+        if(buff[i] == '#' && (i == 0 || buff[i - 1] == '\n')) {
+            uint include_start = i;
+            const char* word = "include \"";
+            uint word_i = 0;
+            // skip hash
+            i++;
+            while(word[word_i] != '\0' && buff[i] != '\0' && buff[i] == word[word_i]) {
+                word_i++;
+                i++;
+            }
+            if(word[word_i] != '\0') {
+                continue;
+            }
+            uint path_start = i;
+            while(
+                buff[i] != '\0' &&
+                buff[i] != '\n' &&
+                buff[i] != '\"'
+            ) {
+                i++;
+            }
+            if(buff[i] != '\"') {
+                continue;
+            }
+            uint path_end = i;
+
+            i++;
+            if(buff[i] != '\n') {
+                continue;
+            }
+            uint include_end = i;
+
+            std::string include_path = buff.substr(path_start, path_end - path_start);
+            buff.erase(include_start, include_end - include_start);
+
+            std::string include = load_shader_file(include_path.c_str());
+            buff.insert(include_start, include);
+        }
+    }
+}
+
+GLuint Shader_core::load_shader(GLenum shader_type, std::string filename) {
     // handle
     GLuint shader = glCreateShader(shader_type);
 
-    std::string source_str = "";
-    for (const auto& filename: filenames) {
-        std::string append_str = read_file(filename);
-        source_str += '\n' + append_str;
-    }
+    auto source_str = load_shader_file(filename);
     const GLchar* shader_source = source_str.c_str();
     glShaderSource(shader, 1, &shader_source, NULL);
     glCompileShader(shader);
@@ -73,9 +117,9 @@ void err_log_shader(GLuint handle, Log_type type) {
 
 }
 
-Compute_program::Compute_program(std::initializer_list<std::string> comput_files) {
+Compute_program::Compute_program(std::string filename) {
     LOG_DBG("Loading compute shader...");
-    compute = load_shader(GL_COMPUTE_SHADER, comput_files);
+    compute = load_shader(GL_COMPUTE_SHADER, filename);
 
     program = glCreateProgram();
 
@@ -86,12 +130,12 @@ Compute_program::Compute_program(std::initializer_list<std::string> comput_files
     LOG_DBG("Compute shader program created");
 }
 
-Shader_program::Shader_program(const char* vert_file, const char* frag_file) {
+Shader_program::Shader_program(std::string vert_file, std::string frag_file) {
     LOG_DBG("Loading vertex shader...");
-    vertex = load_shader(GL_VERTEX_SHADER, {vert_file});
+    vertex = load_shader(GL_VERTEX_SHADER, vert_file);
 
     LOG_DBG("Loading fragment shader...");
-    fragment = load_shader(GL_FRAGMENT_SHADER, {frag_file});
+    fragment = load_shader(GL_FRAGMENT_SHADER, frag_file);
 
     program = glCreateProgram();
 

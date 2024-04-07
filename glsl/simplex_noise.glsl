@@ -1,4 +1,3 @@
-#version 460
 // source: https://github.com/FarazzShaikh/glNoise
 // #name: BlendModes
 

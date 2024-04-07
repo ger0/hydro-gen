@@ -173,6 +173,43 @@ int main(int argc, char* argv[]) {
     );
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // ----------- water tex generation ---------------
+    GLuint water_buffer;
+    glGenBuffers(1, &water_buffer);
+    defer { glDeleteBuffers(1, &water_buffer); };
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, water_buffer);
+    glBufferData(
+        GL_SHADER_STORAGE_BUFFER, 
+        WINDOW_W * sizeof(float) * WINDOW_H, nullptr, 
+        GL_STATIC_DRAW
+    );
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, water_buffer);
+
+    GLuint water_tex;
+    glGenTextures(1, &water_tex);
+    defer { glDeleteTextures(1, &water_tex); };
+
+    glBindTexture(GL_TEXTURE_2D, water_tex);
+    glTexImage2D(
+        GL_TEXTURE_2D,
+        0,
+        GL_R32F,
+        noise_size, noise_size,
+        0, 
+        GL_RED, GL_FLOAT,
+        nullptr
+    );
+    glBindImageTexture(
+        1, 
+        water_tex, 0, 
+        GL_FALSE, 
+        0, 
+        GL_WRITE_ONLY, 
+        GL_R32F
+    );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     compute_noise.use();
     glDispatchCompute(noise_size / 8, noise_size / 8, 1);
@@ -228,6 +265,25 @@ int main(int argc, char* argv[]) {
         0, 
         GL_READ_ONLY, 
         GL_RGBA32F
+    );
+
+    glBindTexture(GL_TEXTURE_2D, water_tex);
+    glTexImage2D(
+        GL_TEXTURE_2D, 
+        0, 
+        GL_R32F, 
+        noise_size, noise_size, 
+        0, 
+        GL_RED, GL_FLOAT, 
+        nullptr
+    );
+    glBindImageTexture(
+        4, 
+        water_tex, 0, 
+        GL_FALSE, 
+        0, 
+        GL_READ_ONLY, 
+        GL_R32F
     );
 
     GLuint output_buffer;
@@ -309,6 +365,7 @@ int main(int argc, char* argv[]) {
 
 	    compute_output.set_uniform("dir", camera.dir);
 	    compute_output.set_uniform("pos", camera.pos);
+	    compute_output.set_uniform("time", current_frame);
 
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER)

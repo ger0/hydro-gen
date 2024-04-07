@@ -52,16 +52,10 @@ void GLAPIENTRY gl_error_callback(
         case GL_DEBUG_SOURCE_OTHER: source_str = "OTHER"; break;
     }
 
-    fprintf(
-        stderr,
-        "GL_%s, source = %s, message = %s\n",
-        type_str,
-        source_str,
-        message
-    );
-    if(type == GL_DEBUG_TYPE_ERROR) {
-        abort();
-    }
+    LOG_DBG("GL_{}, source = {}, message = {}", 
+            type_str,
+            source_str,
+            message);
 }
 
 GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title) {
@@ -71,6 +65,9 @@ GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+#ifdef DEBUG
+    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);  
+#endif
 
     GLFWwindow* win = glfwCreateWindow(window_size.x, window_size.y, window_title, NULL, NULL);
     if (win == nullptr) {
@@ -88,7 +85,8 @@ GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title) {
     }
 #ifdef DEBUG
     glEnable(GL_DEBUG_OUTPUT);
-    glDebugMessageCallback(gl_error_callback, 0);
+    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    glDebugMessageCallback(gl_error_callback, nullptr);
 #endif
 
     return win;

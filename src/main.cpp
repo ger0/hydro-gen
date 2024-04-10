@@ -133,42 +133,56 @@ int main(int argc, char* argv[]) {
 
     // ----------- noise generation ---------------
     constexpr GLuint noise_size = 4096;
-    GLuint noise_buffer;
-    glGenBuffers(1, &noise_buffer);
-    defer { glDeleteBuffers(1, &noise_buffer); };
 
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, noise_buffer);
-    glBufferData(
-        GL_SHADER_STORAGE_BUFFER, 
-        sizeof(float) * 4 * noise_size  * noise_size, nullptr, 
-        GL_STATIC_DRAW
-    );
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, noise_buffer);
+    auto gen_map_texture = [&](const GLuint width, const GLuint height) 
+        -> std::tuple<GLuint, GLuint> {
+        GLuint noise_buffer;
+        glGenBuffers(1, &noise_buffer);
 
-    GLuint noise_texture;
-    glGenTextures(1, &noise_texture);
-    defer { glDeleteTextures(1, &noise_texture); };
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, noise_buffer);
+        glBufferData(
+            GL_SHADER_STORAGE_BUFFER, 
+            sizeof(float) * 4 * width  * height, nullptr, 
+            GL_STATIC_DRAW
+        );
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, noise_buffer);
 
-    glBindTexture(GL_TEXTURE_2D, noise_texture);
-    glTexImage2D(
-        GL_TEXTURE_2D,
-        0,
-        GL_RGBA32F,
-        noise_size, noise_size,
-        0, 
-        GL_RGBA, GL_FLOAT,
-        nullptr
-    );
-    glBindImageTexture(
-        0, 
-        noise_texture, 0, 
-        GL_FALSE, 
-        0, 
-        GL_WRITE_ONLY, 
-        GL_RGBA32F
-    );
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        GLuint noise_texture;
+        glGenTextures(1, &noise_texture);
+
+        glBindTexture(GL_TEXTURE_2D, noise_texture);
+        glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            GL_RGBA32F,
+            width, height,
+            0, 
+            GL_RGBA, GL_FLOAT,
+            nullptr
+        );
+        glBindImageTexture(
+            0, 
+            noise_texture, 0, 
+            GL_FALSE, 
+            0, 
+            GL_READ_WRITE, 
+            GL_RGBA32F
+        );
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        return std::make_tuple(noise_texture, noise_buffer);
+    };
+
+    auto [flux_texture, flux_buffer]   = gen_map_texture(noise_size, noise_size);
+    defer { glDeleteBuffers(1, &flux_buffer); glDeleteTextures(1, &flux_texture);};
+
+    auto [vel_texture, vel_buffer]     = gen_map_texture(noise_size, noise_size);
+    defer { glDeleteBuffers(1, &vel_buffer); glDeleteTextures(1, &vel_texture);};
+
+    auto [noise_texture, noise_buffer] = gen_map_texture(noise_size, noise_size);
+    defer { glDeleteBuffers(1, &noise_buffer); glDeleteTextures(1, &noise_texture);};
+
     // ----------- water tex generation ---------------
     GLuint water_buffer;
     glGenBuffers(1, &water_buffer);

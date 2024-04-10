@@ -14,7 +14,7 @@ enum Log_type {
 void err_log_shader(GLuint program, Log_type type);
 
 std::string load_shader_file(std::string filename) {
-    LOG_DBG("Loading shader {}", filename);
+    LOG_DBG("   Shader filename {}", filename);
     char path[1 << 8];
     snprintf(path, sizeof(path), "../glsl/%s", filename.c_str());
 

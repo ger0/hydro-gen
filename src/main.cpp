@@ -22,12 +22,12 @@ constexpr float Z_FAR = 2048.f;
 constexpr float FOV = 90.f;
 constexpr float ASPECT_RATIO = float(WINDOW_W) / WINDOW_H;
 
+constexpr GLuint NOISE_SIZE = 4096;
+
 // shader filenames
 constexpr auto noise_comput_file    = "heightmap.glsl";
 constexpr auto render_comput_file   = "rendering.glsl";
 constexpr auto erosion_comput_file  = "erosion.glsl";
-
-// ----------------------
 
 static float delta_time = 0.f;
 static float last_frame = 0.f;
@@ -53,6 +53,153 @@ static struct Camera {
 
 	bool boost  = false;	
 } camera;
+
+struct World_data {
+    GLuint heightmap;
+    GLuint out_heightmap;
+    GLuint water_tex;
+
+    GLuint water_flux;
+    GLuint water_vel;
+};
+
+void delete_world_textures(World_data& data) {
+    glDeleteTextures(1, &data.heightmap);
+    glDeleteTextures(1, &data.out_heightmap);
+    glDeleteTextures(1, &data.water_tex);
+    glDeleteTextures(1, &data.water_flux);
+    glDeleteTextures(1, &data.water_vel);
+}
+
+World_data gen_world_textures() {
+    // ----------- noise generation ---------------
+    auto gen_map_texture = [&](const GLuint width, const GLuint height) 
+        -> GLuint {
+        GLuint noise_texture;
+        glGenTextures(1, &noise_texture);
+
+        glBindTexture(GL_TEXTURE_2D, noise_texture);
+        glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            GL_RGBA32F,
+            width, height,
+            0, 
+            GL_RGBA, GL_FLOAT,
+            nullptr
+        );
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        return noise_texture;
+    };
+
+    auto flux           = gen_map_texture(NOISE_SIZE, NOISE_SIZE);
+    auto velocity       = gen_map_texture(NOISE_SIZE, NOISE_SIZE);
+    auto heightmap      = gen_map_texture(NOISE_SIZE, NOISE_SIZE);
+    auto out_heightmap  = gen_map_texture(NOISE_SIZE, NOISE_SIZE);
+    // ----------- water tex generation ---------------
+    GLuint water_tex;
+    glGenTextures(1, &water_tex);
+
+    glBindTexture(GL_TEXTURE_2D, water_tex);
+    glTexImage2D(
+        GL_TEXTURE_2D,
+        0,
+        GL_R32F,
+        NOISE_SIZE, NOISE_SIZE,
+        0, 
+        GL_RED, GL_FLOAT,
+        nullptr
+    );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // Set texture wrapping behavior
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    return World_data {
+        .heightmap      = heightmap,
+        .out_heightmap  = out_heightmap,
+        .water_tex      = water_tex,
+        .water_flux     = flux,
+        .water_vel      = velocity
+    };
+}
+
+void dispatch_erosion(Compute_program& program, World_data& tex) {
+    program.use();
+
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+    glBindTexture(GL_TEXTURE_2D, tex.heightmap);
+    glBindImageTexture(
+        0, 
+        tex.heightmap, 0, 
+        GL_FALSE, 
+        0, 
+        GL_READ_ONLY, 
+        GL_RGBA32F
+    );
+    glBindTexture(GL_TEXTURE_2D, tex.out_heightmap);
+    glBindImageTexture(
+        1, 
+        tex.out_heightmap, 0, 
+        GL_FALSE, 
+        0, 
+        GL_WRITE_ONLY, 
+        GL_RGBA32F
+    );
+    glDispatchCompute(NOISE_SIZE / 8, NOISE_SIZE / 8, 1);
+}
+
+struct Render_data {
+    float time;
+    GLuint framebuffer;
+    GLuint output_texture;
+    // camera;
+};
+
+bool dispatch_rendering(Compute_program& shader, Render_data &data, World_data& textures) {
+    using glm::perspective, glm::lookAt, glm::radians;
+    shader.use();
+
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    // TODO: change to a uniform buffer
+    glm::mat4 mat_v = lookAt(
+	    camera.pos, 
+	    camera.pos + camera.dir, 
+	    camera.up
+	);
+    glm::mat4 mat_p = perspective(
+	    radians(FOV), 
+	    ASPECT_RATIO, 
+	    Z_NEAR, Z_FAR
+	);
+
+	shader.set_uniform("view", mat_v);
+	shader.set_uniform("perspective", mat_p);
+	shader.set_uniform("dir", camera.dir);
+	shader.set_uniform("pos", camera.pos);
+	shader.set_uniform("time", data.time);
+
+    glDispatchCompute(WINDOW_W / 8, WINDOW_H / 8, 1);
+
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glBlitNamedFramebuffer(
+        data.framebuffer, 0, 
+        0, 0, WINDOW_W, WINDOW_H, 
+        0, 0, WINDOW_W, WINDOW_H, 
+        GL_COLOR_BUFFER_BIT, GL_NEAREST
+    );
+    return true;
+}
 
 void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
 	float xoffset = xpos - mouse_last.x;
@@ -136,100 +283,57 @@ int main(int argc, char* argv[]) {
     Compute_program render_comput(render_comput_file);
     Compute_program erosion_comput(erosion_comput_file);
 
-    // ----------- noise generation ---------------
-    constexpr GLuint noise_size = 4096;
+    // textures 
+    World_data textures = gen_world_textures();
+    defer{ delete_world_textures(textures);};
 
-    auto gen_map_texture = [&](const GLuint width, const GLuint height) 
-        -> GLuint {
-        GLuint noise_texture;
-        glGenTextures(1, &noise_texture);
-
-        glBindTexture(GL_TEXTURE_2D, noise_texture);
-        glTexImage2D(
-            GL_TEXTURE_2D,
-            0,
-            GL_RGBA32F,
-            width, height,
-            0, 
-            GL_RGBA, GL_FLOAT,
-            nullptr
-        );
-        glBindImageTexture(
-            0, 
-            noise_texture, 0, 
-            GL_FALSE, 
-            0, 
-            GL_READ_WRITE, 
-            GL_RGBA32F
-        );
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        return noise_texture;
-    };
-
-    auto flux_texture = gen_map_texture(noise_size, noise_size);
-    defer {glDeleteTextures(1, &flux_texture);};
-
-    auto vel_texture = gen_map_texture(noise_size, noise_size);
-    defer {glDeleteTextures(1, &vel_texture);};
-
-    auto noise_texture = gen_map_texture(noise_size, noise_size);
-    defer {glDeleteTextures(1, &noise_texture);};
-
-    // ----------- water tex generation ---------------
-    GLuint water_tex;
-    glGenTextures(1, &water_tex);
-    defer { glDeleteTextures(1, &water_tex); };
-
-    glBindTexture(GL_TEXTURE_2D, water_tex);
-    glTexImage2D(
-        GL_TEXTURE_2D,
-        0,
-        GL_R32F,
-        noise_size, noise_size,
+    // ------------ noise generation -----------------
+    noise_comput.use();
+    glBindTexture(GL_TEXTURE_2D, textures.heightmap);
+    glBindImageTexture(
         0, 
-        GL_RED, GL_FLOAT,
-        nullptr
+        textures.heightmap, 0, 
+        GL_FALSE, 
+        0, 
+        GL_READ_WRITE, 
+        GL_RGBA32F
     );
+    glBindTexture(GL_TEXTURE_2D, textures.water_tex);
     glBindImageTexture(
         1, 
-        water_tex, 0, 
+        textures.water_tex, 0, 
         GL_FALSE, 
         0, 
         GL_WRITE_ONLY, 
         GL_R32F
     );
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // Set texture wrapping behavior
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-    noise_comput.use();
     noise_comput.set_uniform("height_scale", MAX_HEIGHT);
     noise_comput.set_uniform("water_lvl", WATER_HEIGHT);
-    glDispatchCompute(noise_size / 8, noise_size / 8, 1);
-    // ---------- erosion compute shader ------------
-    erosion_comput.use();
-    glDispatchCompute(noise_size / 8, noise_size / 8, 1);
+    glDispatchCompute(NOISE_SIZE / 8, NOISE_SIZE / 8, 1);
 
     // ---------- output framebuffer  ---------------
-    GLuint framebuffer;
-    glGenFramebuffers(1, &framebuffer);
-    defer { glDeleteFramebuffers(1, &framebuffer); };
+    Render_data render_data;
+    glGenFramebuffers(1, &render_data.framebuffer);
+    defer { glDeleteFramebuffers(1, &render_data.framebuffer); };
 
-    constexpr u32 group_size = 8;
-    constexpr u32 chunk_size = 8;
-    constexpr u32 total_size = group_size * chunk_size;
-
+    // output image rendered to framebuffer
+    glGenTextures(1, &render_data.output_texture);
+    defer { glDeleteTextures(1, &render_data.output_texture); };
+    glBindTexture(GL_TEXTURE_2D, render_data.output_texture);
+    glTexImage2D(
+        GL_TEXTURE_2D, 
+        0, 
+        GL_RGBA32F, 
+        WINDOW_W, WINDOW_H, 
+        0, 
+        GL_RGBA, GL_FLOAT, 
+        nullptr
+    );
     render_comput.use();
-
     // configuration
-    struct Compute_config {
-        alignas(16) ivec2 dims          = ivec2(noise_size, noise_size);
-        /* alignas(16) vec4 sky_color      = vec4(0.45, 0.716, 0.914, 1);
-        alignas(16) vec4 water_color    = vec4(0.15, 0.216, 0.614, 1); */
+    constexpr struct Compute_config {
+        alignas(16) float max_height    = MAX_HEIGHT;
+        alignas(16) ivec2 dims          = ivec2(NOISE_SIZE, NOISE_SIZE);
     } conf_buff;
 
     GLuint ubo_config;
@@ -245,74 +349,39 @@ int main(int argc, char* argv[]) {
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
     render_comput.ub_bind("config", ubo_config);
 
-    using glm::lookAt, glm::perspective, glm::radians;
-
-    glBindTexture(GL_TEXTURE_2D, noise_texture);
-    glTexImage2D(
-        GL_TEXTURE_2D, 
-        0, 
-        GL_RGBA32F, 
-        noise_size, noise_size, 
-        0, 
-        GL_RGBA, GL_FLOAT, 
-        nullptr
-    );
+    glBindTexture(GL_TEXTURE_2D, textures.heightmap);
     glBindImageTexture(
         2, 
-        noise_texture, 0, 
+        textures.heightmap, 0, 
         GL_FALSE, 
         0, 
         GL_READ_ONLY, 
         GL_RGBA32F
     );
-
-    glBindTexture(GL_TEXTURE_2D, water_tex);
-    glTexImage2D(
-        GL_TEXTURE_2D, 
-        0, 
-        GL_R32F, 
-        noise_size, noise_size, 
-        0, 
-        GL_RED, GL_FLOAT, 
-        nullptr
-    );
+    glBindTexture(GL_TEXTURE_2D, textures.water_tex);
     glBindImageTexture(
         4, 
-        water_tex, 0, 
+        textures.water_tex, 0, 
         GL_FALSE, 
         0, 
         GL_READ_ONLY, 
         GL_R32F
     );
-    GLuint output_texture;
-    glGenTextures(1, &output_texture);
-    defer { glDeleteTextures(1, &output_texture); };
-
-    glBindTexture(GL_TEXTURE_2D, output_texture);
-    glTexImage2D(
-        GL_TEXTURE_2D, 
-        0, 
-        GL_RGBA32F, 
-        WINDOW_W, WINDOW_H, 
-        0, 
-        GL_RGBA, GL_FLOAT, 
-        nullptr
-    );
+    glBindTexture(GL_TEXTURE_2D, render_data.output_texture);
     glBindImageTexture(
         3, 
-        output_texture, 0, 
+        render_data.output_texture, 0, 
         GL_FALSE, 
         0, 
         GL_WRITE_ONLY, 
         GL_RGBA32F
     );
-
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, render_data.framebuffer);
     glFramebufferTexture2D(
         GL_FRAMEBUFFER,
         GL_COLOR_ATTACHMENT0, 
         GL_TEXTURE_2D, 
-        output_texture, 
+        render_data.output_texture, 
         0
     );
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER)
@@ -321,16 +390,13 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }    
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    render_comput.set_uniform("max_height", MAX_HEIGHT);
-    render_comput.set_uniform("water_lvl", WATER_HEIGHT);
-    glDispatchCompute(WINDOW_W / 8, WINDOW_H / 8, 1);
 
     u32 frame_count = 0;
     float last_frame_rounded = 0.0;
     double frame_time = 0.0;
+
     while (!glfwWindowShouldClose(window.get())) {
         frame_count += 1;
-
         float current_frame = glfwGetTime();
         delta_time = current_frame - last_frame;
         if (current_frame - last_frame_rounded >= 1.f) {
@@ -339,51 +405,16 @@ int main(int argc, char* argv[]) {
             last_frame_rounded += 1.f;
         }
         last_frame = current_frame;
-
         glfwPollEvents();
 
-        render_comput.use();
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        // ---------- erosion compute shader ------------
+        dispatch_erosion(erosion_comput, textures);
 
-        glm::mat4 mat_v = lookAt(
-	        camera.pos, 
-	        camera.pos + camera.dir, 
-	        camera.up
-	    );
-        glm::mat4 mat_p = perspective(
-	        radians(FOV), 
-	        ASPECT_RATIO, 
-	        Z_NEAR, Z_FAR
-	    );
-
-	    render_comput.set_uniform("view", mat_v);
-	    render_comput.set_uniform("perspective", mat_p);
-
-	    render_comput.set_uniform("dir", camera.dir);
-	    render_comput.set_uniform("pos", camera.pos);
-	    render_comput.set_uniform("time", current_frame);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER)
-                != GL_FRAMEBUFFER_COMPLETE) {
-            LOG_ERR("FRAMEBUFFER INCOMPLETE!");
+        render_data.time = current_frame;
+        if (!dispatch_rendering(render_comput, render_data, textures)) {
             return EXIT_FAILURE;
-        }    
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glDispatchCompute(WINDOW_W / 8, WINDOW_H / 8, 1);
+        }
 
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        glBlitNamedFramebuffer(
-            framebuffer, 0, 
-            0, 0, WINDOW_W, WINDOW_H, 
-            0, 0, WINDOW_W, WINDOW_H, 
-            GL_COLOR_BUFFER_BIT, GL_NEAREST
-        );
         // imgui
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();

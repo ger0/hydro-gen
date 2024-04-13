@@ -5,6 +5,7 @@
 layout (local_size_x = 8, local_size_y = 8) in;
 
 layout (binding = 0) uniform config {
+    float max_height;
     ivec2 hmap_dims;
 };
 
@@ -13,11 +14,8 @@ uniform mat4 view;
 
 uniform vec3 dir;
 uniform vec3 pos;
-// world max height
-uniform float max_height;
 
 uniform float time;
-
 layout (rgba32f, binding = 2) uniform readonly image2D heightmap;
 layout (rgba32f, binding = 3) uniform writeonly image2D out_tex;
 layout (r32f,    binding = 4) uniform readonly image2D water_tex;
@@ -234,7 +232,7 @@ vec4 calc_water(vec3 in_color, Ray ray, vec3 direction, float sundot, vec2 water
         (w_orig.xz / WORLD_SCALE) + (vec2(time / 3, time / 5) / WORLD_SCALE)
     );
 
-    w_norm.xz *= 0.02;
+    w_norm.xz *= 0.03;
     w_norm.y = 1;
     w_norm = normalize(w_norm);
     vec3 w_refl = reflect(direction, -w_norm);

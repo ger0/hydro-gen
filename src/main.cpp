@@ -22,9 +22,10 @@ constexpr float Z_FAR = 2048.f;
 constexpr float FOV = 90.f;
 constexpr float ASPECT_RATIO = float(WINDOW_W) / WINDOW_H;
 
-constexpr auto compute_noise_file = "compute.glsl";
-constexpr auto compute_verts_file = "compute_vertices.glsl";
-constexpr auto simplex_noise_file = "simplex_noise.glsl";
+// shader filenames
+constexpr auto noise_comput_file    = "heightmap.glsl";
+constexpr auto render_comput_file   = "rendering.glsl";
+constexpr auto erosion_comput_file  = "erosion.glsl";
 
 // ----------------------
 
@@ -131,25 +132,15 @@ int main(int argc, char* argv[]) {
     init_imgui(window.get());
     defer { destroy_imgui(); };
 
-    Compute_program compute_noise(compute_noise_file);
-    Compute_program compute_output(compute_verts_file);
+    Compute_program noise_comput(noise_comput_file);
+    Compute_program render_comput(render_comput_file);
+    Compute_program erosion_comput(erosion_comput_file);
 
     // ----------- noise generation ---------------
     constexpr GLuint noise_size = 4096;
 
     auto gen_map_texture = [&](const GLuint width, const GLuint height) 
-        -> std::tuple<GLuint, GLuint> {
-        GLuint noise_buffer;
-        glGenBuffers(1, &noise_buffer);
-
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, noise_buffer);
-        glBufferData(
-            GL_SHADER_STORAGE_BUFFER, 
-            sizeof(float) * 4 * width  * height, nullptr, 
-            GL_STATIC_DRAW
-        );
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, noise_buffer);
-
+        -> GLuint {
         GLuint noise_texture;
         glGenTextures(1, &noise_texture);
 
@@ -174,31 +165,19 @@ int main(int argc, char* argv[]) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-        return std::make_tuple(noise_texture, noise_buffer);
+        return noise_texture;
     };
 
-    auto [flux_texture, flux_buffer]   = gen_map_texture(noise_size, noise_size);
-    defer { glDeleteBuffers(1, &flux_buffer); glDeleteTextures(1, &flux_texture);};
+    auto flux_texture = gen_map_texture(noise_size, noise_size);
+    defer {glDeleteTextures(1, &flux_texture);};
 
-    auto [vel_texture, vel_buffer]     = gen_map_texture(noise_size, noise_size);
-    defer { glDeleteBuffers(1, &vel_buffer); glDeleteTextures(1, &vel_texture);};
+    auto vel_texture = gen_map_texture(noise_size, noise_size);
+    defer {glDeleteTextures(1, &vel_texture);};
 
-    auto [noise_texture, noise_buffer] = gen_map_texture(noise_size, noise_size);
-    defer { glDeleteBuffers(1, &noise_buffer); glDeleteTextures(1, &noise_texture);};
+    auto noise_texture = gen_map_texture(noise_size, noise_size);
+    defer {glDeleteTextures(1, &noise_texture);};
 
     // ----------- water tex generation ---------------
-    GLuint water_buffer;
-    glGenBuffers(1, &water_buffer);
-    defer { glDeleteBuffers(1, &water_buffer); };
-
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, water_buffer);
-    glBufferData(
-        GL_SHADER_STORAGE_BUFFER, 
-        WINDOW_W * sizeof(float) * WINDOW_H, nullptr, 
-        GL_STATIC_DRAW
-    );
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, water_buffer);
-
     GLuint water_tex;
     glGenTextures(1, &water_tex);
     defer { glDeleteTextures(1, &water_tex); };
@@ -227,22 +206,24 @@ int main(int argc, char* argv[]) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
-    compute_noise.use();
-    compute_noise.set_uniform("height_scale", MAX_HEIGHT);
-    compute_noise.set_uniform("water_lvl", WATER_HEIGHT);
+    noise_comput.use();
+    noise_comput.set_uniform("height_scale", MAX_HEIGHT);
+    noise_comput.set_uniform("water_lvl", WATER_HEIGHT);
+    glDispatchCompute(noise_size / 8, noise_size / 8, 1);
+    // ---------- erosion compute shader ------------
+    erosion_comput.use();
     glDispatchCompute(noise_size / 8, noise_size / 8, 1);
 
+    // ---------- output framebuffer  ---------------
     GLuint framebuffer;
     glGenFramebuffers(1, &framebuffer);
     defer { glDeleteFramebuffers(1, &framebuffer); };
-
-    // ---------- output framebuffer  ---------------
 
     constexpr u32 group_size = 8;
     constexpr u32 chunk_size = 8;
     constexpr u32 total_size = group_size * chunk_size;
 
-    compute_output.use();
+    render_comput.use();
 
     // configuration
     struct Compute_config {
@@ -262,7 +243,7 @@ int main(int argc, char* argv[]) {
         GL_STATIC_DRAW
     );
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    compute_output.ub_bind("config", ubo_config);
+    render_comput.ub_bind("config", ubo_config);
 
     using glm::lookAt, glm::perspective, glm::radians;
 
@@ -303,19 +284,6 @@ int main(int argc, char* argv[]) {
         GL_READ_ONLY, 
         GL_R32F
     );
-
-    GLuint output_buffer;
-    glGenBuffers(1, &output_buffer);
-    defer { glDeleteBuffers(1, &output_buffer); };
-
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, output_buffer);
-    glBufferData(
-        GL_SHADER_STORAGE_BUFFER, 
-        WINDOW_W * sizeof(float) * WINDOW_H, nullptr, 
-        GL_STATIC_DRAW
-    );
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, output_buffer);
-
     GLuint output_texture;
     glGenTextures(1, &output_texture);
     defer { glDeleteTextures(1, &output_texture); };
@@ -353,8 +321,8 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }    
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    compute_output.set_uniform("max_height", MAX_HEIGHT);
-    compute_output.set_uniform("water_lvl", WATER_HEIGHT);
+    render_comput.set_uniform("max_height", MAX_HEIGHT);
+    render_comput.set_uniform("water_lvl", WATER_HEIGHT);
     glDispatchCompute(WINDOW_W / 8, WINDOW_H / 8, 1);
 
     u32 frame_count = 0;
@@ -374,7 +342,7 @@ int main(int argc, char* argv[]) {
 
         glfwPollEvents();
 
-        compute_output.use();
+        render_comput.use();
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
@@ -389,12 +357,12 @@ int main(int argc, char* argv[]) {
 	        Z_NEAR, Z_FAR
 	    );
 
-	    compute_output.set_uniform("view", mat_v);
-	    compute_output.set_uniform("perspective", mat_p);
+	    render_comput.set_uniform("view", mat_v);
+	    render_comput.set_uniform("perspective", mat_p);
 
-	    compute_output.set_uniform("dir", camera.dir);
-	    compute_output.set_uniform("pos", camera.pos);
-	    compute_output.set_uniform("time", current_frame);
+	    render_comput.set_uniform("dir", camera.dir);
+	    render_comput.set_uniform("pos", camera.pos);
+	    render_comput.set_uniform("time", current_frame);
 
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER)

@@ -21,12 +21,11 @@ void main() {
     gln_tFBMOpts opts = gln_tFBMOpts(0, 0.5, 2.0, 0.0035, 1, 9, false, false);
     float val = (gln_sfbm(store_pos, opts) + 1) / 2;
     vec4 terrain = vec4(val * height_scale, 0.0, 0.0, 0.0);
+    float water_col = gln_simplex(vec2(store_pos));
     // water height
     terrain.b = max(water_lvl - terrain.r, 0.0);
     // total height
     terrain.w = max(terrain.r, terrain.b);
-
-    float water_col = gln_simplex(vec2(store_pos));
 
     imageStore(dest_tex, store_pos, terrain);
     imageStore(water_tex, store_pos, vec4(water_col, 0, 0, 0));

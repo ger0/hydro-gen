@@ -11,15 +11,17 @@ layout (binding = 0) uniform config {
 
 uniform mat4 perspective;
 uniform mat4 view;
-
 uniform vec3 dir;
 uniform vec3 pos;
-
 uniform float time;
+
 layout (rgba32f, binding = 2) uniform readonly image2D heightmap;
 layout (rgba32f, binding = 3) uniform writeonly image2D out_tex;
 layout (r32f,    binding = 4) uniform readonly image2D water_tex;
 
+// max raymarching distance
+const float max_dist    = 2048.0;
+const int   max_steps   = 1028;
 
 const vec3 light_dir    = normalize(vec3(0.0, -0.5, -1.0));
 const vec3 light_color  = normalize(vec3(0.09, 0.075, 0.04));
@@ -27,12 +29,6 @@ const vec3 light_color  = normalize(vec3(0.09, 0.075, 0.04));
 // diffuse colours
 const vec3 sky_color    = vec3(0.3, 0.5, 0.85);
 const vec3 water_color  = vec3(0.22, 0.606, 0.964);
-
-vec2 get_water_top_bottom(vec3 pos) {
-    float dirt = img_bilinear_r(heightmap, pos.xz);
-    float water = img_bilinear_b(heightmap, pos.xz);
-    return vec2(dirt + water, dirt);
-}
 
 struct Material_colors {
     vec3 grass;
@@ -62,19 +58,10 @@ const Material_colors diffuse_cols = Material_colors(
     vec3(0.5, 0.48, 0.49) * 2 / 3
 );
 
-const float max_dist    = 2048.0;
-const int   max_steps   = 1028;
-
 struct Ray {
     vec4 pos;
     float dist; 
 };
-
-vec2 rand2(vec2 p) {
-    return fract(
-        sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) *
-        43758.5453);
-}
 
 // functions
 // a different curve between [0 - 1] values
@@ -92,12 +79,20 @@ vec3 get_shade_terr(vec3 ray_pos, vec3 normal);
 vec3 get_fog_color(vec3 col, float ray_dist, float sundot);
 // returns the color of the sky based on camera and sun direction
 vec3 get_sky_color(vec3 direction, float ray_dist, float sundot);
+// get height of the top and bottom of the water body
+vec2 get_water_top_bottom(vec3 pos);
 // shade individual pixel on the screen
 vec3 get_pixel_color(vec3 origin, vec3 direction);
 // march rays
 Ray raymarch(vec3 orig, vec3 dir, const float max_dst, const int max_iter);
 // convert coords to world coordinates
 vec4 to_world(vec4 coord);
+
+vec2 get_water_top_bottom(vec3 pos) {
+    float dirt = img_bilinear_r(heightmap, pos.xz);
+    float water = img_bilinear_b(heightmap, pos.xz);
+    return vec2(dirt + water, dirt);
+}
 
 float fog_mix(float fog) {
     return clamp(fog * fog * fog, 0.0, 1.0); 
@@ -331,7 +326,7 @@ Ray raymarch(vec3 origin, vec3 direction,
         vec3 sample_pos = origin + direction * dist;
 
         // float height = img_bilinear(heightmap, sample_pos.xz);
-        float t_height = img_bilinear_w(heightmap, sample_pos.xz);
+        float t_height = img_bilinear_r(heightmap, sample_pos.xz);
 
         if (sample_pos.y > max_height && direction.y >= 0) {
             break;

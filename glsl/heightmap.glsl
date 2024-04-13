@@ -25,7 +25,7 @@ void main() {
     // water height
     terrain.b = max(water_lvl - terrain.r, 0.0);
     // total height
-    terrain.w = max(terrain.r, terrain.b);
+    terrain.w = terrain.r + terrain.b;
 
     imageStore(dest_tex, store_pos, terrain);
     imageStore(water_tex, store_pos, vec4(water_col, 0, 0, 0));

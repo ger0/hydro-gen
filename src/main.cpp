@@ -127,12 +127,8 @@ World_data gen_world_textures() {
     };
 }
 
-void dispatch_erosion(Compute_program& program, World_data& tex) {
+void prepare_erosion(Compute_program& program, World_data& tex) {
     program.use();
-
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-
     glBindTexture(GL_TEXTURE_2D, tex.heightmap);
     glBindImageTexture(
         0, 
@@ -151,17 +147,130 @@ void dispatch_erosion(Compute_program& program, World_data& tex) {
         GL_WRITE_ONLY, 
         GL_RGBA32F
     );
+}
+
+void dispatch_erosion(Compute_program& program, World_data& tex) {
+    program.use();
+
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
     glDispatchCompute(NOISE_SIZE / 8, NOISE_SIZE / 8, 1);
+
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+    glCopyImageSubData(
+        tex.out_heightmap,
+        GL_TEXTURE_2D, 0,
+        0, 0, 0,
+        tex.heightmap,
+        GL_TEXTURE_2D, 0,
+        0, 0, 0,
+        NOISE_SIZE, NOISE_SIZE, 1
+    );
 }
 
 struct Render_data {
     float time;
     GLuint framebuffer;
     GLuint output_texture;
-    // camera;
+    GLuint config_buffer;
 };
 
-bool dispatch_rendering(Compute_program& shader, Render_data &data, World_data& textures) {
+void delete_renderer(Render_data& data) {
+    glDeleteFramebuffers(1, &data.framebuffer);
+    glDeleteTextures(1, &data.output_texture);
+    glDeleteBuffers(1, &data.config_buffer);
+}
+
+bool prepare_rendering(
+        Render_data& data, 
+        Compute_program& program, 
+        World_data& textures
+    ) {
+    program.use();
+
+    glGenFramebuffers(1, &data.framebuffer);
+    // output image rendered to framebuffer
+    glGenTextures(1, &data.output_texture);
+    glBindTexture(GL_TEXTURE_2D, data.output_texture);
+    glTexImage2D(
+        GL_TEXTURE_2D, 
+        0, 
+        GL_RGBA32F, 
+        WINDOW_W, WINDOW_H, 
+        0, 
+        GL_RGBA, GL_FLOAT, 
+        nullptr
+    );
+    // configuration
+    constexpr struct Compute_config {
+        alignas(16) float max_height    = MAX_HEIGHT;
+        alignas(16) ivec2 dims          = ivec2(NOISE_SIZE, NOISE_SIZE);
+    } conf_buff;
+
+    glGenBuffers(1, &data.config_buffer);
+
+    glBindBuffer(GL_UNIFORM_BUFFER, data.config_buffer);
+    glBufferData(
+        GL_UNIFORM_BUFFER, 
+        sizeof(conf_buff), &conf_buff, 
+        GL_STATIC_DRAW
+    );
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    program.ub_bind("config", data.config_buffer);
+
+    glBindTexture(GL_TEXTURE_2D, textures.heightmap);
+    glBindImageTexture(
+        2, 
+        textures.heightmap, 0, 
+        GL_FALSE, 
+        0, 
+        GL_READ_ONLY, 
+        GL_RGBA32F
+    );
+    glBindTexture(GL_TEXTURE_2D, textures.water_tex);
+    glBindImageTexture(
+        4, 
+        textures.water_tex, 0, 
+        GL_FALSE, 
+        0, 
+        GL_READ_ONLY, 
+        GL_R32F
+    );
+    glBindTexture(GL_TEXTURE_2D, data.output_texture);
+    glBindImageTexture(
+        3, 
+        data.output_texture, 0, 
+        GL_FALSE, 
+        0, 
+        GL_WRITE_ONLY, 
+        GL_RGBA32F
+    );
+    glBindFramebuffer(GL_FRAMEBUFFER, data.framebuffer);
+    glFramebufferTexture2D(
+        GL_FRAMEBUFFER,
+        GL_COLOR_ATTACHMENT0, 
+        GL_TEXTURE_2D, 
+        data.output_texture, 
+        0
+    );
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER)
+            != GL_FRAMEBUFFER_COMPLETE) {
+        LOG_ERR("FRAMEBUFFER INCOMPLETE!");
+        return false;
+    }    
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    return true;
+}
+
+bool dispatch_rendering(
+        Compute_program& shader, 
+        Render_data &data, 
+        World_data& textures
+    ) {
     using glm::perspective, glm::lookAt, glm::radians;
     shader.use();
 
@@ -179,11 +288,11 @@ bool dispatch_rendering(Compute_program& shader, Render_data &data, World_data& 
 	    Z_NEAR, Z_FAR
 	);
 
-	shader.set_uniform("view", mat_v);
-	shader.set_uniform("perspective", mat_p);
-	shader.set_uniform("dir", camera.dir);
-	shader.set_uniform("pos", camera.pos);
-	shader.set_uniform("time", data.time);
+    shader.set_uniform("view", mat_v);
+    shader.set_uniform("perspective", mat_p);
+    shader.set_uniform("dir", camera.dir);
+    shader.set_uniform("pos", camera.pos);
+    shader.set_uniform("time", data.time);
 
     glDispatchCompute(WINDOW_W / 8, WINDOW_H / 8, 1);
 
@@ -311,85 +420,12 @@ int main(int argc, char* argv[]) {
     noise_comput.set_uniform("water_lvl", WATER_HEIGHT);
     glDispatchCompute(NOISE_SIZE / 8, NOISE_SIZE / 8, 1);
 
-    // ---------- output framebuffer  ---------------
+    // ---------- prepare textures for rendering  ---------------
     Render_data render_data;
-    glGenFramebuffers(1, &render_data.framebuffer);
-    defer { glDeleteFramebuffers(1, &render_data.framebuffer); };
+    prepare_rendering(render_data, render_comput, textures);
+    defer{delete_renderer(render_data);};
 
-    // output image rendered to framebuffer
-    glGenTextures(1, &render_data.output_texture);
-    defer { glDeleteTextures(1, &render_data.output_texture); };
-    glBindTexture(GL_TEXTURE_2D, render_data.output_texture);
-    glTexImage2D(
-        GL_TEXTURE_2D, 
-        0, 
-        GL_RGBA32F, 
-        WINDOW_W, WINDOW_H, 
-        0, 
-        GL_RGBA, GL_FLOAT, 
-        nullptr
-    );
-    render_comput.use();
-    // configuration
-    constexpr struct Compute_config {
-        alignas(16) float max_height    = MAX_HEIGHT;
-        alignas(16) ivec2 dims          = ivec2(NOISE_SIZE, NOISE_SIZE);
-    } conf_buff;
-
-    GLuint ubo_config;
-    glGenBuffers(1, &ubo_config);
-    defer { glDeleteBuffers(1, &ubo_config); };
-
-    glBindBuffer(GL_UNIFORM_BUFFER, ubo_config);
-    glBufferData(
-        GL_UNIFORM_BUFFER, 
-        sizeof(conf_buff), &conf_buff, 
-        GL_STATIC_DRAW
-    );
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    render_comput.ub_bind("config", ubo_config);
-
-    glBindTexture(GL_TEXTURE_2D, textures.heightmap);
-    glBindImageTexture(
-        2, 
-        textures.heightmap, 0, 
-        GL_FALSE, 
-        0, 
-        GL_READ_ONLY, 
-        GL_RGBA32F
-    );
-    glBindTexture(GL_TEXTURE_2D, textures.water_tex);
-    glBindImageTexture(
-        4, 
-        textures.water_tex, 0, 
-        GL_FALSE, 
-        0, 
-        GL_READ_ONLY, 
-        GL_R32F
-    );
-    glBindTexture(GL_TEXTURE_2D, render_data.output_texture);
-    glBindImageTexture(
-        3, 
-        render_data.output_texture, 0, 
-        GL_FALSE, 
-        0, 
-        GL_WRITE_ONLY, 
-        GL_RGBA32F
-    );
-    glBindFramebuffer(GL_FRAMEBUFFER, render_data.framebuffer);
-    glFramebufferTexture2D(
-        GL_FRAMEBUFFER,
-        GL_COLOR_ATTACHMENT0, 
-        GL_TEXTURE_2D, 
-        render_data.output_texture, 
-        0
-    );
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER)
-            != GL_FRAMEBUFFER_COMPLETE) {
-        LOG_ERR("FRAMEBUFFER INCOMPLETE!");
-        return EXIT_FAILURE;
-    }    
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    prepare_erosion(erosion_comput, textures);
 
     u32 frame_count = 0;
     float last_frame_rounded = 0.0;
@@ -397,20 +433,20 @@ int main(int argc, char* argv[]) {
 
     while (!glfwWindowShouldClose(window.get())) {
         frame_count += 1;
-        float current_frame = glfwGetTime();
-        delta_time = current_frame - last_frame;
-        if (current_frame - last_frame_rounded >= 1.f) {
+        render_data.time = glfwGetTime();
+        delta_time = render_data.time - last_frame;
+        if (render_data.time - last_frame_rounded >= 1.f) {
             frame_time = 1000.0 / (double)frame_count;
             frame_count = 0;
             last_frame_rounded += 1.f;
         }
-        last_frame = current_frame;
+        last_frame = render_data.time;
+
         glfwPollEvents();
 
         // ---------- erosion compute shader ------------
         dispatch_erosion(erosion_comput, textures);
 
-        render_data.time = current_frame;
         if (!dispatch_rendering(render_comput, render_data, textures)) {
             return EXIT_FAILURE;
         }
@@ -433,9 +469,7 @@ int main(int argc, char* argv[]) {
         );
         ImGui::Text("frame time (ms): {%.2f}", frame_time);
         ImGui::Text("fps: {%.2f}", 1000.0 / frame_time);
-
         ImGui::End();
-
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 

@@ -29,7 +29,7 @@ using Arr = std::array<T, n>;
 template <typename T>
 using Vec = std::vector<T>;
 
-GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title);
+GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title, bool* error_bool);
 void init_imgui(GLFWwindow* window);
 void destroy_window(GLFWwindow* win);
 void destroy_imgui();
@@ -60,4 +60,3 @@ template <class F> deferrer<F> operator*(defer_dummy, F f) { return {f}; }
 #endif
 
 #endif // HYDR_TYPES_HPP
-

@@ -11,8 +11,6 @@ enum Log_type {
     PROGRAM
 };
 
-void err_log_shader(GLuint program, Log_type type);
-
 std::string load_shader_file(std::string filename) {
     LOG_DBG("   Shader filename {}", filename);
     char path[1 << 8];
@@ -89,32 +87,7 @@ GLuint Shader_core::load_shader(GLenum shader_type, std::string filename) {
     glShaderSource(shader, 1, &shader_source, NULL);
     glCompileShader(shader);
 
-    err_log_shader(shader, SHADER);
     return shader;
-}
-
-void err_log_shader(GLuint handle, Log_type type) {
-    // error handling x2
-    int info_log_len = 0;
-    int chars_written = 0;
-    char *info_log;
-
-    if (type == SHADER) {
-        glGetShaderiv(handle, GL_INFO_LOG_LENGTH, &info_log_len);
-    } else if (type == PROGRAM) {
-        glGetProgramiv(handle, GL_INFO_LOG_LENGTH, &info_log_len);
-    }
-    if (info_log_len > 1) {
-        info_log = new char[info_log_len];
-        if (type == SHADER) {
-            glGetShaderInfoLog(handle, info_log_len, &chars_written, info_log);
-        } else if (type == PROGRAM) {
-            glGetProgramInfoLog(handle, info_log_len, &chars_written, info_log);
-        }
-        LOG_NOFORMAT_DBG(info_log);
-        delete []info_log;
-    }
-
 }
 
 Compute_program::Compute_program(std::string filename) {
@@ -126,7 +99,6 @@ Compute_program::Compute_program(std::string filename) {
     glAttachShader(program, compute);
     glLinkProgram(program);
 
-    err_log_shader(program, PROGRAM);
     LOG_DBG("Compute shader program created");
 }
 
@@ -143,7 +115,6 @@ Shader_program::Shader_program(std::string vert_file, std::string frag_file) {
     glAttachShader(program, fragment);
     glLinkProgram(program);
 
-    err_log_shader(program, PROGRAM);
     LOG_DBG("Shader pipeline created");
 }
 
@@ -180,8 +151,12 @@ void Compute_program::ub_bind(const char* variable, GLuint bind) {
     glBindBufferBase(GL_UNIFORM_BUFFER, idx, bind);
 }
 
-GLuint Shader_core::a(const char* attribute) {
+GLuint Shader_core::get_attrib_location(const char* attribute) {
     return glGetAttribLocation(program, attribute);
+}
+
+GLuint Shader_core::get_uniform_location(const char* name) {
+    return glGetUniformLocation(program, name);
 }
 
 template<>

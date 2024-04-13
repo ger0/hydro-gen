@@ -10,7 +10,8 @@ protected:
     GLuint load_shader(GLenum shader_type, std::string filename);
 public:
     void use();
-    GLuint a(const char* attribute);
+    GLuint get_attrib_location(const char* attribute);
+    GLuint get_uniform_location(const char* uniform);
 
     template<typename T>
     void set_uniform(const char* id, T const& v);

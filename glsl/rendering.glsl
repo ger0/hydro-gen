@@ -1,10 +1,11 @@
 #version 460
 
+#include "bindings.glsl"
 #include "img_interpolation.glsl"
 
 layout (local_size_x = 8, local_size_y = 8) in;
 
-layout (binding = 0) uniform config {
+layout (binding = BIND_CONFIG) uniform config {
     float max_height;
     ivec2 hmap_dims;
 };
@@ -15,9 +16,14 @@ uniform vec3 dir;
 uniform vec3 pos;
 uniform float time;
 
-layout (rgba32f, binding = 2) uniform readonly image2D heightmap;
-layout (rgba32f, binding = 3) uniform writeonly image2D out_tex;
-layout (r32f,    binding = 4) uniform readonly image2D water_tex;
+layout (rgba32f, binding = BIND_HEIGHTMAP) 
+	uniform readonly image2D heightmap;
+
+layout (rgba32f, binding = BIND_DISPLAY_TEXTURE) 
+	uniform writeonly image2D out_tex;
+
+layout (r32f,    binding = BIND_WATER_TEXTURE) 
+	uniform readonly image2D water_tex;
 
 // max raymarching distance
 const float max_dist    = 2048.0;
@@ -112,11 +118,11 @@ vec3 get_material_color(vec3 pos, vec3 norm, Material_colors material) {
 	float angle = dot(norm, up);
 	/* if (angle > 0.6 && pos.y < (water_lvl + 2.3)) {
 	    return material.sand; */
-    if (angle < 0.45 && pos.y > (max_height * 0.45)) {
+    if (angle < 0.55 && pos.y > (max_height * 0.45)) {
         return material.rock;
-    } else if (angle < 0.25) {
+    } else if (angle < 0.45) {
         return material.rock;
-	} else if (angle < 0.55 && pos.y > (max_height * 0.35)) {
+	} else if (angle < 0.85 && pos.y > (max_height * 0.35)) {
 	    return material.dirt;
 	} else {
 	    return material.grass;
@@ -212,6 +218,9 @@ vec3 get_shade_terr(vec3 ray_pos, vec3 normal) {
 }
 
 vec4 calc_water(vec3 in_color, Ray ray, vec3 direction, float sundot, vec2 water_lvls) {
+    // debugging TODO: REMOVE
+    return vec4(0, 0, 1, 0.001);
+
     const float water_step = 0.01;
     float diff = (water_lvls.r - ray.pos.y);
     float scale = diff / direction.y;

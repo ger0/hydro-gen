@@ -11,6 +11,8 @@
 #include "shaderprogram.hpp"
 #include "utils.hpp"
 
+#include "../glsl/bindings.glsl"
+
 constexpr u32 WINDOW_W = 1920;
 constexpr u32 WINDOW_H = 1080;
 
@@ -29,6 +31,7 @@ constexpr auto noise_comput_file    = "heightmap.glsl";
 constexpr auto render_comput_file   = "rendering.glsl";
 constexpr auto erosion_comput_file  = "erosion.glsl";
 
+static bool shader_error = false;
 static float delta_time = 0.f;
 static float last_frame = 0.f;
 
@@ -60,15 +63,22 @@ struct World_data {
     GLuint water_tex;
 
     GLuint water_flux;
+    GLuint out_water_flux;
     GLuint water_vel;
+    GLuint out_water_vel;
 };
 
 void delete_world_textures(World_data& data) {
     glDeleteTextures(1, &data.heightmap);
     glDeleteTextures(1, &data.out_heightmap);
+
     glDeleteTextures(1, &data.water_tex);
+
     glDeleteTextures(1, &data.water_flux);
+    glDeleteTextures(1, &data.out_water_flux);
+
     glDeleteTextures(1, &data.water_vel);
+    glDeleteTextures(1, &data.out_water_vel);
 }
 
 World_data gen_world_textures() {
@@ -95,7 +105,11 @@ World_data gen_world_textures() {
     };
 
     auto flux           = gen_map_texture(NOISE_SIZE, NOISE_SIZE);
+    auto out_flux       = gen_map_texture(NOISE_SIZE, NOISE_SIZE);
+
     auto velocity       = gen_map_texture(NOISE_SIZE, NOISE_SIZE);
+    auto out_velocity   = gen_map_texture(NOISE_SIZE, NOISE_SIZE);
+
     auto heightmap      = gen_map_texture(NOISE_SIZE, NOISE_SIZE);
     auto out_heightmap  = gen_map_texture(NOISE_SIZE, NOISE_SIZE);
     // ----------- water tex generation ---------------
@@ -123,7 +137,8 @@ World_data gen_world_textures() {
         .out_heightmap  = out_heightmap,
         .water_tex      = water_tex,
         .water_flux     = flux,
-        .water_vel      = velocity
+        .out_water_flux = out_flux,
+        .out_water_vel  = out_velocity
     };
 }
 
@@ -131,7 +146,7 @@ void prepare_erosion(Compute_program& program, World_data& tex) {
     program.use();
     glBindTexture(GL_TEXTURE_2D, tex.heightmap);
     glBindImageTexture(
-        0, 
+        BIND_HEIGHTMAP, 
         tex.heightmap, 0, 
         GL_FALSE, 
         0, 
@@ -140,25 +155,59 @@ void prepare_erosion(Compute_program& program, World_data& tex) {
     );
     glBindTexture(GL_TEXTURE_2D, tex.out_heightmap);
     glBindImageTexture(
-        1, 
+        BIND_WRITE_HEIGHTMAP, 
         tex.out_heightmap, 0, 
         GL_FALSE, 
         0, 
         GL_WRITE_ONLY, 
         GL_RGBA32F
     );
+    glBindTexture(GL_TEXTURE_2D, tex.water_flux);
+    glBindImageTexture(
+        BIND_FLUXMAP, 
+        tex.water_flux, 0, 
+        GL_FALSE, 
+        0, 
+        GL_READ_ONLY, 
+        GL_RGBA32F
+    );
+    glBindTexture(GL_TEXTURE_2D, tex.out_water_flux);
+    glBindImageTexture(
+        BIND_WRITE_FLUXMAP, 
+        tex.out_water_flux, 0, 
+        GL_FALSE, 
+        0, 
+        GL_WRITE_ONLY, 
+        GL_RGBA32F
+    );
+
+    glBindTexture(GL_TEXTURE_2D, tex.water_vel);
+    glBindImageTexture(
+        BIND_VELOCITYMAP, 
+        tex.water_vel, 0, 
+        GL_FALSE, 
+        0, 
+        GL_READ_ONLY, 
+        GL_RGBA32F
+    );
+    glBindTexture(GL_TEXTURE_2D, tex.out_water_vel);
+    glBindImageTexture(
+        BIND_WRITE_VELOCITYMAP, 
+        tex.out_water_vel, 0, 
+        GL_FALSE, 
+        0, 
+        GL_READ_WRITE, 
+        GL_RGBA32F
+    );
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void dispatch_erosion(Compute_program& program, World_data& tex) {
     program.use();
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
     glDispatchCompute(NOISE_SIZE / 8, NOISE_SIZE / 8, 1);
-
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
     glCopyImageSubData(
         tex.out_heightmap,
@@ -169,6 +218,18 @@ void dispatch_erosion(Compute_program& program, World_data& tex) {
         0, 0, 0,
         NOISE_SIZE, NOISE_SIZE, 1
     );
+
+    glCopyImageSubData(
+        tex.out_water_flux,
+        GL_TEXTURE_2D, 0,
+        0, 0, 0,
+        tex.water_flux,
+        GL_TEXTURE_2D, 0,
+        0, 0, 0,
+        NOISE_SIZE, NOISE_SIZE, 1
+    );
+
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
 
 struct Render_data {
@@ -223,7 +284,7 @@ bool prepare_rendering(
 
     glBindTexture(GL_TEXTURE_2D, textures.heightmap);
     glBindImageTexture(
-        2, 
+        BIND_HEIGHTMAP, 
         textures.heightmap, 0, 
         GL_FALSE, 
         0, 
@@ -232,7 +293,7 @@ bool prepare_rendering(
     );
     glBindTexture(GL_TEXTURE_2D, textures.water_tex);
     glBindImageTexture(
-        4, 
+        BIND_WATER_TEXTURE, 
         textures.water_tex, 0, 
         GL_FALSE, 
         0, 
@@ -241,7 +302,7 @@ bool prepare_rendering(
     );
     glBindTexture(GL_TEXTURE_2D, data.output_texture);
     glBindImageTexture(
-        3, 
+        BIND_DISPLAY_TEXTURE, 
         data.output_texture, 0, 
         GL_FALSE, 
         0, 
@@ -375,7 +436,7 @@ int main(int argc, char* argv[]) {
     }
 
     Uq_ptr<GLFWwindow, decltype(&destroy_window)> window(
-        init_window(glm::uvec2{WINDOW_W, WINDOW_H}, "Game"),
+        init_window(glm::uvec2{WINDOW_W, WINDOW_H}, "Game", &shader_error),
         destroy_window
     );
 
@@ -400,16 +461,16 @@ int main(int argc, char* argv[]) {
     noise_comput.use();
     glBindTexture(GL_TEXTURE_2D, textures.heightmap);
     glBindImageTexture(
-        0, 
+        BIND_HEIGHTMAP, 
         textures.heightmap, 0, 
         GL_FALSE, 
         0, 
-        GL_READ_WRITE, 
+        GL_WRITE_ONLY, 
         GL_RGBA32F
     );
     glBindTexture(GL_TEXTURE_2D, textures.water_tex);
     glBindImageTexture(
-        1, 
+        BIND_WATER_TEXTURE, 
         textures.water_tex, 0, 
         GL_FALSE, 
         0, 
@@ -431,7 +492,10 @@ int main(int argc, char* argv[]) {
     float last_frame_rounded = 0.0;
     double frame_time = 0.0;
 
-    while (!glfwWindowShouldClose(window.get())) {
+    const u32 max_erosion_steps = 6000;
+    u32 erosion_steps = 0;
+
+    while (!glfwWindowShouldClose(window.get()) && (!shader_error)) {
         frame_count += 1;
         render_data.time = glfwGetTime();
         delta_time = render_data.time - last_frame;
@@ -445,7 +509,10 @@ int main(int argc, char* argv[]) {
         glfwPollEvents();
 
         // ---------- erosion compute shader ------------
-        dispatch_erosion(erosion_comput, textures);
+        if (erosion_steps < max_erosion_steps) {
+            dispatch_erosion(erosion_comput, textures);
+            erosion_steps++;
+        }
 
         if (!dispatch_rendering(render_comput, render_data, textures)) {
             return EXIT_FAILURE;
@@ -457,18 +524,19 @@ int main(int argc, char* argv[]) {
         ImGui::NewFrame();
 
         ImGui::Begin("Info");
-        ImGui::Text("camera pos: {%.2f %.2f %.2f}", 
+        ImGui::Text("Camera pos: {%.2f %.2f %.2f}", 
             camera.pos.x, 
             camera.pos.y, 
             camera.pos.z
         );
-        ImGui::Text("camera dir: {%.2f %.2f %.2f}", 
+        ImGui::Text("Camera dir: {%.2f %.2f %.2f}", 
             camera.dir.x, 
             camera.dir.y, 
             camera.dir.z
         );
-        ImGui::Text("frame time (ms): {%.2f}", frame_time);
-        ImGui::Text("fps: {%.2f}", 1000.0 / frame_time);
+        ImGui::Text("Frame time (ms): {%.2f}", frame_time);
+        ImGui::Text("FPS: {%.2f}", 1000.0 / frame_time);
+        ImGui::Text("Erosion updates: {%lu}", erosion_steps);
         ImGui::End();
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

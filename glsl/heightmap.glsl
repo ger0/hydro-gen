@@ -1,11 +1,15 @@
 #version 460
 
+#include "bindings.glsl"
 #include "simplex_noise.glsl"
 layout (local_size_x = 8, local_size_y = 8) in;
 
 // (dirt, rock, water, total)
-layout (binding = 0, rgba32f)   uniform image2D dest_tex;
-layout (binding = 1, r32f)      uniform image2D water_tex;
+layout (binding = BIND_HEIGHTMAP, rgba32f)
+    uniform writeonly image2D dest_tex;
+
+layout (binding = BIND_WATER_TEXTURE, r32f)
+    uniform writeonly image2D water_tex;
 
 uniform float height_scale;
 uniform float water_lvl;
@@ -18,13 +22,16 @@ float rand(vec2 co) {
 void main() {
     ivec2 store_pos = ivec2(gl_GlobalInvocationID.xy);
 
-    gln_tFBMOpts opts = gln_tFBMOpts(0, 0.5, 2.0, 0.0035, 1, 9, false, false);
+    gln_tFBMOpts opts = gln_tFBMOpts(0, 0.5, 2.0, 0.0035, 1, 8, false, false);
     float val = (gln_sfbm(store_pos, opts) + 1) / 2;
     vec4 terrain = vec4(val * height_scale, 0.0, 0.0, 0.0);
     float water_col = gln_simplex(vec2(store_pos));
     // water height
     terrain.b = max(water_lvl - terrain.r, 0.0);
     // total height
+    if (store_pos.x >= 34 && store_pos.x <= 48 && store_pos.y < 48 && store_pos.y >= 34) {
+        terrain.b = 2.0;
+    }
     terrain.w = terrain.r + terrain.b;
 
     imageStore(dest_tex, store_pos, terrain);

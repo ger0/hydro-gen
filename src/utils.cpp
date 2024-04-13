@@ -18,8 +18,6 @@ void GLAPIENTRY gl_error_callback(
     const GLchar* message,
     const void* user
 ) {
-    static u32 test = 0;
-
     (void)id;
     (void)length;
     (void)user;
@@ -52,17 +50,21 @@ void GLAPIENTRY gl_error_callback(
         case GL_DEBUG_SOURCE_OTHER: source_str = "OTHER"; break;
     }
 
-    LOG_DBG("GL_{}, source = {}, message = {}", 
-            type_str,
-            source_str,
-            message);
     if (type == GL_DEBUG_TYPE_ERROR) {
-        test++;
-        assert(test < 2);
+        (*(bool*)user) = true;
+        LOG_ERR("GL_{}, source = {}, message = {}", 
+                type_str,
+                source_str,
+                message);
+    } else {
+        LOG_DBG("GL_{}, source = {}, message = {}", 
+                type_str,
+                source_str,
+                message);
     }
 }
 
-GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title) {
+GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title, bool* error_bool) {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -88,7 +90,7 @@ GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title) {
 #ifdef DEBUG
     glEnable(GL_DEBUG_OUTPUT);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-    glDebugMessageCallback(gl_error_callback, nullptr);
+    glDebugMessageCallback(gl_error_callback, error_bool);
 #endif
     return win;
 }
@@ -101,6 +103,7 @@ void init_imgui(GLFWwindow* window) {
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 460");
 }
+
 void destroy_imgui() {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();

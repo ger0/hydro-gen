@@ -14,6 +14,9 @@
 constexpr u32 WINDOW_W = 1920;
 constexpr u32 WINDOW_H = 1080;
 
+constexpr float MAX_HEIGHT = 48.f;
+constexpr float WATER_HEIGHT = 18.f;
+
 constexpr float Z_NEAR = 0.1f;
 constexpr float Z_FAR = 2048.f;
 constexpr float FOV = 90.f;
@@ -225,6 +228,8 @@ int main(int argc, char* argv[]) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
     compute_noise.use();
+    compute_noise.set_uniform("height_scale", MAX_HEIGHT);
+    compute_noise.set_uniform("water_lvl", WATER_HEIGHT);
     glDispatchCompute(noise_size / 8, noise_size / 8, 1);
 
     GLuint framebuffer;
@@ -348,7 +353,8 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }    
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
+    compute_output.set_uniform("max_height", MAX_HEIGHT);
+    compute_output.set_uniform("water_lvl", WATER_HEIGHT);
     glDispatchCompute(WINDOW_W / 8, WINDOW_H / 8, 1);
 
     u32 frame_count = 0;

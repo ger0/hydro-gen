@@ -14,6 +14,10 @@ uniform mat4 view;
 
 uniform vec3 dir;
 uniform vec3 pos;
+// world max height
+uniform float max_height;
+// base water level
+uniform float water_lvl;
 
 uniform float time;
 
@@ -21,8 +25,6 @@ layout (rgba32f, binding = 2) uniform readonly image2D heightmap;
 layout (rgba32f, binding = 3) uniform writeonly image2D out_tex;
 layout (r32f,    binding = 4) uniform readonly image2D water_tex;
 
-const float y_scale     = 48.0; // max height
-const float water_lvl   = 20.0; // base water level
 
 const vec3 light_dir    = normalize(vec3(0.0, -0.5, -1.0));
 const vec3 light_color  = normalize(vec3(0.09, 0.075, 0.04));
@@ -30,6 +32,10 @@ const vec3 light_color  = normalize(vec3(0.09, 0.075, 0.04));
 // diffuse colours
 const vec3 sky_color    = vec3(0.3, 0.5, 0.85);
 const vec3 water_color  = vec3(0.22, 0.606, 0.964);
+
+vec2 get_water_top_bottom(vec4 terrain) {
+    return vec2(terrain.b + terrain.r, terrain.r);
+}
 
 struct Material_colors {
     vec3 grass;
@@ -65,6 +71,7 @@ const int   max_steps   = 1028;
 struct Ray {
     vec4 pos;
     float dist; 
+    vec4 terrain;
 };
 
 vec2 rand2(vec2 p) {
@@ -116,17 +123,38 @@ vec3 get_material_color(vec3 pos, vec3 norm, Material_colors material) {
 	float angle = dot(norm, up);
 	if (angle > 0.6 && pos.y < (water_lvl + 2.3)) {
 	    return material.sand;
-    } else if (angle < 0.45 && pos.y > (y_scale * 0.45)) {
+    } else if (angle < 0.45 && pos.y > (max_height * 0.45)) {
         return material.rock;
     } else if (angle < 0.25) {
         return material.rock;
-	} else if (angle < 0.55 && pos.y > (y_scale * 0.35)) {
+	} else if (angle < 0.55 && pos.y > (max_height * 0.35)) {
 	    return material.dirt;
 	} else {
 	    return material.grass;
 	}
-	/* } else if (angle > 0.50 && pos.y > (y_scale * 0.55)) {
+	/* } else if (angle > 0.50 && pos.y > (max_height * 0.55)) {
 	    return material.snow; */
+}
+
+vec4 get_height(readonly image2D img, vec2 sample_pos) {
+    ivec2 pos = ivec2(sample_pos * WORLD_SCALE);
+    vec2 s_pos = fract(sample_pos * WORLD_SCALE);
+    vec4 v1 = mix(
+        imageLoad(img, ivec2(pos)), 
+        imageLoad(img, ivec2(pos) + ivec2(1, 0)),
+        s_pos.x
+    );
+    vec4 v2 = mix(
+        imageLoad(img, ivec2(pos) + ivec2(0, 1)), 
+        imageLoad(img, ivec2(pos) + ivec2(1, 1)),
+        s_pos.x
+    );
+    vec4 value = mix(
+        v1, 
+        v2, 
+        s_pos.y
+    );
+    return value;
 }
 
 float img_bilinear(readonly image2D img, vec2 sample_pos) {
@@ -155,12 +183,12 @@ vec3 get_img_normal(readonly image2D img, vec2 pos) {
         -(
             img_bilinear(img, pos - vec2( 1, 0)) - 
             img_bilinear(img, pos - vec2(-1, 0))
-        ) * y_scale,
+        ),
         1.0,
         -(
             img_bilinear(img, pos - vec2(0, 1)) -
             img_bilinear(img, pos - vec2(0,-1))
-        ) * y_scale
+        )
     );
     return normalize(dpos);
 }
@@ -200,9 +228,10 @@ vec3 get_sky_color(vec3 direction, float ray_dist, float sundot) {
 vec4 get_shade(vec3 ray_pos, vec3 normal, bool is_water) {
     // shadow 
     // difference to the point above which there's no possible surface
-    float shadow_diff = y_scale - ray_pos.y;
+    float shadow_diff = max_height - ray_pos.y;
     float shadow_scale = shadow_diff / -light_dir.y;
     float shadow_max = length(light_dir * shadow_scale);
+    // casting a shadow ray towards the sun
     Ray shadow = raymarch(ray_pos, -light_dir, shadow_max, max_steps / 2);
 
     vec3 ambient;
@@ -235,9 +264,9 @@ vec3 get_shade_terr(vec3 ray_pos, vec3 normal) {
     return get_shade(ray_pos, normal, false).xyz;
 }
 
-vec4 calc_water(vec3 in_color, Ray ray, vec3 direction, float sundot) {
+vec4 calc_water(vec3 in_color, Ray ray, vec3 direction, float sundot, vec2 water_lvls) {
     const float water_step = 0.01;
-    float diff = (water_lvl - ray.pos.y);
+    float diff = (water_lvls.r - ray.pos.y);
     float scale = diff / direction.y;
     float water_vol = clamp((length(direction * scale) * water_step), 0.0, 1.0);
 
@@ -297,6 +326,9 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
     Ray ray = raymarch(origin, direction, max_dist, max_steps);
 	float sundot = clamp(dot(direction, -light_dir), 0.0, 1.0);
 
+    // top, bottom heights of water body
+    vec2 water_lvls = get_water_top_bottom(ray.terrain);
+
     // water buildup
     float water_vol = 0.0;
     vec3 water_col = vec3(0,0,0);
@@ -314,8 +346,8 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
     vec3 outp = get_shade_terr(ray.pos.xyz, normal);
     // if the hit is below water level
     // find the intersection of the ray and the surface of water
-    if (origin.y >= water_lvl && ray.pos.y <= water_lvl) {
-        vec4 res = calc_water(outp, ray, direction, sundot);
+    if (origin.y >= water_lvls.r && ray.pos.y <= water_lvls.r) {
+        vec4 res = calc_water(outp, ray, direction, sundot, water_lvls);
         water_col = res.rgb;
         water_vol = res.w;
     }
@@ -341,25 +373,34 @@ Ray raymarch(vec3 origin, vec3 direction,
     // shadow penumbra
     float min_sdf = 1.0;
 
+    vec4 terrain = vec4(0, 0, 0, 0);
     for (int i = 0; i < max_steps; ++i) {
         vec3 sample_pos = origin + direction * dist;
 
-        float height = img_bilinear(heightmap, sample_pos.xz) * y_scale;
-        if (sample_pos.y > y_scale && direction.y >= 0) {
+        // float height = img_bilinear(heightmap, sample_pos.xz);
+        terrain = get_height(heightmap, sample_pos.xz);
+        float t_height = terrain.w;
+
+        if (sample_pos.y > max_height && direction.y >= 0) {
             break;
         }
         // hitting the ground ??
-        float d_height = sample_pos.y - height;
+        float d_height = sample_pos.y - t_height;
         if (d_height <= (0.05)) {
             return Ray(
                 vec4(sample_pos - (0.05 * direction), 0.0),
-                dist - (0.05)
+                dist - (0.05),
+                get_height(heightmap, (sample_pos - (0.05 * direction)).xz)
             );
         }
         // penumbra
         min_sdf = min(min_sdf, 12 * d_dist / dist);
         if (dist > max_dist) {
-            return Ray(vec4(sample_pos, min_sdf), max_dist);
+            return Ray(
+                vec4(sample_pos, min_sdf),
+                max_dist,
+                terrain
+            );
         }
         // TODO: dist can't be higher than max slope approximation 
         d_dist = 0.35 * d_height;
@@ -367,7 +408,8 @@ Ray raymarch(vec3 origin, vec3 direction,
     }
     return Ray(
         vec4(origin + direction * max_dist, min_sdf),
-        max_dist
+        max_dist,
+        terrain
     );
 }
 

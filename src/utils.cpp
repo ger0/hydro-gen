@@ -18,6 +18,8 @@ void GLAPIENTRY gl_error_callback(
     const GLchar* message,
     const void* user
 ) {
+    static u32 test = 0;
+
     (void)id;
     (void)length;
     (void)user;
@@ -54,6 +56,10 @@ void GLAPIENTRY gl_error_callback(
             type_str,
             source_str,
             message);
+    if (type == GL_DEBUG_TYPE_ERROR) {
+        test++;
+        assert(test < 2);
+    }
 }
 
 GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title) {

@@ -16,7 +16,7 @@
 constexpr u32 WINDOW_W = 1920;
 constexpr u32 WINDOW_H = 1080;
 
-constexpr float MAX_HEIGHT = 48.f;
+constexpr float MAX_HEIGHT = 128.f;
 constexpr float WATER_HEIGHT = 18.f;
 
 constexpr float Z_NEAR = 0.1f;
@@ -30,6 +30,8 @@ constexpr GLuint NOISE_SIZE = 2048;
 constexpr auto noise_comput_file    = "heightmap.glsl";
 constexpr auto render_comput_file   = "rendering.glsl";
 constexpr auto erosion_comput_file  = "erosion.glsl";
+constexpr auto erosion_sed_comput_file  = "sediment_transport.glsl";
+constexpr auto erosion_sed_calc_file  = "water_flux.glsl";
 
 static bool shader_error = false;
 static float delta_time = 0.f;
@@ -100,6 +102,8 @@ World_data gen_world_textures() {
         );
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
         return noise_texture;
     };
@@ -146,6 +150,7 @@ World_data gen_world_textures() {
 void prepare_erosion(Compute_program& program, World_data& tex) {
     program.use();
     program.set_uniform("max_height", MAX_HEIGHT);
+    program.set_uniform("d_t", 0.005f);
     glBindTexture(GL_TEXTURE_2D, tex.heightmap);
     glBindImageTexture(
         BIND_HEIGHTMAP, 
@@ -463,6 +468,8 @@ int main(int argc, char* argv[]) {
     Compute_program noise_comput(noise_comput_file);
     Compute_program render_comput(render_comput_file);
     Compute_program erosion_comput(erosion_comput_file);
+    Compute_program erosion_sed_comput(erosion_sed_comput_file);
+    Compute_program erosion_sed_calc(erosion_sed_calc_file);
 
     // textures 
     World_data textures = gen_world_textures();
@@ -516,6 +523,8 @@ int main(int argc, char* argv[]) {
     defer{delete_renderer(render_data);};
 
     prepare_erosion(erosion_comput, textures);
+    prepare_erosion(erosion_sed_calc, textures);
+    prepare_erosion(erosion_sed_comput, textures);
 
     u32 frame_count = 0;
     float last_frame_rounded = 0.0;
@@ -540,6 +549,9 @@ int main(int argc, char* argv[]) {
         // ---------- erosion compute shader ------------
         if (erosion_steps < max_erosion_steps) {
             dispatch_erosion(erosion_comput, textures);
+            dispatch_erosion(erosion_sed_calc, textures);
+            dispatch_erosion(erosion_sed_comput, textures);
+
             erosion_steps++;
         }
 

@@ -1,0 +1,103 @@
+#version 460
+
+#include "img_interpolation.glsl"
+#include "bindings.glsl"
+
+layout (local_size_x = 8, local_size_y = 8) in;
+
+// (dirt height, rock height, water height, total height)
+layout (binding = BIND_HEIGHTMAP, rgba32f)   
+	uniform readonly image2D heightmap;
+layout (binding = BIND_WRITE_HEIGHTMAP, rgba32f)   
+	uniform writeonly image2D out_heightmap;
+
+// (fL, fR, fT, fB) left, right, top, bottom
+layout (binding = BIND_FLUXMAP, rgba32f)   
+	uniform readonly image2D fluxmap;
+layout (binding = BIND_WRITE_FLUXMAP, rgba32f)   
+	uniform writeonly image2D out_fluxmap;
+
+// velocity + suspended sediment vector
+// vec3((u, v), suspended)
+layout (binding = BIND_VELOCITYMAP, rgba32f)   
+	uniform readonly image2D velocitymap;
+layout (binding = BIND_WRITE_VELOCITYMAP, rgba32f)   
+	uniform writeonly image2D out_velocitymap;
+
+uniform float max_height;
+float max_flux = max_height * 1000000000;
+
+#define PI 3.1415926538
+
+const float L = 1.0;
+// time step
+uniform float d_t;
+// sediment capacity constant
+const float Kc = 0.02;
+// sediment dissolving constant
+const float Ks = 0.01;
+// sediment deposition constant
+const float Kd = 0.0025;
+
+float find_sin_alpha(ivec2 pos) {
+	float r_b = imageLoad(heightmap, pos + ivec2(1, 0)).r;
+	float l_b = imageLoad(heightmap, pos - ivec2(1, 0)).r;
+	float d_b = imageLoad(heightmap, pos + ivec2(0, 1)).r;
+	float u_b = imageLoad(heightmap, pos - ivec2(0, 1)).r;
+
+	float dbdx = (r_b-l_b) / (2.0* L);
+	float dbdy = (r_b-l_b) / (2.0* L);
+
+	return sqrt(dbdx*dbdx+dbdy*dbdy)/sqrt(1+dbdx*dbdx+dbdy*dbdy);
+}
+
+void main() {
+    ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+    vec4 vel = imageLoad(velocitymap, pos);
+    // water velocity
+    float d_Wx = (
+        imageLoad(fluxmap, pos + ivec2(-1, 0)).y -
+        imageLoad(fluxmap, pos).x + 
+        imageLoad(fluxmap, pos).y -
+        imageLoad(fluxmap, pos + ivec2(1, 0)).x
+    ) / 2.0;
+    float u = d_Wx / (L * 1.0);
+
+    float d_Wy = (
+        imageLoad(fluxmap, pos + ivec2(0, -1)).z -
+        imageLoad(fluxmap, pos).w + 
+        imageLoad(fluxmap, pos).z -
+        imageLoad(fluxmap, pos + ivec2(0, 1)).w
+    ) / 2.0;
+    float v = d_Wy / (L * 1.0);
+
+    float sin_a = find_sin_alpha(pos);
+    float c = Kc * sin_a * length(vec2(u, v));
+
+    float st = imageLoad(velocitymap, pos).z;
+    float bt;
+    float s1;
+    vec4 terrain = imageLoad(heightmap, pos);
+
+    // dissolve sediment
+    if (c > st) {
+        bt = terrain.r - Ks * (c - st);
+        s1 = st + Ks * (c - st);
+    } 
+    // deposit sediment
+    else if (c <= st) {
+        bt = terrain.r + Kd * (st - c);
+        s1 = st - Kd * (st - c);
+    }
+    vec4 flux = imageLoad(fluxmap, pos);
+    vel.x = u;
+    vel.y = v;
+    vel.w = sin_a;
+    imageStore(out_fluxmap, pos, flux);
+    imageStore(out_velocitymap, pos, vel);
+    terrain.r = bt;
+    terrain.g = s1;
+    terrain.w = terrain.b + bt;
+    imageStore(out_heightmap, pos, terrain);
+
+}

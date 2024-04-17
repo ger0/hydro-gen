@@ -122,7 +122,7 @@ vec3 get_material_color(vec3 pos, vec3 norm, Material_colors material) {
         return material.rock; */
     /* } else if (angle < 0.45) {
         return material.rock; */
-	if (angle < 0.7) {
+	if (angle < 0.85) {
 	    return material.dirt;
 	} else {
 	    return material.grass;
@@ -133,14 +133,14 @@ vec3 get_material_color(vec3 pos, vec3 norm, Material_colors material) {
 
 vec3 get_img_normal_w(readonly image2D img, vec2 pos) {
     vec3 dpos = vec3(
-        -(
-            img_bilinear_w(img, pos - vec2( 1, 0)) - 
-            img_bilinear_w(img, pos - vec2(-1, 0))
+        (
+            img_bilinear_w(img, pos + vec2( 1, 0)) - 
+            img_bilinear_w(img, pos + vec2(-1, 0))
         ),
         1.0,
-        -(
-            img_bilinear_w(img, pos - vec2(0, 1)) -
-            img_bilinear_w(img, pos - vec2(0,-1))
+        (
+            img_bilinear_w(img, pos + vec2(0, 1)) -
+            img_bilinear_w(img, pos + vec2(0,-1))
         )
     );
     return normalize(dpos);
@@ -234,7 +234,7 @@ vec3 get_shade_terr(vec3 ray_pos, vec3 normal) {
 
 vec4 calc_water(vec3 in_color, Ray ray, vec3 direction, float sundot, vec2 water_lvls) {
     // debugging TODO: REMOVE
-    // return vec4(0, 0, 1, 1);
+    //return vec4(0, 0, 1, 1);
 
     const float water_step = 0.01;
     float diff = (water_lvls.r - ray.pos.y);
@@ -375,7 +375,7 @@ Ray raymarch(vec3 origin, vec3 direction,
             );
         }
         // TODO: dist can't be higher than max slope approximation 
-        d_dist = 0.35 * d_height;
+        d_dist = 0.25 * d_height;
         dist += d_dist;
     }
     return Ray(

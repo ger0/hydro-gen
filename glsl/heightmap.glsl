@@ -22,15 +22,17 @@ float rand(vec2 co) {
 void main() {
     ivec2 store_pos = ivec2(gl_GlobalInvocationID.xy);
 
-    gln_tFBMOpts opts = gln_tFBMOpts(0, 0.5, 2.0, 0.0035, 1, 8, false, false);
+    gln_tFBMOpts opts = gln_tFBMOpts(0, 0.5, 2.0, 0.0070, 1, 8, false, false);
     float val = (gln_sfbm(store_pos, opts) + 1) / 2;
     vec4 terrain = vec4(val * height_scale, 0.0, 0.0, 0.0);
     float water_col = gln_simplex(vec2(store_pos));
     // water height
-    terrain.b = max(water_lvl - terrain.r, 0.0);
+    // terrain.b = max(water_lvl - terrain.r, 0.0);
     // total height
-    if (store_pos.x >= 34 && store_pos.x <= 48 && store_pos.y < 48 && store_pos.y >= 34) {
-        terrain.b = 2.0;
+    if (store_pos.x >= 64 && store_pos.x <= 98 && store_pos.y < 98 && store_pos.y >= 64) {
+        terrain.b = 06.2;
+    } else {
+        terrain.b = 0.4;
     }
     terrain.w = terrain.r + terrain.b;
 

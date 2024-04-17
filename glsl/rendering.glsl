@@ -118,17 +118,32 @@ vec3 get_material_color(vec3 pos, vec3 norm, Material_colors material) {
 	float angle = dot(norm, up);
 	/* if (angle > 0.6 && pos.y < (water_lvl + 2.3)) {
 	    return material.sand; */
-    if (angle < 0.55 && pos.y > (max_height * 0.45)) {
-        return material.rock;
-    } else if (angle < 0.45) {
-        return material.rock;
-	} else if (angle < 0.85 && pos.y > (max_height * 0.35)) {
+    /* if (angle < 0.55 && pos.y > (max_height * 0.45)) {
+        return material.rock; */
+    /* } else if (angle < 0.45) {
+        return material.rock; */
+	if (angle < 0.7) {
 	    return material.dirt;
 	} else {
 	    return material.grass;
 	}
 	/* } else if (angle > 0.50 && pos.y > (max_height * 0.55)) {
 	    return material.snow; */
+}
+
+vec3 get_img_normal_w(readonly image2D img, vec2 pos) {
+    vec3 dpos = vec3(
+        -(
+            img_bilinear_w(img, pos - vec2( 1, 0)) - 
+            img_bilinear_w(img, pos - vec2(-1, 0))
+        ),
+        1.0,
+        -(
+            img_bilinear_w(img, pos - vec2(0, 1)) -
+            img_bilinear_w(img, pos - vec2(0,-1))
+        )
+    );
+    return normalize(dpos);
 }
 
 vec3 get_img_normal(readonly image2D img, vec2 pos) {
@@ -219,7 +234,7 @@ vec3 get_shade_terr(vec3 ray_pos, vec3 normal) {
 
 vec4 calc_water(vec3 in_color, Ray ray, vec3 direction, float sundot, vec2 water_lvls) {
     // debugging TODO: REMOVE
-    return vec4(0, 0, 1, 0.001);
+    // return vec4(0, 0, 1, 0.01);
 
     const float water_step = 0.01;
     float diff = (water_lvls.r - ray.pos.y);
@@ -235,9 +250,11 @@ vec4 calc_water(vec3 in_color, Ray ray, vec3 direction, float sundot, vec2 water
         water_tex,
         (w_orig.xz / WORLD_SCALE) + (vec2(time / 3, time / 5) / WORLD_SCALE)
     );
+    vec3 surface_norm = get_img_normal_w(heightmap, w_orig.xz);
 
     w_norm.xz *= 0.03;
     w_norm.y = 1;
+    w_norm += surface_norm;
     w_norm = normalize(w_norm);
     vec3 w_refl = reflect(direction, -w_norm);
     Ray w_ray = raymarch(w_orig, w_refl, max_dist / 2.0, max_steps / 2);
@@ -250,7 +267,7 @@ vec4 calc_water(vec3 in_color, Ray ray, vec3 direction, float sundot, vec2 water
 
     // fresnel
     float cos_theta = dot(normalize(-direction), w_norm);
-    float fresnel = max(pow(1.0 - cos_theta, 2.0), 0.1);
+    float fresnel = max(pow(1.0 - cos_theta, 2.0), 0.17);
 
     // bouncing off to the sky
     if (w_ray.dist >= (max_dist / 4.0)) {

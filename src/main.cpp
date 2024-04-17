@@ -24,7 +24,7 @@ constexpr float Z_FAR = 2048.f;
 constexpr float FOV = 90.f;
 constexpr float ASPECT_RATIO = float(WINDOW_W) / WINDOW_H;
 
-constexpr GLuint NOISE_SIZE = 4096;
+constexpr GLuint NOISE_SIZE = 2048;
 
 // shader filenames
 constexpr auto noise_comput_file    = "heightmap.glsl";
@@ -138,6 +138,7 @@ World_data gen_world_textures() {
         .water_tex      = water_tex,
         .water_flux     = flux,
         .out_water_flux = out_flux,
+        .water_vel      = velocity,
         .out_water_vel  = out_velocity
     };
 }
@@ -196,7 +197,7 @@ void prepare_erosion(Compute_program& program, World_data& tex) {
         tex.out_water_vel, 0, 
         GL_FALSE, 
         0, 
-        GL_READ_WRITE, 
+        GL_WRITE_ONLY, 
         GL_RGBA32F
     );
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -224,6 +225,16 @@ void dispatch_erosion(Compute_program& program, World_data& tex) {
         GL_TEXTURE_2D, 0,
         0, 0, 0,
         tex.water_flux,
+        GL_TEXTURE_2D, 0,
+        0, 0, 0,
+        NOISE_SIZE, NOISE_SIZE, 1
+    );
+
+    glCopyImageSubData(
+        tex.out_water_vel,
+        GL_TEXTURE_2D, 0,
+        0, 0, 0,
+        tex.water_vel,
         GL_TEXTURE_2D, 0,
         0, 0, 0,
         NOISE_SIZE, NOISE_SIZE, 1
@@ -492,7 +503,7 @@ int main(int argc, char* argv[]) {
     float last_frame_rounded = 0.0;
     double frame_time = 0.0;
 
-    const u32 max_erosion_steps = 6000;
+    const u32 max_erosion_steps = 6000000000;
     u32 erosion_steps = 0;
 
     while (!glfwWindowShouldClose(window.get()) && (!shader_error)) {

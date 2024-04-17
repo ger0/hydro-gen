@@ -145,6 +145,7 @@ World_data gen_world_textures() {
 
 void prepare_erosion(Compute_program& program, World_data& tex) {
     program.use();
+    program.set_uniform("max_height", MAX_HEIGHT);
     glBindTexture(GL_TEXTURE_2D, tex.heightmap);
     glBindImageTexture(
         BIND_HEIGHTMAP, 
@@ -181,7 +182,6 @@ void prepare_erosion(Compute_program& program, World_data& tex) {
         GL_WRITE_ONLY, 
         GL_RGBA32F
     );
-
     glBindTexture(GL_TEXTURE_2D, tex.water_vel);
     glBindImageTexture(
         BIND_VELOCITYMAP, 
@@ -474,6 +474,24 @@ int main(int argc, char* argv[]) {
     glBindImageTexture(
         BIND_HEIGHTMAP, 
         textures.heightmap, 0, 
+        GL_FALSE, 
+        0, 
+        GL_WRITE_ONLY, 
+        GL_RGBA32F
+    );
+    glBindTexture(GL_TEXTURE_2D, textures.water_flux);
+    glBindImageTexture(
+        BIND_FLUXMAP, 
+        textures.water_flux, 0, 
+        GL_FALSE, 
+        0, 
+        GL_WRITE_ONLY, 
+        GL_RGBA32F
+    );
+    glBindTexture(GL_TEXTURE_2D, textures.water_vel);
+    glBindImageTexture(
+        BIND_VELOCITYMAP, 
+        textures.water_vel, 0, 
         GL_FALSE, 
         0, 
         GL_WRITE_ONLY, 

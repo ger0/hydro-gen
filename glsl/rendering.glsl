@@ -148,14 +148,14 @@ vec3 get_img_normal_w(readonly image2D img, vec2 pos) {
 
 vec3 get_img_normal(readonly image2D img, vec2 pos) {
     vec3 dpos = vec3(
-        -(
-            img_bilinear_r(img, pos - vec2( 1, 0)) - 
-            img_bilinear_r(img, pos - vec2(-1, 0))
+        (
+            img_bilinear_r(img, pos + vec2( 1, 0)) - 
+            img_bilinear_r(img, pos + vec2(-1, 0))
         ),
         1.0,
-        -(
-            img_bilinear_r(img, pos - vec2(0, 1)) -
-            img_bilinear_r(img, pos - vec2(0,-1))
+        (
+            img_bilinear_r(img, pos + vec2(0, 1)) -
+            img_bilinear_r(img, pos + vec2(0,-1))
         )
     );
     return normalize(dpos);
@@ -234,7 +234,7 @@ vec3 get_shade_terr(vec3 ray_pos, vec3 normal) {
 
 vec4 calc_water(vec3 in_color, Ray ray, vec3 direction, float sundot, vec2 water_lvls) {
     // debugging TODO: REMOVE
-    // return vec4(0, 0, 1, 0.01);
+    // return vec4(0, 0, 1, 1);
 
     const float water_step = 0.01;
     float diff = (water_lvls.r - ray.pos.y);
@@ -246,15 +246,16 @@ vec4 calc_water(vec3 in_color, Ray ray, vec3 direction, float sundot, vec2 water
     float rdist_to_w = ray.dist - length(direction * scale);
 
     // a ray out of water's surface
-    vec3 w_norm = get_img_normal(
+    /* vec3 w_norm = get_img_normal(
         water_tex,
         (w_orig.xz / WORLD_SCALE) + (vec2(time / 3, time / 5) / WORLD_SCALE)
     );
-    vec3 surface_norm = get_img_normal_w(heightmap, w_orig.xz);
-
     w_norm.xz *= 0.03;
     w_norm.y = 1;
     w_norm += surface_norm;
+    */
+    vec3 w_norm = get_img_normal_w(heightmap, w_orig.xz);
+
     w_norm = normalize(w_norm);
     vec3 w_refl = reflect(direction, -w_norm);
     Ray w_ray = raymarch(w_orig, w_refl, max_dist / 2.0, max_steps / 2);
@@ -321,7 +322,7 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
     vec3 outp = get_shade_terr(ray.pos.xyz, normal);
     // if the hit is below water level
     // find the intersection of the ray and the surface of water
-    if (origin.y >= water_lvls.r && ray.pos.y <= water_lvls.r) {
+    if (ray.pos.y <= water_lvls.r) {
         vec4 res = calc_water(outp, ray, direction, sundot, water_lvls);
         water_col = res.rgb;
         water_vol = res.w;

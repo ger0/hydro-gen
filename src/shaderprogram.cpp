@@ -6,6 +6,31 @@ using namespace glm;
 std::string load_shader_file(std::string filename);
 void resolve_includes(std::string& buff);
 
+namespace gl {
+    void gen_texture(Texture& tex,
+            GLenum format = GL_RGBA,
+            GLenum type = GL_FLOAT,
+            const void* pixels = nullptr) {
+        glGenTextures(1, &tex.texture);
+        glBindTexture(tex.target, tex.texture);
+        glTexImage2D(
+            tex.target,
+            tex.level,
+            tex.format,
+            tex.width, tex.height,
+            0,  // border
+            format, type,
+            pixels
+        );
+    }
+    void bind_texture(Texture& tex) {
+        glBindTexture(tex.target, tex.texture);
+    }
+    void unbind_texture(Texture& tex) {
+        glBindTexture(tex.target, 0);
+    }
+}
+
 enum Log_type {
     SHADER,
     PROGRAM
@@ -138,11 +163,11 @@ Compute_program::~Compute_program() {
     LOG_DBG("Compute shader program deleted");
 }
 
-void Shader_core::use() {
+void Shader_core::use() const {
     glUseProgram(program);
 }
 
-void Compute_program::ub_bind(const char* variable, GLuint bind) {
+void Compute_program::bind_uniform_block(const char* variable, GLuint bind) const  {
     GLuint idx = glGetUniformBlockIndex(program, variable);
     if (idx == GL_INVALID_INDEX) {
         LOG_ERR("ERROR: Invalid buffer block index");
@@ -151,90 +176,111 @@ void Compute_program::ub_bind(const char* variable, GLuint bind) {
     glBindBufferBase(GL_UNIFORM_BUFFER, idx, bind);
 }
 
-GLuint Shader_core::get_attrib_location(const char* attribute) {
+GLuint Shader_core::get_attrib_location(const char* attribute) const {
     return glGetAttribLocation(program, attribute);
 }
 
-GLuint Shader_core::get_uniform_location(const char* name) {
+GLuint Shader_core::get_uniform_location(const char* name) const {
     return glGetUniformLocation(program, name);
 }
 
+void Shader_core::set_texture(gl::Texture tex, std::string str) {
+    gl::bind_texture(tex);
+    auto iter = cached_bindings.find(str);
+    GLuint binding;
+    if (iter == cached_bindings.end()) {
+        binding = glGetUniformLocation(this->program, str.c_str());
+        cached_bindings[str] = binding;
+    } else {
+        binding = iter->second;
+    }
+    glBindImageTexture(
+        binding,
+        tex.texture,
+        tex.level, 
+        tex.layered, 
+        tex.layer, 
+        tex.access, 
+        tex.format 
+    );
+}
+
 template<>
-void Shader_core::set_uniform(const char* id, bool const& v) {
+void Shader_core::set_uniform(const char* id, bool const& v) const {
     glUniform1i(glGetUniformLocation(program, id), v);
 }
 
 template<>
-void Shader_core::set_uniform(const char* id, uint const& v) {
+void Shader_core::set_uniform(const char* id, uint const& v) const {
     glUniform1ui(glGetUniformLocation(program, id), v);
 }
 
 template<>
-void Shader_core::set_uniform(const char* id, uvec2 const& v) {
+void Shader_core::set_uniform(const char* id, uvec2 const& v) const {
     glUniform2uiv(glGetUniformLocation(program, id), 1, glm::value_ptr(v));
 }
 
 template<>
-void Shader_core::set_uniform(const char* id, uvec3 const& v) {
+void Shader_core::set_uniform(const char* id, uvec3 const& v) const {
     glUniform3uiv(glGetUniformLocation(program, id), 1, glm::value_ptr(v));
 }
 
 template<>
-void Shader_core::set_uniform(const char* id, uvec4 const& v) {
+void Shader_core::set_uniform(const char* id, uvec4 const& v) const {
     glUniform4uiv(glGetUniformLocation(program, id), 1, glm::value_ptr(v));
 }
 
 template<>
-void Shader_core::set_uniform(const char* id, int const& v) {
+void Shader_core::set_uniform(const char* id, int const& v) const {
     glUniform1i(glGetUniformLocation(program, id), v);
 }
 
 template<>
-void Shader_core::set_uniform(const char* id, ivec2 const& v) {
+void Shader_core::set_uniform(const char* id, ivec2 const& v) const {
     glUniform2iv(glGetUniformLocation(program, id), 1, glm::value_ptr(v));
 }
 
 template<>
-void Shader_core::set_uniform(const char* id, ivec3 const& v) {
+void Shader_core::set_uniform(const char* id, ivec3 const& v) const {
     glUniform3iv(glGetUniformLocation(program, id), 1, glm::value_ptr(v));
 }
 
 template<>
-void Shader_core::set_uniform(const char* id, ivec4 const& v) {
+void Shader_core::set_uniform(const char* id, ivec4 const& v) const {
     glUniform4iv(glGetUniformLocation(program, id), 1, glm::value_ptr(v));
 }
 
 template<>
-void Shader_core::set_uniform(const char* id, float const& v) {
+void Shader_core::set_uniform(const char* id, float const& v) const {
     glUniform1f(glGetUniformLocation(program, id), v);
 }
 
 template<>
-void Shader_core::set_uniform(const char* id, vec2 const& v) {
+void Shader_core::set_uniform(const char* id, vec2 const& v) const {
     glUniform2fv(glGetUniformLocation(program, id), 1, glm::value_ptr(v));
 }
 
 template<>
-void Shader_core::set_uniform(const char* id, vec3 const& v) {
+void Shader_core::set_uniform(const char* id, vec3 const& v) const {
     glUniform3fv(glGetUniformLocation(program, id), 1, glm::value_ptr(v));
 }
 
 template<>
-void Shader_core::set_uniform(const char* id, vec4 const& v) {
+void Shader_core::set_uniform(const char* id, vec4 const& v) const {
     glUniform4fv(glGetUniformLocation(program, id), 1, glm::value_ptr(v));
 }
 
 template<>
-void Shader_core::set_uniform(const char* id, mat2 const& v) {
+void Shader_core::set_uniform(const char* id, mat2 const& v) const {
     glUniformMatrix2fv(glGetUniformLocation(program, id), 1, GL_FALSE, glm::value_ptr(v));
 }
 
 template<>
-void Shader_core::set_uniform(const char* id, mat3 const& v) {
+void Shader_core::set_uniform(const char* id, mat3 const& v) const {
     glUniformMatrix3fv(glGetUniformLocation(program, id), 1, GL_FALSE, glm::value_ptr(v));
 }
 
 template<>
-void Shader_core::set_uniform(const char* id, mat4 const& v) {
+void Shader_core::set_uniform(const char* id, mat4 const& v) const {
     glUniformMatrix4fv(glGetUniformLocation(program, id), 1, GL_FALSE, glm::value_ptr(v));
 }

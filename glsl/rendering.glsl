@@ -3,9 +3,9 @@
 #include "bindings.glsl"
 #include "img_interpolation.glsl"
 
-layout (local_size_x = 8, local_size_y = 8) in;
+layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
-layout (binding = BIND_CONFIG) uniform config {
+layout (std140) uniform config {
     float max_height;
     ivec2 hmap_dims;
 };
@@ -15,6 +15,7 @@ uniform mat4 view;
 uniform vec3 dir;
 uniform vec3 pos;
 uniform float time;
+uniform bool should_draw_water;
 
 layout (rgba32f, binding = BIND_HEIGHTMAP) 
 	uniform readonly image2D heightmap;
@@ -22,14 +23,11 @@ layout (rgba32f, binding = BIND_HEIGHTMAP)
 layout (rgba32f, binding = BIND_DISPLAY_TEXTURE) 
 	uniform writeonly image2D out_tex;
 
-layout (r32f,    binding = BIND_WATER_TEXTURE) 
-	uniform readonly image2D water_tex;
-
 // max raymarching distance
-const float max_dist    = 2048.0;
-const int   max_steps   = 1028;
+const float max_dist    = 8096.0;
+const int   max_steps   = 4096;
 
-const vec3 light_dir    = normalize(vec3(0.0, -0.5, -1.0));
+const vec3 light_dir    = normalize(vec3(0.0, -1.0, -0.5));
 const vec3 light_color  = normalize(vec3(0.09, 0.075, 0.04));
 
 // diffuse colours
@@ -108,10 +106,6 @@ float water_mix(float water) {
     return pow(water, 1.0 / 8.0); 
 }
 
-float get_wnoise_texture(vec2 pos) {
-    return img_bilinear_r(water_tex, fract(pos) * 4096.0 / WORLD_SCALE);
-}
-
 vec3 get_material_color(vec3 pos, vec3 norm, Material_colors material) {
     const vec3 up = vec3(0, 1, 0);
     // angle
@@ -163,9 +157,9 @@ vec3 get_img_normal(readonly image2D img, vec2 pos) {
 
 vec3 get_fog_color(vec3 col, float ray_dist, float sundot) {
     // fog
-    float fo = 1.0 - exp(-pow(0.15 * ray_dist / SC, 1.5));
+    float fo = 1.0 - exp(-pow(0.01 * ray_dist / SC, 1.5));
     vec3 fco = 0.65 * vec3(0.4, 0.65, 1.0) + 
-        0.1 * vec3(1.0, 0.8, 0.5) * pow(sundot, 4.0);
+        0.1 * vec3(1.0, 0.8, 0.5) * pow(sundot, 2.0);
     return mix(col, fco, fo);
 }
 
@@ -234,7 +228,7 @@ vec3 get_shade_terr(vec3 ray_pos, vec3 normal) {
 
 vec4 calc_water(vec3 in_color, Ray ray, vec3 direction, float sundot, vec2 water_lvls) {
     // debugging TODO: REMOVE
-    //return vec4(0, 0, 1, 1);
+    //return vec4(0, 0, 1, 0.6);
 
     const float water_step = 0.01;
     float diff = (water_lvls.r - ray.pos.y);
@@ -246,14 +240,6 @@ vec4 calc_water(vec3 in_color, Ray ray, vec3 direction, float sundot, vec2 water
     float rdist_to_w = ray.dist - length(direction * scale);
 
     // a ray out of water's surface
-    /* vec3 w_norm = get_img_normal(
-        water_tex,
-        (w_orig.xz / WORLD_SCALE) + (vec2(time / 3, time / 5) / WORLD_SCALE)
-    );
-    w_norm.xz *= 0.03;
-    w_norm.y = 1;
-    w_norm += surface_norm;
-    */
     vec3 w_norm = get_img_normal_w(heightmap, w_orig.xz);
 
     w_norm = normalize(w_norm);
@@ -360,7 +346,7 @@ Ray raymarch(vec3 origin, vec3 direction,
         }
         // hitting the ground ??
         float d_height = sample_pos.y - t_height;
-        if (d_height <= (0.05)) {
+        if (abs(d_height) <= 0.05) {
             return Ray(
                 vec4(sample_pos - (0.05 * direction), 0.0),
                 dist - (0.05)
@@ -375,7 +361,7 @@ Ray raymarch(vec3 origin, vec3 direction,
             );
         }
         // TODO: dist can't be higher than max slope approximation 
-        d_dist = 0.25 * d_height;
+        d_dist = 0.35 * d_height;
         dist += d_dist;
     }
     return Ray(

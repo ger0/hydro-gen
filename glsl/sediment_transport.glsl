@@ -3,7 +3,7 @@
 #include "img_interpolation.glsl"
 #include "bindings.glsl"
 
-layout (local_size_x = 8, local_size_y = 8) in;
+layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
 layout (binding = BIND_HEIGHTMAP, rgba32f)   
 	uniform readonly image2D heightmap;
@@ -27,15 +27,22 @@ layout (binding = BIND_WRITE_VELOCITYMAP, rgba32f)
 uniform float max_height;
 uniform float d_t;
 
-const float Ke = 0.2;
+const float Ke = 0.05;
+
+float get_lerp_sed(vec2 back_coords) {
+    if (back_coords.x <= 0.0 || back_coords.x >= (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1.0) ||
+    back_coords.y <= 0.0 || back_coords.y >= (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1.0)) {
+        return 0.00;
+    }
+    return img_bilinear_g(heightmap, back_coords);
+}
 
 void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
     vec4 vel = imageLoad(velocitymap, pos);
 	vec2 v = vel.xy;
     vec2 back_coords = vec2(pos.x - vel.x * d_t, pos.y - vel.y * d_t);
-    float st = img_bilinear_b(velocitymap, back_coords);
-
+    float st = get_lerp_sed(back_coords);
 
     vec4 flux = imageLoad(fluxmap, pos);
     vec4 terrain = imageLoad(heightmap, pos);

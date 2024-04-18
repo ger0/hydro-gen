@@ -1,5 +1,5 @@
 #define SC (250.0)
-#define WORLD_SCALE (0.2)
+#define WORLD_SCALE (0.5)
 
 vec4 img_bilinear(readonly image2D img, vec2 sample_pos) {
     ivec2 pos = ivec2(sample_pos * WORLD_SCALE);

@@ -33,11 +33,11 @@ const float L = 1.0;
 // time step
 uniform float d_t;
 // sediment capacity constant
-const float Kc = 0.005;
+const float Kc = 0.01;
 // sediment dissolving constant
-const float Ks = 0.003;
+const float Ks = 0.01;
 // sediment deposition constant
-const float Kd = 0.3;
+const float Kd = 0.01;
 
 float find_sin_alpha(ivec2 pos) {
 	float r_b = imageLoad(heightmap, pos + ivec2(1, 0)).r;
@@ -87,7 +87,7 @@ void main() {
     float s1;
     vec4 terrain = imageLoad(heightmap, pos);
 
-    //c *= clamp(terrain.b, 0.0, 1.0);
+    c *= clamp(terrain.b, 0.0, 1.0);
 
     // dissolve sediment
     if (c > st) {

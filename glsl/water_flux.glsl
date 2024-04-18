@@ -68,7 +68,6 @@ void main() {
     d_height.z = terrain.w - get_height(pos + ivec2( 0, 1)); // top
     d_height.w = terrain.w - get_height(pos + ivec2( 0,-1)); // bottom
 
-
     vec4 in_flux;
     in_flux.x = get_flux(pos + ivec2(-1, 0)).y; // from left
     in_flux.y = get_flux(pos + ivec2( 1, 0)).x; // from right
@@ -76,15 +75,15 @@ void main() {
     in_flux.w = get_flux(pos + ivec2( 0,-1)).z; // from bottom 
 
 
-    #define LOSS .997
+    #define LOSS 0.91
     out_flux.x = 
-        max(0.00000000000001, LOSS * out_flux.x + d_t * A * (G * d_height.x) / L);
+        max(1e-32, LOSS * out_flux.x + d_t * A * (G * d_height.x) / L);
     out_flux.y =  
-        max(0.00000000000001, LOSS * out_flux.y + d_t * A * (G * d_height.y) / L);
+        max(1e-32, LOSS * out_flux.y + d_t * A * (G * d_height.y) / L);
     out_flux.z =  
-        max(0.00000000000001, LOSS * out_flux.z + d_t * A * (G * d_height.z) / L);
+        max(1e-32, LOSS * out_flux.z + d_t * A * (G * d_height.z) / L);
     out_flux.w =
-        max(0.00000000000001, LOSS * out_flux.w + d_t * A * (G * d_height.w) / L);
+        max(1e-32, LOSS * out_flux.w + d_t * A * (G * d_height.w) / L);
 
     // boundary checking */
     if (pos.x <= 0) {

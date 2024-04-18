@@ -15,17 +15,17 @@ float rand(float n) {
     return fract(sin(n) * 1e4);
 }
 
-#define MOUNT_HGH 0.45
+#define MOUNT_HGH 0.65
 
 void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
     vec4 terr = imageLoad(heightmap, pos);
     float r = rand(time* sin(pos.x) / WRKGRP_SIZE_X * cos(pos.y) / WRKGRP_SIZE_Y);
-    if (r > 0.5) {
-        float incr = 0.0001;
+    if (r > 0.6) {
+        float incr = 1.0;
         float mountain = terr.w - max_height * MOUNT_HGH;
         if (mountain > 0) {
-            incr += mountain * 0.04 / ((1.0 - MOUNT_HGH) * max_height);
+            incr += mountain * 1.6 / ((1.0 - MOUNT_HGH) * max_height);
         }
         terr.b += incr;
         terr.w = terr.r + terr.b;

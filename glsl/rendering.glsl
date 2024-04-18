@@ -24,8 +24,8 @@ layout (rgba32f, binding = BIND_DISPLAY_TEXTURE)
 	uniform writeonly image2D out_tex;
 
 // max raymarching distance
-const float max_dist    = 8096.0;
-const int   max_steps   = 4096;
+const float max_dist    = 4096.0;
+const int   max_steps   = 2048;
 
 const vec3 light_dir    = normalize(vec3(0.0, -1.0, -0.5));
 const vec3 light_color  = normalize(vec3(0.09, 0.075, 0.04));
@@ -157,9 +157,9 @@ vec3 get_img_normal(readonly image2D img, vec2 pos) {
 
 vec3 get_fog_color(vec3 col, float ray_dist, float sundot) {
     // fog
-    float fo = 1.0 - exp(-pow(0.01 * ray_dist / SC, 1.5));
+    float fo = 1.0 - exp(-pow(0.15 * ray_dist / (SC * 16.0), 1.5));
     vec3 fco = 0.65 * vec3(0.4, 0.65, 1.0) + 
-        0.1 * vec3(1.0, 0.8, 0.5) * pow(sundot, 2.0);
+        0.1 * vec3(1.0, 0.8, 0.5) * pow(sundot, 4.0);
     return mix(col, fco, fo);
 }
 
@@ -228,7 +228,7 @@ vec3 get_shade_terr(vec3 ray_pos, vec3 normal) {
 
 vec4 calc_water(vec3 in_color, Ray ray, vec3 direction, float sundot, vec2 water_lvls) {
     // debugging TODO: REMOVE
-    //return vec4(0, 0, 1, 0.6);
+    //return vec4(0, 0, 1, 0.001);
 
     const float water_step = 0.01;
     float diff = (water_lvls.r - ray.pos.y);

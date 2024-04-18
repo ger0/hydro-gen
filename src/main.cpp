@@ -35,8 +35,11 @@ constexpr auto erosion_sediment_file    = "sediment_transport.glsl";
 constexpr auto erosion_flux_file        = "water_flux.glsl";
 
 static bool shader_error = false;
-static float delta_time = 0.f;
+
+static float delta_frame = 0.f;
 static float last_frame = 0.f;
+
+static float delta_time = 0.f;
 
 using glm::normalize, glm::cross;
 using glm::vec2, glm::vec3, glm::ivec2, glm::ivec3;
@@ -130,7 +133,7 @@ World_data gen_world_textures() {
 void prepare_erosion(Compute_program& program, World_data& tex) {
     program.use();
     program.set_uniform("max_height", MAX_HEIGHT);
-    program.set_uniform("d_t", 0.02f);
+    program.set_uniform("d_t", 0.05f);
     glBindTexture(GL_TEXTURE_2D, tex.heightmap);
     glBindImageTexture(
         BIND_HEIGHTMAP, 
@@ -402,7 +405,7 @@ void key_callback(GLFWwindow *window,
         int key, int scancode, 
         int act, int mod) {
     constexpr float speed_cap = 100.0f;
-	float speed = 200.f * delta_time * (camera.boost ? 8.f : 1.f);
+	float speed = 200.f * delta_frame * (camera.boost ? 8.f : 1.f);
 	speed = speed > speed_cap ? speed_cap : speed;
     
 	constexpr auto& gkey = glfwGetKey;
@@ -507,31 +510,32 @@ int main(int argc, char* argv[]) {
     float last_frame_rounded = 0.0;
     double frame_time = 0.0;
 
-    const u32 max_erosion_steps = 6000000000;
+    const u32 max_erosion_steps = 6000;
     u32 erosion_steps = 0;
 
     while (!glfwWindowShouldClose(window.get()) && (!shader_error)) {
 
         glfwPollEvents();
+        world_data.time = glfwGetTime();
+        delta_time = world_data.time - delta_time;
 
         // ---------- erosion compute shader ------------
         if (erosion_steps < max_erosion_steps) {
-            //if (!(erosion_steps) % 2) {
+            if (!(erosion_steps % 127)) {
                 dispatch_rain(heightmap_rain, world_data);
-            //}
-            dispatch_erosion(erosion_flux, world_data);
-            dispatch_erosion(erosion_erosion, world_data);
-            dispatch_erosion(erosion_sediment, world_data);
-            erosion_steps++;
-        }
+            }
+        } 
+        dispatch_erosion(erosion_flux, world_data);
+        dispatch_erosion(erosion_erosion, world_data);
+        dispatch_erosion(erosion_sediment, world_data);
+        erosion_steps++;
 
         if (erosion_steps % 2) {
             continue;
         }
 
+        delta_frame = world_data.time - last_frame;
         frame_count += 1;
-        world_data.time = glfwGetTime();
-        delta_time = world_data.time - last_frame;
         if (world_data.time - last_frame_rounded >= 1.f) {
             frame_time = 1000.0 / (double)frame_count;
             frame_count = 0;
@@ -562,7 +566,7 @@ int main(int argc, char* argv[]) {
         ImGui::Text("Frame time (ms): {%.2f}", frame_time);
         ImGui::Text("FPS: {%.2f}", 1000.0 / frame_time);
         ImGui::Text("Erosion updates: {%lu}", erosion_steps);
-        ImGui::Text("d_t: {%f}", delta_time);
+        ImGui::Text("d_t: {%f}", delta_frame);
         ImGui::End();
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

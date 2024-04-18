@@ -23,16 +23,14 @@ float rand(vec2 co) {
     return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
-#define SEED 13.0
+#define SEED 0.0
 
 void main() {
     ivec2 store_pos = ivec2(gl_GlobalInvocationID.xy);
 
-    gln_tFBMOpts opts = gln_tFBMOpts(SEED, 0.4, 2.0, 0.0025, 1, 6, false, false);
+    gln_tFBMOpts opts = gln_tFBMOpts(SEED, 0.4, 2.0, 0.0012, 1, 8, false, false);
     float val = (gln_sfbm(store_pos, opts) + 1) / 2;
-    //val = smoothstep(0.0, 1.0, val);
-    //val *= val; 
-    //val *= 1.6;
+    //val = (pow(val + 0.5, 3) - 0.125) / 3.25;
     vec4 terrain = vec4(val * height_scale, 0.0, 0.0, 0.0);
     // water height
     terrain.b = max(0.0, water_lvl - terrain.r);

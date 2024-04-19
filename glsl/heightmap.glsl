@@ -23,7 +23,7 @@ float rand(vec2 co) {
     return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
-#define SEED 0.0
+#define SEED 20.0
 
 void main() {
     ivec2 store_pos = ivec2(gl_GlobalInvocationID.xy);
@@ -33,8 +33,8 @@ void main() {
     //val = (pow(val + 0.5, 3) - 0.125) / 3.25;
     vec4 terrain = vec4(val * height_scale, 0.0, 0.0, 0.0);
     // water height
-    //terrain.b = max(0.0, water_lvl - terrain.r);
-    terrain.b += 1.4;
+    terrain.b = max(0.0, water_lvl - terrain.r);
+    //terrain.b += 1.4;
     terrain.w = terrain.r + terrain.b;
 
     imageStore(dest_tex, store_pos, terrain);

@@ -17,7 +17,7 @@ constexpr u32 WINDOW_W = 1920;
 constexpr u32 WINDOW_H = 1080;
 
 constexpr float MAX_HEIGHT = 256.f;
-constexpr float WATER_HEIGHT = 64.f;
+constexpr float WATER_HEIGHT = 84.f;
 
 constexpr float Z_NEAR = 0.1f;
 constexpr float Z_FAR = 2048.f * 5;
@@ -508,7 +508,7 @@ int main(int argc, char* argv[]) {
     float last_frame_rounded = 0.0;
     double frame_t = 0.0;
 
-    const u32 max_rain_steps = 60000;
+    const u32 max_rain_steps = 900000;
     u32 erosion_steps = 0;
 
     float mean_erosion_t = 0.f;
@@ -533,7 +533,7 @@ int main(int argc, char* argv[]) {
 
         // ---------- erosion compute shader ------------
         if (erosion_steps < max_rain_steps) {
-            if (!(erosion_steps % 28)) {
+            if (!(erosion_steps % 1048)) {
                 dispatch_rain(heightmap_rain, world_data);
             }
         } 

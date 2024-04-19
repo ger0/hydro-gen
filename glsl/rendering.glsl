@@ -23,11 +23,17 @@ layout (rgba32f, binding = BIND_HEIGHTMAP)
 layout (rgba32f, binding = BIND_DISPLAY_TEXTURE) 
 	uniform writeonly image2D out_tex;
 
+// HEIGHTMAP VARIABLES
+const int TERRAIN   = 0x00;
+const int SEDIMENT  = 0x01;
+const int WATER     = 0x02;
+const int TOTAL     = 0x03;
+
 // max raymarching distance
 const float max_dist    = 4096.0;
 const int   max_steps   = 2048;
 
-const vec3 light_dir    = normalize(vec3(0.0, -1.0, -0.5));
+const vec3 light_dir    = normalize(vec3(0.0, -0.6, -0.5));
 const vec3 light_color  = normalize(vec3(0.09, 0.075, 0.04));
 
 // diffuse colours
@@ -83,20 +89,12 @@ vec3 get_shade_terr(vec3 ray_pos, vec3 normal);
 vec3 get_fog_color(vec3 col, float ray_dist, float sundot);
 // returns the color of the sky based on camera and sun direction
 vec3 get_sky_color(vec3 direction, float ray_dist, float sundot);
-// get height of the top and bottom of the water body
-vec2 get_water_top_bottom(vec3 pos);
 // shade individual pixel on the screen
 vec3 get_pixel_color(vec3 origin, vec3 direction);
 // march rays
-Ray raymarch(vec3 orig, vec3 dir, const float max_dst, const int max_iter);
+Ray raymarch(vec3 orig, vec3 dir, const float max_dst, const int max_iter, const int terr_type);
 // convert coords to world coordinates
 vec4 to_world(vec4 coord);
-
-vec2 get_water_top_bottom(vec3 pos) {
-    float dirt = img_bilinear_r(heightmap, pos.xz);
-    float water = img_bilinear_b(heightmap, pos.xz);
-    return vec2(dirt + water, dirt);
-}
 
 float fog_mix(float fog) {
     return clamp(fog * fog * fog, 0.0, 1.0); 
@@ -131,7 +129,7 @@ vec3 get_img_normal_w(readonly image2D img, vec2 pos) {
             img_bilinear_w(img, pos + vec2( 1, 0)) - 
             img_bilinear_w(img, pos + vec2(-1, 0))
         ),
-        1.0,
+        2.0,
         (
             img_bilinear_w(img, pos + vec2(0, 1)) -
             img_bilinear_w(img, pos + vec2(0,-1))
@@ -146,10 +144,10 @@ vec3 get_img_normal(readonly image2D img, vec2 pos) {
             img_bilinear_r(img, pos + vec2( 1, 0)) - 
             img_bilinear_r(img, pos + vec2(-1, 0))
         ),
-        1.0,
+        2.0,
         (
             img_bilinear_r(img, pos + vec2(0, 1)) -
-            img_bilinear_r(img, pos + vec2(0,-1))
+            img_bilinear_r(img, pos + vec2(0,-1)) 
         )
     );
     return normalize(dpos);
@@ -194,21 +192,25 @@ vec4 get_shade(vec3 ray_pos, vec3 normal, bool is_water) {
     float shadow_scale = shadow_diff / -light_dir.y;
     float shadow_max = length(light_dir * shadow_scale);
     // casting a shadow ray towards the sun
-    Ray shadow = raymarch(ray_pos, -light_dir, shadow_max, max_steps / 2);
+    Ray shadow = raymarch(ray_pos, -light_dir, shadow_max, max_steps / 2, TERRAIN);
 
     vec3 ambient;
     float amb_factor = clamp(0.5 + 0.5 * normal.y, 0.0, 1.0);
     // background
+    vec3 diffuse;
     if (is_water) {
-        ambient = vec3(0.0035, 0.004, 0.0045);
+        //ambient = vec3(0.0035, 0.004, 0.0045);
+        ambient = sky_color * 0.001;
+        //diffuse = sky_color * 0.1;
+        diffuse = vec3(0.408, 0.487, 0.588) * 0.5;
     } else {
         ambient = get_material_color(ray_pos.xyz, normal, ambient_cols);
+        diffuse = get_material_color(
+            ray_pos.xyz, 
+            normal, 
+            diffuse_cols
+        );
     }
-    vec3 diffuse = get_material_color(
-        ray_pos.xyz, 
-        normal, 
-        diffuse_cols
-    );
     ambient += amb_factor * (diffuse / 16); // bonus
     vec4 outp = vec4(ambient, 0.04);
     // no shadow
@@ -226,120 +228,141 @@ vec3 get_shade_terr(vec3 ray_pos, vec3 normal) {
     return get_shade(ray_pos, normal, false).xyz;
 }
 
-vec4 calc_water(vec3 in_color, Ray ray, vec3 direction, float sundot, vec2 water_lvls) {
-    // debugging TODO: REMOVE
-    //return vec4(0, 0, 1, 0.001);
-
-    const float water_step = 0.01;
-    float diff = (water_lvls.r - ray.pos.y);
-    float scale = diff / direction.y;
-    float water_vol = clamp((length(direction * scale) * water_step), 0.0, 1.0);
-
-    // the point where the ray hit the water surface
-    vec3 w_orig = ray.pos.xyz + (direction * scale);
-    float rdist_to_w = ray.dist - length(direction * scale);
-
-    // a ray out of water's surface
-    vec3 w_norm = get_img_normal_w(heightmap, w_orig.xz);
-
-    w_norm = normalize(w_norm);
-    vec3 w_refl = reflect(direction, -w_norm);
-    Ray w_ray = raymarch(w_orig, w_refl, max_dist / 2.0, max_steps / 2);
-
-    // shadow
-    vec4 w_shad = get_shade(w_orig, w_norm, true);
-    vec3 water_col = w_shad.rgb;
-    // get the color of sky reflected on water
-    vec3 col = get_sky_color(w_refl, ray.dist, sundot); 
-
-    // fresnel
-    float cos_theta = dot(normalize(-direction), w_norm);
-    float fresnel = max(pow(1.0 - cos_theta, 2.0), 0.17);
-
-    // bouncing off to the sky
-    if (w_ray.dist >= (max_dist / 4.0)) {
-        water_col = col;
-        water_col = mix(in_color, water_col, fresnel);
-        water_col = mix(w_shad.rgb, water_col, w_shad.w);
-    } else {
-        vec3 t_norm = get_img_normal(heightmap, w_ray.pos.xz);
-        // get shadow of the sampled terrain
-        water_col = mix(
-            w_shad.rgb, 
-            get_shade_terr(w_ray.pos.xyz, t_norm), 
-            w_shad.w
-        );
-        water_col = mix(in_color, water_col, fresnel);
-        water_col = get_fog_color(
-            water_col, 
-            w_ray.dist + rdist_to_w, 
-            sundot
-        );
-        water_col = mix(
-            water_col,
-            col,
-            fog_mix((w_ray.dist + rdist_to_w) / max_dist)
-        );
-    }
-    return vec4(water_col, water_vol);
-}
-
-vec3 get_pixel_color(vec3 origin, vec3 direction) {
-    Ray ray = raymarch(origin, direction, max_dist, max_steps);
-	float sundot = clamp(dot(direction, -light_dir), 0.0, 1.0);
-
-    // top, bottom heights of water body
-    vec2 water_lvls = get_water_top_bottom(ray.pos.xyz);
-
-    // water buildup
-    float water_vol = 0.0;
-    vec3 water_col = vec3(0,0,0);
-
-    // no hit - sky
-    if (ray.dist >= max_dist) {
-        vec3 col = get_sky_color(direction, ray.dist, sundot);
-        return col;
-    }
-    // hit - get terrain
+vec3 get_terrain_color(Ray ray, vec3 direction, float sundot) {
     vec3 normal = get_img_normal(
         heightmap, 
         ray.pos.xz 
     );
-    vec3 outp = get_shade_terr(ray.pos.xyz, normal);
-    // if the hit is below water level
-    // find the intersection of the ray and the surface of water
-    if (ray.pos.y <= water_lvls.r) {
-        vec4 res = calc_water(outp, ray, direction, sundot, water_lvls);
-        water_col = res.rgb;
-        water_vol = res.w;
-    }
-    outp = mix(
-        outp, 
-        water_col, 
-        water_mix(water_vol)
-    );
-    outp = get_fog_color(outp, ray.dist, sundot);
-    outp = mix(
-        outp,
+    vec3 col = get_shade_terr(ray.pos.xyz, normal);
+    col = get_fog_color(col, ray.dist, sundot);
+    col = mix(
+        col,
         get_sky_color(direction, ray.dist, sundot),
         fog_mix(ray.dist / max_dist)
     );
-    return outp;
+    return col;
 }
 
-Ray raymarch(vec3 origin, vec3 direction, 
-              const float max_dist, const int max_steps) {
+vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
+    // water surface normal
+    vec3 w_norm = get_img_normal_w(heightmap, w_ray.pos.xz);
+
+    // cast ray to the bottom of the water
+    Ray t_ray = raymarch(
+        w_ray.pos.xyz, direction,
+        max_dist / 4.0, max_steps / 4,
+        TERRAIN
+    );
+    float water_vol = t_ray.dist;
+    t_ray.dist += w_ray.dist;
+
+    vec3 t_shad = get_terrain_color(t_ray, direction, sundot);
+
+    vec3 w_refl = reflect(direction, -w_norm);
+    Ray wrefl_ray = raymarch(
+        w_ray.pos.xyz, w_refl,
+        max_dist, max_steps,
+        TERRAIN
+    );
+    // wrefl_ray.dist += w_ray.dist;
+
+    // get shading for the water surface
+    vec4 w_shad = get_shade(w_ray.pos.xyz, w_norm, true);
+
+    vec3 water_col = t_shad;
+
+    // get the color of sky reflected on water
+    vec3 wrefl_skycol = get_sky_color(
+        w_refl,
+        wrefl_ray.dist + w_ray.dist,
+        sundot
+    ); 
+
+    // reflections:
+    // fresnel
+    float cos_theta = dot(normalize(-direction), w_norm);
+    float fresnel = max(pow(1.0 - cos_theta, 2.0), 0.17);
+    // bouncing off to the sky
+    if (wrefl_ray.dist >= max_dist) {
+        water_col = mix(t_shad, wrefl_skycol, fresnel);
+        water_col = mix(w_shad.rgb, water_col, w_shad.w);
+    } 
+    // else sampling the reflection of a terrain
+    else {
+        // get colour of the sampled terrain
+        wrefl_ray.dist += w_ray.dist;
+        // get the color of terrain from a ray reflected from the surface of water
+        water_col = get_fog_color(
+            w_shad.rgb, 
+            wrefl_ray.dist, 
+            sundot
+        );
+        water_col = mix(t_shad, water_col, fresnel);
+        /* water_col = mix(
+            water_col,
+            wrefl_skycol,
+            fog_mix(wrefl_ray.dist / (max_dist))
+        ); */
+        water_col = mix(
+            w_shad.rgb, 
+            get_terrain_color(wrefl_ray, w_refl, sundot),
+            w_shad.w
+        );
+    }
+    return water_col;
+}
+
+vec3 get_pixel_color(vec3 origin, vec3 direction) {
+    Ray ray = raymarch(origin, direction, max_dist, max_steps, TOTAL);
+	float sundot = clamp(dot(direction, -light_dir), 0.0, 1.0);
+
+	float water_h = img_bilinear_b(heightmap, ray.pos.xz);
+
+    // no hit - sky
+    if (ray.dist >= max_dist) {
+        return get_sky_color(direction, ray.dist, sundot);
+    }
+    // ray hitting the surface of water
+    if (water_h > 0.01f) {
+        // water buildup
+        // float water_vol = 0.0;
+        vec3 water_col = get_water_color(ray, direction, sundot);
+        water_col = get_fog_color(water_col, ray.dist, sundot);
+        water_col = mix(
+            water_col,
+            get_sky_color(direction, ray.dist, sundot),
+            fog_mix(ray.dist / max_dist)
+        );
+        return water_col;
+    } 
+    // hit - get terrain
+    else {
+        return get_terrain_color(ray, direction, sundot);
+    }
+}
+
+Ray raymarch(
+    vec3 origin, vec3 direction, 
+    const float max_dist, const int max_steps, 
+    const int terr_type
+) {
     float dist = 0.001;
     float d_dist = 0.1;
 
     // shadow penumbra
     float min_sdf = 1.0;
+    float t_height = 0.0;
 
     for (int i = 0; i < max_steps; ++i) {
         vec3 sample_pos = origin + direction * dist;
 
-        // float height = img_bilinear(heightmap, sample_pos.xz);
-        float t_height = img_bilinear_r(heightmap, sample_pos.xz);
+        if (terr_type == TERRAIN) {
+            t_height = img_bilinear_r(heightmap, sample_pos.xz);
+        } 
+        // ELSE TOTAL
+        else {
+            t_height = img_bilinear_w(heightmap, sample_pos.xz);
+        }
 
         if (sample_pos.y > max_height && direction.y >= 0) {
             break;

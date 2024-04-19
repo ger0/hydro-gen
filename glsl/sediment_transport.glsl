@@ -48,7 +48,7 @@ void main() {
     vec4 terrain = imageLoad(heightmap, pos);
     terrain.b *= (1 - Ke * d_t);
     terrain.g = st;
-    terrain.w = terrain.r + terrain.b;
+    terrain.w = terrain.r + terrain.b + st;
     imageStore(out_fluxmap, pos, flux);
     imageStore(out_velocitymap, pos, vel);
     imageStore(out_heightmap, pos, terrain);

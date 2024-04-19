@@ -1,5 +1,6 @@
 #include "shaderprogram.hpp"
 #include "utils.hpp"
+#include <algorithm>
 #include <glm/gtc/type_ptr.hpp>
 
 using namespace glm;
@@ -37,7 +38,6 @@ enum Log_type {
 };
 
 std::string load_shader_file(std::string filename) {
-    LOG_DBG("   Shader filename {}", filename);
     char path[1 << 8];
     snprintf(path, sizeof(path), "../glsl/%s", filename.c_str());
 
@@ -98,6 +98,9 @@ void resolve_includes(std::string& buff) {
             buff.erase(include_start, include_end - include_start);
 
             std::string include = load_shader_file(include_path.c_str());
+            constexpr char n_line = '\n';
+            int n_lines = std::count(include.cbegin(), include.cend(), n_line);
+            LOG_DBG("    Shader filename \t {:30} total lines: {}", include_path, n_lines);
             buff.insert(include_start, include);
         }
     }

@@ -80,7 +80,7 @@ GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title, bool* 
     }
     glfwMakeContextCurrent(win);
     // glfwSetInputMode(win, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    glfwSwapInterval(1);
+    glfwSwapInterval(0);
     glViewport(0, 0, window_size.x, window_size.y);
 
     if (glewInit() != GLEW_OK) {

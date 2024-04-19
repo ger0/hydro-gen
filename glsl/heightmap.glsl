@@ -28,13 +28,13 @@ float rand(vec2 co) {
 void main() {
     ivec2 store_pos = ivec2(gl_GlobalInvocationID.xy);
 
-    gln_tFBMOpts opts = gln_tFBMOpts(SEED, 0.4, 2.0, 0.0012, 1, 8, false, false);
+    gln_tFBMOpts opts = gln_tFBMOpts(SEED, 0.4, 2.0, 0.004, 1, 7, false, false);
     float val = (gln_sfbm(store_pos, opts) + 1) / 2;
     //val = (pow(val + 0.5, 3) - 0.125) / 3.25;
     vec4 terrain = vec4(val * height_scale, 0.0, 0.0, 0.0);
     // water height
-    terrain.b = max(0.0, water_lvl - terrain.r);
-    // terrain.b += 2.4;
+    //terrain.b = max(0.0, water_lvl - terrain.r);
+    terrain.b += 1.4;
     terrain.w = terrain.r + terrain.b;
 
     imageStore(dest_tex, store_pos, terrain);

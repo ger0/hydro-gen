@@ -109,14 +109,14 @@ float water_mix(float water) {
 vec3 get_material_color(vec3 pos, vec3 norm, Material_colors material) {
     const vec3 up = vec3(0, 1, 0);
     // angle
-	float angle = dot(norm, up);
+	float cos_a = dot(norm, up);
 	/* if (angle > 0.6 && pos.y < (water_lvl + 2.3)) {
 	    return material.sand; */
     /* if (angle < 0.55 && pos.y > (max_height * 0.45)) {
         return material.rock; */
-    /* } else if (angle < 0.45) {
-        return material.rock; */
-	if (angle < 0.85) {
+    if (cos_a < 0.50) {
+        return material.rock;
+	} else if (cos_a < 0.88) {
 	    return material.dirt;
 	} else {
 	    return material.grass;
@@ -157,9 +157,9 @@ vec3 get_img_normal(readonly image2D img, vec2 pos) {
 
 vec3 get_fog_color(vec3 col, float ray_dist, float sundot) {
     // fog
-    float fo = 1.0 - exp(-pow(0.15 * ray_dist / (SC * 16.0), 1.5));
+    float fo = 1.0 - exp(-pow(0.15 * ray_dist / (max_dist / 16.0), 2.5));
     vec3 fco = 0.65 * vec3(0.4, 0.65, 1.0) + 
-        0.1 * vec3(1.0, 0.8, 0.5) * pow(sundot, 4.0);
+        0.1 * vec3(1.0, 0.8, 0.5) * pow(sundot * 1.5, 4.0);
     return mix(col, fco, fo);
 }
 

@@ -35,7 +35,15 @@ const float G = 9.81;
 // time step
 uniform float d_t;
 
-float get_height(ivec2 pos) {
+float get_rheight(ivec2 pos) {
+    if (pos.x < 0 || pos.x > (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
+    pos.y < 0 || pos.y > (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1)) {
+        return 999999999999.0;
+    }
+    return imageLoad(heightmap, pos).r;
+}
+
+float get_wheight(ivec2 pos) {
     if (pos.x < 0 || pos.x > (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
     pos.y < 0 || pos.y > (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1)) {
         return 999999999999.0;
@@ -63,10 +71,15 @@ void main() {
 
     // total height difference
     vec4 d_height;
-    d_height.x = terrain.w - get_height(pos + ivec2(-1, 0)); // left
-    d_height.y = terrain.w - get_height(pos + ivec2( 1, 0)); // right
-    d_height.z = terrain.w - get_height(pos + ivec2( 0, 1)); // top
-    d_height.w = terrain.w - get_height(pos + ivec2( 0,-1)); // bottom
+    d_height.x = terrain.w - get_wheight(pos + ivec2(-1, 0)); // left
+    d_height.y = terrain.w - get_wheight(pos + ivec2( 1, 0)); // right
+    d_height.z = terrain.w - get_wheight(pos + ivec2( 0, 1)); // top
+    d_height.w = terrain.w - get_wheight(pos + ivec2( 0,-1)); // bottom
+
+    // terrain slope
+    vec2 slope;
+    slope.x = (get_wheight(pos + ivec2( 1, 0)) - get_wheight(pos + ivec2(-1, 0))) / 2.0; // dx
+    slope.y = (get_wheight(pos + ivec2( 0, 1)) - get_wheight(pos + ivec2( 0,-1))) / 2.0; // dz
 
     vec4 in_flux;
     in_flux.x = get_flux(pos + ivec2(-1, 0)).y; // from left
@@ -74,8 +87,12 @@ void main() {
     in_flux.z = get_flux(pos + ivec2( 0, 1)).w; // from top
     in_flux.w = get_flux(pos + ivec2( 0,-1)).z; // from bottom 
 
+    /* out_flux.x += slope.x;
+    out_flux.y += -slope.x;
+    out_flux.z += -slope.y;
+    out_flux.w += slope.y; */
 
-    #define LOSS 0.91
+    #define LOSS 0.99985
     out_flux.x = 
         max(1e-32, LOSS * out_flux.x + d_t * A * (G * d_height.x) / L);
     out_flux.y =  
@@ -84,6 +101,11 @@ void main() {
         max(1e-32, LOSS * out_flux.z + d_t * A * (G * d_height.z) / L);
     out_flux.w =
         max(1e-32, LOSS * out_flux.w + d_t * A * (G * d_height.w) / L);
+
+    /* out_flux.x = min(1e-32, out_flux.x + d_t * A * (G * d_height.x) / L);
+    out_flux.y = min(1e-32, out_flux.y + d_t * A * (G * d_height.y) / L);
+    out_flux.z = min(1e-32, out_flux.z + d_t * A * (G * d_height.z) / L);
+    out_flux.w = min(1e-32, out_flux.w + d_t * A * (G * d_height.w) / L); */
 
     // boundary checking */
     if (pos.x <= 0) {
@@ -97,13 +119,18 @@ void main() {
         out_flux.z = 0.0;
     } 
 
-    // scaling factor
-    float sum_out_flux = out_flux.x + out_flux.y + out_flux.z + out_flux.w;
-    float K = min(1.0, (terrain.b * L * L) / (sum_out_flux * d_t));
-    out_flux *= K;
-    sum_out_flux *= K;
-
     float sum_in_flux = in_flux.x + in_flux.y + in_flux.z + in_flux.w;
+    float sum_out_flux = out_flux.x + out_flux.y + out_flux.z + out_flux.w;
+
+     //scaling factor
+     /* float K = min(1.0, (terrain.b * L * L) / (sum_out_flux * d_t));
+     out_flux *= K;
+     sum_out_flux *= K; */
+    if ((sum_out_flux * d_t) > (L * L * terrain.b)) {
+        float K = (terrain.b * L * L) / (sum_out_flux * d_t);
+        out_flux *= K;
+        sum_out_flux *= K;
+    }
     float d_volume = d_t * (sum_in_flux - sum_out_flux);
     float d2 = d1 + (d_volume / (L * L));
 

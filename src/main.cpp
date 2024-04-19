@@ -16,7 +16,7 @@
 constexpr u32 WINDOW_W = 1920;
 constexpr u32 WINDOW_H = 1080;
 
-constexpr float MAX_HEIGHT = 512.f;
+constexpr float MAX_HEIGHT = 256.f;
 constexpr float WATER_HEIGHT = 64.f;
 
 constexpr float Z_NEAR = 0.1f;
@@ -24,7 +24,7 @@ constexpr float Z_FAR = 2048.f * 5;
 constexpr float FOV = 90.f;
 constexpr float ASPECT_RATIO = float(WINDOW_W) / WINDOW_H;
 
-constexpr GLuint NOISE_SIZE = 2048;
+constexpr GLuint NOISE_SIZE = 384;
 
 // shader filenames
 constexpr auto noise_comput_file        = "heightmap.glsl";
@@ -38,8 +38,6 @@ static bool shader_error = false;
 
 static float delta_frame = 0.f;
 static float last_frame = 0.f;
-
-static float delta_time = 0.f;
 
 using glm::normalize, glm::cross;
 using glm::vec2, glm::vec3, glm::ivec2, glm::ivec3;
@@ -133,7 +131,6 @@ World_data gen_world_textures() {
 void prepare_erosion(Compute_program& program, World_data& tex) {
     program.use();
     program.set_uniform("max_height", MAX_HEIGHT);
-    program.set_uniform("d_t", 0.05f);
     glBindTexture(GL_TEXTURE_2D, tex.heightmap);
     glBindImageTexture(
         BIND_HEIGHTMAP, 
@@ -201,12 +198,13 @@ void dispatch_rain(Compute_program& program, const World_data& data) {
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
 
+//TODO: STOP COPYING, START SWAPPING BUFFERS 
 void dispatch_erosion(
         Compute_program& program,
         World_data& data
     ) {
     program.use();
-    program.set_uniform("d_t", 0.05f);
+    program.set_uniform("d_t", 0.002f);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
     glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
@@ -508,44 +506,43 @@ int main(int argc, char* argv[]) {
 
     u32 frame_count = 0;
     float last_frame_rounded = 0.0;
-    double frame_time = 0.0;
+    double frame_t = 0.0;
 
-    const u32 max_erosion_steps = 6000;
+    const u32 max_rain_steps = 60000;
     u32 erosion_steps = 0;
 
-    while (!glfwWindowShouldClose(window.get()) && (!shader_error)) {
+    float mean_erosion_t = 0.f;
 
+    while (!glfwWindowShouldClose(window.get()) && (!shader_error)) {
         glfwPollEvents();
         world_data.time = glfwGetTime();
-        delta_time = world_data.time - delta_time;
+
+        if ((world_data.time - last_frame + mean_erosion_t) >= (1/40.f)) {
+            if (!dispatch_rendering(render_shader, render_data, world_data)) {
+                return EXIT_FAILURE;
+            }
+            delta_frame = world_data.time - last_frame;
+            frame_count += 1;
+            if (world_data.time - last_frame_rounded >= 1.f) {
+                frame_t = 1000.0 / (double)frame_count;
+                frame_count = 0;
+                last_frame_rounded += 1.f;
+            }
+            last_frame = world_data.time;
+        }
 
         // ---------- erosion compute shader ------------
-        if (erosion_steps < max_erosion_steps) {
-            if (!(erosion_steps % 127)) {
+        if (erosion_steps < max_rain_steps) {
+            if (!(erosion_steps % 28)) {
                 dispatch_rain(heightmap_rain, world_data);
             }
         } 
         dispatch_erosion(erosion_flux, world_data);
         dispatch_erosion(erosion_erosion, world_data);
         dispatch_erosion(erosion_sediment, world_data);
+
+        mean_erosion_t = glfwGetTime() / erosion_steps;
         erosion_steps++;
-
-        if (erosion_steps % 2) {
-            continue;
-        }
-
-        delta_frame = world_data.time - last_frame;
-        frame_count += 1;
-        if (world_data.time - last_frame_rounded >= 1.f) {
-            frame_time = 1000.0 / (double)frame_count;
-            frame_count = 0;
-            last_frame_rounded += 1.f;
-        }
-        last_frame = world_data.time;
-
-        if (!dispatch_rendering(render_shader, render_data, world_data)) {
-            return EXIT_FAILURE;
-        }
 
         // imgui
         ImGui_ImplOpenGL3_NewFrame();
@@ -563,10 +560,11 @@ int main(int argc, char* argv[]) {
             camera.dir.y, 
             camera.dir.z
         );
-        ImGui::Text("Frame time (ms): {%.2f}", frame_time);
-        ImGui::Text("FPS: {%.2f}", 1000.0 / frame_time);
+        ImGui::Text("Frame time (ms): {%.2f}", frame_t);
+        ImGui::Text("FPS: {%.2f}", 1000.0 / frame_t);
         ImGui::Text("Erosion updates: {%lu}", erosion_steps);
-        ImGui::Text("d_t: {%f}", delta_frame);
+        ImGui::Text("Mean erosion time: {%f}", mean_erosion_t);
+        ImGui::Text("Total Time: {%f}", world_data.time);
         ImGui::End();
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

@@ -24,7 +24,7 @@ constexpr float Z_FAR = 2048.f * 5;
 constexpr float FOV = 90.f;
 constexpr float ASPECT_RATIO = float(WINDOW_W) / WINDOW_H;
 
-constexpr GLuint NOISE_SIZE = 384;
+constexpr GLuint NOISE_SIZE = 512;
 
 // shader filenames
 constexpr auto noise_comput_file        = "heightmap.glsl";
@@ -73,9 +73,9 @@ struct World_data {
 };
 
 struct Rain_settings {
-    float amount = 0.05f;
-    float mountain_thresh = 0.45f;
-    float mountain_multip = 0.1f;
+    float amount = 0.01f;
+    float mountain_thresh = 0.65f;
+    float mountain_multip = 0.05f;
     int period = 48;
 };
 
@@ -205,14 +205,14 @@ void prepare_erosion(Compute_program& program, World_data& tex) {
 void dispatch_rain(Compute_program& program, const World_data& data, Rain_settings& set) {
     program.use();
     program.set_uniform("time", data.time);
-    program.set_uniform("amount", set.amount);
+    program.set_uniform("rain_amount", set.amount);
     program.set_uniform("MOUNT_HGH", set.mountain_thresh);
     program.set_uniform("mount_mtp", set.mountain_multip);
 
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    glMemoryBarrier(GL_ALL_BARRIER_BITS);
     glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
 
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    glMemoryBarrier(GL_ALL_BARRIER_BITS);
 }
 
 //TODO: STOP COPYING, START SWAPPING BUFFERS 
@@ -228,7 +228,7 @@ void dispatch_erosion(
     program.set_uniform("Kd", set.Kd);
     program.set_uniform("Ke", set.Ke);
 
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
     glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
 
@@ -262,7 +262,7 @@ void dispatch_erosion(
         NOISE_SIZE, NOISE_SIZE, 1
     );
 
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    glMemoryBarrier(GL_ALL_BARRIER_BITS);
 }
 
 struct Render_data {

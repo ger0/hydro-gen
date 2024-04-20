@@ -239,13 +239,28 @@ vec3 get_terrain_color(Ray ray, vec3 direction, float sundot) {
     return col;
 }
 
+vec3 refractCameraRay(vec3 surfaceNormal, vec3 cameraDirection, float refractiveIndex) {
+    float cosTheta = dot(-surfaceNormal, cameraDirection);
+    float sinTheta2 = 1.0 - cosTheta * cosTheta;
+    float sinPhi2 = refractiveIndex * refractiveIndex * sinTheta2;
+
+    if (sinPhi2 > 1.0) {
+        // Total internal reflection
+        return reflect(cameraDirection, surfaceNormal);
+    } else {
+        float cosPhi = sqrt(1.0 - sinPhi2);
+        return refractiveIndex * cameraDirection + (refractiveIndex * cosTheta - cosPhi) * surfaceNormal;
+    }
+}
+
 vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
     // water surface normal
     vec3 w_norm = get_img_normal_w(heightmap, w_ray.pos.xz);
 
     // cast ray to the bottom of the water
+    vec3 refract_dir = refractCameraRay(w_norm, direction, 1.0 / 1.3);
     Ray t_ray = raymarch(
-        w_ray.pos.xyz, direction,
+        w_ray.pos.xyz, -refract_dir,
         max_dist / 4.0, max_steps / 4,
         TERRAIN
     );
@@ -274,16 +289,15 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
         wrefl_ray.dist + w_ray.dist,
         refl_sundot
     ); 
-    //return vec3(refl_sundot, refl_sundot, refl_sundot);
-    //return wrefl_skycol;
 
     // reflections:
     // fresnel
     float cos_theta = dot(direction, w_norm);
-    float fresnel = max(pow(1.0 - cos_theta, 2.0), 0.01);
+    float fresnel = max(pow(1.0 - cos_theta, 2.0), 0.06);
     // bouncing off to the sky
     if (wrefl_ray.dist >= max_dist) {
-        water_col = mix(t_shad, wrefl_skycol, fresnel);
+        water_col = mix(t_shad, w_shad.rgb, min(1.0, t_ray.dist / 2000000.0));
+        water_col = mix(water_col, wrefl_skycol, fresnel);
         water_col = mix(w_shad.rgb, water_col, w_shad.w);
     } 
     // else sampling the reflection of a terrain
@@ -291,21 +305,22 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
         // get colour of the sampled terrain
         wrefl_ray.dist += w_ray.dist;
         // get the color of terrain from a ray reflected from the surface of water
-        water_col = get_fog_color(
-            w_shad.rgb, 
+        water_col = mix(t_shad, w_shad.rgb, min(1.0, t_ray.dist / 2000000.0));
+        water_col = mix(
+            water_col, 
+            get_terrain_color(wrefl_ray, w_refl, refl_sundot),
+            w_shad.w
+        );
+        /* water_col = get_fog_color(
+            water_col, 
             wrefl_ray.dist, 
             refl_sundot
-        );
-        //water_col = mix(water_col, wrefl_skycol, fresnel);
-        /* water_col = mix(
+        ); */
+        water_col = mix(t_shad, water_col, fresnel);
+        water_col = mix(
             water_col,
             wrefl_skycol,
             fog_mix(wrefl_ray.dist / (max_dist))
-        ); */
-        water_col = mix(
-            w_shad.rgb, 
-            get_terrain_color(wrefl_ray, w_refl, refl_sundot),
-            w_shad.w
         );
     }
     return water_col;

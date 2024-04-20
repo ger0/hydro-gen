@@ -85,9 +85,11 @@ void main() {
     float sin_a = find_sin_alpha(pos);
     float c = Kc * (sin_a + 0.15) * max(0.15, length(vec2(u, v)));
     if (terrain.b > 1.0) {
-        c = max(0.0, (c + 1.0) - terrain.b);
+        //c = max(0.0, c - max(0.0, terrain.b - 2.f));
+        // deep water doesn't erode as much
+        c /= terrain.b;
     } else {
-        c *= smoothstep(0.0, 1.0, terrain.b);
+        c *= terrain.b;
     }
 
     float bt;

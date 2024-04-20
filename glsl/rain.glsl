@@ -1,6 +1,7 @@
 #version 460
 
 #include "img_interpolation.glsl"
+#include "simplex_noise.glsl"
 #include "bindings.glsl"
 
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
@@ -18,11 +19,12 @@ float rand(float n) {
     return fract(sin(n) * 1e4);
 }
 
-
 void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
     vec4 terr = imageLoad(heightmap, pos);
-    float r = rand(time * fract(sin(pos.x * 1e2)) * fract(cos(pos.y * 1e4)));
+    //float r = rand(time * fract(sin(pos.x * 1e2)) * fract(cos(pos.y * 1e4)));
+    gln_tFBMOpts opts = gln_tFBMOpts(time, 0.5, 2.0, 0.05, 1, 2, false, false);
+    float r = max(0.0, gln_sfbm(gl_GlobalInvocationID.xy, opts));
 
     float incr = rain_amount * r;
     /* if (time < 20.f) {

@@ -27,7 +27,7 @@ layout (binding = BIND_WRITE_VELOCITYMAP, rgba32f)
 uniform float max_height;
 uniform float d_t;
 
-const float Ke = 0.05;
+uniform float Ke;
 
 float get_lerp_sed(vec2 back_coords) {
     if (back_coords.x <= 0.0 || back_coords.x >= (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1.0) ||

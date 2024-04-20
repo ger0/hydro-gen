@@ -17,7 +17,7 @@ constexpr u32 WINDOW_W = 1920;
 constexpr u32 WINDOW_H = 1080;
 
 constexpr float MAX_HEIGHT = 256.f;
-constexpr float WATER_HEIGHT = 84.f;
+constexpr float WATER_HEIGHT = 96.f;
 
 constexpr float Z_NEAR = 0.1f;
 constexpr float Z_FAR = 2048.f * 5;
@@ -70,6 +70,20 @@ struct World_data {
     GLuint out_water_flux;
     GLuint water_vel;
     GLuint out_water_vel;
+};
+
+struct Rain_settings {
+    float amount = 0.05f;
+    float mountain_thresh = 0.45f;
+    float mountain_multip = 0.1f;
+    int period = 48;
+};
+
+struct Erosion_settings {
+    float Kc = 0.001;
+    float Ks = 0.001;
+    float Kd = 0.001;
+    float Ke = 0.05;
 };
 
 void delete_world_textures(World_data& data) {
@@ -188,9 +202,12 @@ void prepare_erosion(Compute_program& program, World_data& tex) {
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void dispatch_rain(Compute_program& program, const World_data& data) {
+void dispatch_rain(Compute_program& program, const World_data& data, Rain_settings& set) {
     program.use();
     program.set_uniform("time", data.time);
+    program.set_uniform("amount", set.amount);
+    program.set_uniform("MOUNT_HGH", set.mountain_thresh);
+    program.set_uniform("mount_mtp", set.mountain_multip);
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
@@ -201,10 +218,16 @@ void dispatch_rain(Compute_program& program, const World_data& data) {
 //TODO: STOP COPYING, START SWAPPING BUFFERS 
 void dispatch_erosion(
         Compute_program& program,
-        World_data& data
+        World_data& data,
+        Erosion_settings& set
     ) {
     program.use();
     program.set_uniform("d_t", 0.002f);
+    program.set_uniform("Kc", set.Kc);
+    program.set_uniform("Ks", set.Ks);
+    program.set_uniform("Kd", set.Kd);
+    program.set_uniform("Ke", set.Ke);
+
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
     glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
@@ -360,7 +383,7 @@ bool dispatch_rendering(
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
-    glClear(GL_COLOR_BUFFER_BIT);
+    //glClear(GL_COLOR_BUFFER_BIT);
 
     glBlitNamedFramebuffer(
         rndr.framebuffer, 0, 
@@ -422,6 +445,14 @@ void key_callback(GLFWwindow *window,
 	}
 	if (gkey(window, GLFW_KEY_SPACE) == GLFW_RELEASE) {
 		camera.boost = false;
+	}
+	if (gkey(window, GLFW_KEY_ENTER)) {
+	    auto curs = glfwGetInputMode(window, GLFW_CURSOR);
+	    if (curs == GLFW_CURSOR_DISABLED) {
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        } else {
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        }
 	}
 }
 
@@ -508,10 +539,13 @@ int main(int argc, char* argv[]) {
     float last_frame_rounded = 0.0;
     double frame_t = 0.0;
 
-    const u32 max_rain_steps = 900000;
+    //const u32 max_rain_steps = 900000;
+    bool should_rain = true;
     u32 erosion_steps = 0;
 
     float mean_erosion_t = 0.f;
+    Rain_settings rain_settings;
+    Erosion_settings erosion_settings;
 
     while (!glfwWindowShouldClose(window.get()) && (!shader_error)) {
         glfwPollEvents();
@@ -529,46 +563,63 @@ int main(int argc, char* argv[]) {
                 last_frame_rounded += 1.f;
             }
             last_frame = world_data.time;
+
+            // imgui
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+            ImGui::Begin("Debug");
+            ImGui::Text("Camera pos: {%.2f %.2f %.2f}", 
+                camera.pos.x, 
+                camera.pos.y, 
+                camera.pos.z
+            );
+            ImGui::Text("Camera dir: {%.2f %.2f %.2f}", 
+                camera.dir.x, 
+                camera.dir.y, 
+                camera.dir.z
+            );
+            ImGui::Text("Frame time (ms): {%.2f}", frame_t);
+            ImGui::Text("FPS: {%.2f}", 1000.0 / frame_t);
+            ImGui::Text("Erosion updates: {%lu}", erosion_steps);
+            ImGui::Text("Mean erosion time: {%f}", mean_erosion_t);
+            ImGui::Text("Total Time: {%f}", world_data.time);
+            ImGui::End();
+
+            ImGui::Begin("Settings");
+            ImGui::SeparatorText("Rain");
+            if (ImGui::Button("Rain")) {
+                should_rain = !should_rain;
+            }
+            ImGui::SliderFloat("Amount", &rain_settings.amount, 0.0f, 1.0f);
+            ImGui::SliderFloat("Bonus %", &rain_settings.mountain_thresh, 0.0f, 1.0f);
+            ImGui::SliderFloat("Bonus Amount", &rain_settings.mountain_multip, 0.0f, 2.5f);
+            ImGui::SliderInt("Tick period", &rain_settings.period, 2, 1000);
+
+            ImGui::SeparatorText("Erosion");
+            ImGui::SliderFloat("Capacity", &erosion_settings.Kc, 0.0001f, 0.1f);
+            ImGui::SliderFloat("Dissolving", &erosion_settings.Ks, 0.0001f, 0.1f);
+            ImGui::SliderFloat("Deposition", &erosion_settings.Kd, 0.0001f, 0.1f);
+            ImGui::SliderFloat("Evaporation", &erosion_settings.Ke, 0.0f, 1.f);
+
+            ImGui::End();
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
         }
 
         // ---------- erosion compute shader ------------
-        if (erosion_steps < max_rain_steps) {
-            if (!(erosion_steps % 1048)) {
-                dispatch_rain(heightmap_rain, world_data);
+        if (should_rain) {
+            if (!(erosion_steps % rain_settings.period)) {
+                dispatch_rain(heightmap_rain, world_data, rain_settings);
             }
         } 
-        dispatch_erosion(erosion_flux, world_data);
-        dispatch_erosion(erosion_erosion, world_data);
-        dispatch_erosion(erosion_sediment, world_data);
+        dispatch_erosion(erosion_flux, world_data, erosion_settings);
+        dispatch_erosion(erosion_erosion, world_data, erosion_settings);
+        dispatch_erosion(erosion_sediment, world_data, erosion_settings);
 
         mean_erosion_t = glfwGetTime() / erosion_steps;
         erosion_steps++;
-
-        // imgui
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-
-        ImGui::Begin("Info");
-        ImGui::Text("Camera pos: {%.2f %.2f %.2f}", 
-            camera.pos.x, 
-            camera.pos.y, 
-            camera.pos.z
-        );
-        ImGui::Text("Camera dir: {%.2f %.2f %.2f}", 
-            camera.dir.x, 
-            camera.dir.y, 
-            camera.dir.z
-        );
-        ImGui::Text("Frame time (ms): {%.2f}", frame_t);
-        ImGui::Text("FPS: {%.2f}", 1000.0 / frame_t);
-        ImGui::Text("Erosion updates: {%lu}", erosion_steps);
-        ImGui::Text("Mean erosion time: {%f}", mean_erosion_t);
-        ImGui::Text("Total Time: {%f}", world_data.time);
-        ImGui::End();
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
         glfwSwapBuffers(window.get());
     }
     LOG_DBG("Closing the program...");

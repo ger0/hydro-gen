@@ -33,11 +33,11 @@ const float L = 1.0;
 // time step
 uniform float d_t;
 // sediment capacity constant
-const float Kc = 0.001;
+uniform float Kc;
 // sediment dissolving constant
-const float Ks = 0.002;
+uniform float Ks;
 // sediment deposition constant
-const float Kd = 0.002;
+uniform float Kd;
 
 float find_sin_alpha(ivec2 pos) {
 	float r_b = imageLoad(heightmap, pos + ivec2(1, 0)).r;

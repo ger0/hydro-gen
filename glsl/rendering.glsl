@@ -33,7 +33,7 @@ const int TOTAL     = 0x03;
 const float max_dist    = 4096.0;
 const int   max_steps   = 2048;
 
-const vec3 light_dir    = normalize(vec3(0.0, -0.6, -0.5));
+const vec3 light_dir    = normalize(vec3(0.0, -0.6, -1.0));
 const vec3 light_color  = normalize(vec3(0.09, 0.075, 0.04));
 
 // diffuse colours
@@ -107,7 +107,7 @@ float water_mix(float water) {
 vec3 get_material_color(vec3 pos, vec3 norm, Material_colors material) {
     const vec3 up = vec3(0, 1, 0);
     // angle
-	float cos_a = dot(norm, up);
+	float cos_a = dot(norm, -up);
 	/* if (angle > 0.6 && pos.y < (water_lvl + 2.3)) {
 	    return material.sand; */
     /* if (angle < 0.55 && pos.y > (max_height * 0.45)) {
@@ -124,33 +124,27 @@ vec3 get_material_color(vec3 pos, vec3 norm, Material_colors material) {
 }
 
 vec3 get_img_normal_w(readonly image2D img, vec2 pos) {
-    vec3 dpos = vec3(
-        (
-            img_bilinear_w(img, pos + vec2( 1, 0)) - 
-            img_bilinear_w(img, pos + vec2(-1, 0))
-        ),
-        2.0,
-        (
-            img_bilinear_w(img, pos + vec2(0, 1)) -
-            img_bilinear_w(img, pos + vec2(0,-1))
-        )
-    );
-    return normalize(dpos);
+        float dx = (
+            img_bilinear_w(img, pos + vec2( 1.0, 0)) - 
+            img_bilinear_w(img, pos + vec2(-1.0, 0))
+        );
+        float dz = (
+            img_bilinear_w(img, pos + vec2(0, 1.0)) -
+            img_bilinear_w(img, pos + vec2(0,-1.0))
+        );
+    return normalize(cross(vec3(2.0, dx, 0), vec3(0, dz, 2.0)));
 }
 
 vec3 get_img_normal(readonly image2D img, vec2 pos) {
-    vec3 dpos = vec3(
-        (
-            img_bilinear_r(img, pos + vec2( 1, 0)) - 
-            img_bilinear_r(img, pos + vec2(-1, 0))
-        ),
-        2.0,
-        (
-            img_bilinear_r(img, pos + vec2(0, 1)) -
-            img_bilinear_r(img, pos + vec2(0,-1)) 
-        )
-    );
-    return normalize(dpos);
+        float dx = (
+            img_bilinear_r(img, pos + vec2( 1.0, 0)) - 
+            img_bilinear_r(img, pos + vec2(-1.0, 0))
+        );
+        float dz = (
+            img_bilinear_r(img, pos + vec2(0, 1.0)) -
+            img_bilinear_r(img, pos + vec2(0,-1.0))
+        );
+    return normalize(cross(vec3(2.0, dx, 0), vec3(0, dz, 2.0)));
 }
 
 vec3 get_fog_color(vec3 col, float ray_dist, float sundot) {
@@ -163,8 +157,8 @@ vec3 get_fog_color(vec3 col, float ray_dist, float sundot) {
 
 vec3 get_sky_color(vec3 direction, float ray_dist, float sundot) {
     // sky		
-    float diry = min(direction.y, 0.78);
-    vec3 col = sky_color - diry * diry * 0.5;
+    float diry = direction.y;
+    vec3 col = sky_color - diry * diry * 0.37;
     col = mix(
         col,
         0.85 * vec3(0.7,0.75,0.85),
@@ -200,9 +194,12 @@ vec4 get_shade(vec3 ray_pos, vec3 normal, bool is_water) {
     vec3 diffuse;
     if (is_water) {
         //ambient = vec3(0.0035, 0.004, 0.0045);
-        ambient = sky_color * 0.001;
+        ambient = sky_color * 0.005;
         //diffuse = sky_color * 0.1;
-        diffuse = vec3(0.408, 0.487, 0.588) * 0.5;
+        diffuse = vec3(0.108, 0.187, 0.288) * 0.1;
+
+        //float sediment = img_bilinear_g(heightmap, ray_pos.xz);
+        //diffuse = mix(diffuse, diffuse_cols.dirt * 100.f, sediment);
     } else {
         ambient = get_material_color(ray_pos.xyz, normal, ambient_cols);
         diffuse = get_material_color(
@@ -214,9 +211,8 @@ vec4 get_shade(vec3 ray_pos, vec3 normal, bool is_water) {
     ambient += amb_factor * (diffuse / 16); // bonus
     vec4 outp = vec4(ambient, 0.04);
     // no shadow
-    if (shadow.dist == shadow_max) {
+    if (shadow.dist >= shadow_max) {
         vec3 light_diff = light_dir;
-        light_diff.y = -light_diff.y;
 	    float lambrt = max(dot(light_diff, normal), 0.0);
         outp.rgb += lambrt / 2 * diffuse * shadow.pos.w; 
         outp.w = shadow.pos.w;
@@ -258,7 +254,7 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
 
     vec3 t_shad = get_terrain_color(t_ray, direction, sundot);
 
-    vec3 w_refl = reflect(direction, -w_norm);
+    vec3 w_refl = reflect(direction, w_norm);
     Ray wrefl_ray = raymarch(
         w_ray.pos.xyz, w_refl,
         max_dist, max_steps,
@@ -272,16 +268,19 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
     vec3 water_col = t_shad;
 
     // get the color of sky reflected on water
+	float refl_sundot = clamp(dot(w_refl, -light_dir), 0.0, 1.0);
     vec3 wrefl_skycol = get_sky_color(
         w_refl,
         wrefl_ray.dist + w_ray.dist,
-        sundot
+        refl_sundot
     ); 
+    //return vec3(refl_sundot, refl_sundot, refl_sundot);
+    //return wrefl_skycol;
 
     // reflections:
     // fresnel
-    float cos_theta = dot(normalize(-direction), w_norm);
-    float fresnel = max(pow(1.0 - cos_theta, 2.0), 0.17);
+    float cos_theta = dot(direction, w_norm);
+    float fresnel = max(pow(1.0 - cos_theta, 2.0), 0.01);
     // bouncing off to the sky
     if (wrefl_ray.dist >= max_dist) {
         water_col = mix(t_shad, wrefl_skycol, fresnel);
@@ -295,9 +294,9 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
         water_col = get_fog_color(
             w_shad.rgb, 
             wrefl_ray.dist, 
-            sundot
+            refl_sundot
         );
-        water_col = mix(t_shad, water_col, fresnel);
+        //water_col = mix(water_col, wrefl_skycol, fresnel);
         /* water_col = mix(
             water_col,
             wrefl_skycol,
@@ -305,7 +304,7 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
         ); */
         water_col = mix(
             w_shad.rgb, 
-            get_terrain_color(wrefl_ray, w_refl, sundot),
+            get_terrain_color(wrefl_ray, w_refl, refl_sundot),
             w_shad.w
         );
     }

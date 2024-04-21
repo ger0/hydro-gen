@@ -24,7 +24,7 @@ constexpr float Z_FAR = 2048.f * 5;
 constexpr float FOV = 90.f;
 constexpr float ASPECT_RATIO = float(WINDOW_W) / WINDOW_H;
 
-constexpr GLuint NOISE_SIZE = 512;
+constexpr GLuint NOISE_SIZE = 864;
 
 // shader filenames
 constexpr auto noise_comput_file        = "heightmap.glsl";
@@ -117,8 +117,6 @@ World_data gen_world_textures() {
         );
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
         return noise_texture;
     };
@@ -215,7 +213,123 @@ void dispatch_rain(Compute_program& program, const World_data& data, Rain_settin
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
 }
 
-//TODO: STOP COPYING, START SWAPPING BUFFERS 
+// TODO: REFACTOR
+void swap_buffers(World_data tex) {
+    static u32 cntr = 0;
+    cntr++;
+    if (cntr % 2) {
+        glBindTexture(GL_TEXTURE_2D, tex.heightmap);
+        glBindImageTexture(
+            BIND_WRITE_HEIGHTMAP, 
+            tex.heightmap, 0, 
+            GL_FALSE, 
+            0, 
+            GL_READ_ONLY, 
+            GL_RGBA32F
+        );
+        glBindTexture(GL_TEXTURE_2D, tex.out_heightmap);
+        glBindImageTexture(
+            BIND_HEIGHTMAP, 
+            tex.out_heightmap, 0, 
+            GL_FALSE, 
+            0, 
+            GL_WRITE_ONLY, 
+            GL_RGBA32F
+        );
+        glBindTexture(GL_TEXTURE_2D, tex.water_flux);
+        glBindImageTexture(
+            BIND_WRITE_FLUXMAP, 
+            tex.water_flux, 0, 
+            GL_FALSE, 
+            0, 
+            GL_READ_ONLY, 
+            GL_RGBA32F
+        );
+        glBindTexture(GL_TEXTURE_2D, tex.out_water_flux);
+        glBindImageTexture(
+            BIND_FLUXMAP, 
+            tex.out_water_flux, 0, 
+            GL_FALSE, 
+            0, 
+            GL_WRITE_ONLY, 
+            GL_RGBA32F
+        );
+        glBindTexture(GL_TEXTURE_2D, tex.water_vel);
+        glBindImageTexture(
+            BIND_WRITE_VELOCITYMAP, 
+            tex.water_vel, 0, 
+            GL_FALSE, 
+            0, 
+            GL_READ_ONLY, 
+            GL_RGBA32F
+        );
+        glBindTexture(GL_TEXTURE_2D, tex.out_water_vel);
+        glBindImageTexture(
+            BIND_VELOCITYMAP, 
+            tex.out_water_vel, 0, 
+            GL_FALSE, 
+            0, 
+            GL_WRITE_ONLY, 
+            GL_RGBA32F
+        );
+    } else {
+        glBindTexture(GL_TEXTURE_2D, tex.heightmap);
+        glBindImageTexture(
+            BIND_HEIGHTMAP, 
+            tex.heightmap, 0, 
+            GL_FALSE, 
+            0, 
+            GL_READ_ONLY, 
+            GL_RGBA32F
+        );
+        glBindTexture(GL_TEXTURE_2D, tex.out_heightmap);
+        glBindImageTexture(
+            BIND_WRITE_HEIGHTMAP, 
+            tex.out_heightmap, 0, 
+            GL_FALSE, 
+            0, 
+            GL_WRITE_ONLY, 
+            GL_RGBA32F
+        );
+        glBindTexture(GL_TEXTURE_2D, tex.water_flux);
+        glBindImageTexture(
+            BIND_FLUXMAP, 
+            tex.water_flux, 0, 
+            GL_FALSE, 
+            0, 
+            GL_READ_ONLY, 
+            GL_RGBA32F
+        );
+        glBindTexture(GL_TEXTURE_2D, tex.out_water_flux);
+        glBindImageTexture(
+            BIND_WRITE_FLUXMAP, 
+            tex.out_water_flux, 0, 
+            GL_FALSE, 
+            0, 
+            GL_WRITE_ONLY, 
+            GL_RGBA32F
+        );
+        glBindTexture(GL_TEXTURE_2D, tex.water_vel);
+        glBindImageTexture(
+            BIND_VELOCITYMAP, 
+            tex.water_vel, 0, 
+            GL_FALSE, 
+            0, 
+            GL_READ_ONLY, 
+            GL_RGBA32F
+        );
+        glBindTexture(GL_TEXTURE_2D, tex.out_water_vel);
+        glBindImageTexture(
+            BIND_WRITE_VELOCITYMAP, 
+            tex.out_water_vel, 0, 
+            GL_FALSE, 
+            0, 
+            GL_WRITE_ONLY, 
+            GL_RGBA32F
+        );
+    }
+}
+
 void dispatch_erosion(
         Compute_program& program,
         World_data& data,
@@ -229,40 +343,10 @@ void dispatch_erosion(
     program.set_uniform("Ke", set.Ke);
 
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
-
     glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
 
-    glCopyImageSubData(
-        data.out_heightmap,
-        GL_TEXTURE_2D, 0,
-        0, 0, 0,
-        data.heightmap,
-        GL_TEXTURE_2D, 0,
-        0, 0, 0,
-        NOISE_SIZE, NOISE_SIZE, 1
-    );
-
-    glCopyImageSubData(
-        data.out_water_flux,
-        GL_TEXTURE_2D, 0,
-        0, 0, 0,
-        data.water_flux,
-        GL_TEXTURE_2D, 0,
-        0, 0, 0,
-        NOISE_SIZE, NOISE_SIZE, 1
-    );
-
-    glCopyImageSubData(
-        data.out_water_vel,
-        GL_TEXTURE_2D, 0,
-        0, 0, 0,
-        data.water_vel,
-        GL_TEXTURE_2D, 0,
-        0, 0, 0,
-        NOISE_SIZE, NOISE_SIZE, 1
-    );
-
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
+    swap_buffers(data);
 }
 
 struct Render_data {
@@ -299,8 +383,8 @@ bool prepare_rendering(
     );
     // configuration
     constexpr struct Compute_config {
-        alignas(16) float max_height    = MAX_HEIGHT;
-        alignas(16) ivec2 dims          = ivec2(NOISE_SIZE, NOISE_SIZE);
+        alignas(sizeof(GLfloat)) GLfloat max_height    = MAX_HEIGHT;
+        alignas(sizeof(GLint) * 2) ivec2 dims          = ivec2(NOISE_SIZE, NOISE_SIZE);
     } conf_buff;
 
     glGenBuffers(1, &data.config_buffer);
@@ -382,15 +466,6 @@ bool dispatch_rendering(
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-
-    //glClear(GL_COLOR_BUFFER_BIT);
-
-    glBlitNamedFramebuffer(
-        rndr.framebuffer, 0, 
-        0, 0, WINDOW_W, WINDOW_H, 
-        0, 0, WINDOW_W, WINDOW_H, 
-        GL_COLOR_BUFFER_BIT, GL_NEAREST
-    );
     return true;
 }
 
@@ -563,49 +638,6 @@ int main(int argc, char* argv[]) {
                 last_frame_rounded += 1.f;
             }
             last_frame = world_data.time;
-
-            // imgui
-            ImGui_ImplOpenGL3_NewFrame();
-            ImGui_ImplGlfw_NewFrame();
-            ImGui::NewFrame();
-            ImGui::Begin("Debug");
-            ImGui::Text("Camera pos: {%.2f %.2f %.2f}", 
-                camera.pos.x, 
-                camera.pos.y, 
-                camera.pos.z
-            );
-            ImGui::Text("Camera dir: {%.2f %.2f %.2f}", 
-                camera.dir.x, 
-                camera.dir.y, 
-                camera.dir.z
-            );
-            ImGui::Text("Frame time (ms): {%.2f}", frame_t);
-            ImGui::Text("FPS: {%.2f}", 1000.0 / frame_t);
-            ImGui::Text("Erosion updates: {%lu}", erosion_steps);
-            ImGui::Text("Mean erosion time: {%f}", mean_erosion_t);
-            ImGui::Text("Total Time: {%f}", world_data.time);
-            ImGui::End();
-
-            ImGui::Begin("Settings");
-            ImGui::SeparatorText("Rain");
-            if (ImGui::Button("Rain")) {
-                should_rain = !should_rain;
-            }
-            ImGui::SliderFloat("Amount", &rain_settings.amount, 0.0f, 1.0f);
-            ImGui::SliderFloat("Bonus %", &rain_settings.mountain_thresh, 0.0f, 1.0f);
-            ImGui::SliderFloat("Bonus Amount", &rain_settings.mountain_multip, 0.0f, 2.5f);
-            ImGui::SliderInt("Tick period", &rain_settings.period, 2, 1000);
-
-            ImGui::SeparatorText("Erosion");
-            ImGui::SliderFloat("Capacity", &erosion_settings.Kc, 0.0001f, 0.1f);
-            ImGui::SliderFloat("Dissolving", &erosion_settings.Ks, 0.0001f, 0.1f);
-            ImGui::SliderFloat("Deposition", &erosion_settings.Kd, 0.0001f, 0.1f);
-            ImGui::SliderFloat("Evaporation", &erosion_settings.Ke, 0.0f, 1.f);
-
-            ImGui::End();
-            ImGui::Render();
-            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
         }
 
         // ---------- erosion compute shader ------------
@@ -620,6 +652,56 @@ int main(int argc, char* argv[]) {
 
         mean_erosion_t = glfwGetTime() / erosion_steps;
         erosion_steps++;
+        // imgui
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        ImGui::Begin("Debug");
+        ImGui::Text("Camera pos: {%.2f %.2f %.2f}", 
+                camera.pos.x, 
+                camera.pos.y, 
+                camera.pos.z
+                );
+        ImGui::Text("Camera dir: {%.2f %.2f %.2f}", 
+                camera.dir.x, 
+                camera.dir.y, 
+                camera.dir.z
+                );
+        ImGui::Text("Frame time (ms): {%.2f}", frame_t);
+        ImGui::Text("FPS: {%.2f}", 1000.0 / frame_t);
+        ImGui::Text("Erosion updates: {%lu}", erosion_steps);
+        ImGui::Text("Mean erosion time: {%f}", mean_erosion_t);
+        ImGui::Text("Total Time: {%f}", world_data.time);
+        ImGui::End();
+
+        ImGui::Begin("Settings");
+        ImGui::SeparatorText("Rain");
+        if (ImGui::Button("Rain")) {
+            should_rain = !should_rain;
+        }
+        ImGui::SliderFloat("Amount", &rain_settings.amount, 0.0f, 1.0f);
+        ImGui::SliderFloat("Bonus %", &rain_settings.mountain_thresh, 0.0f, 1.0f);
+        ImGui::SliderFloat("Bonus Amount", &rain_settings.mountain_multip, 0.0f, 2.5f);
+        ImGui::SliderInt("Tick period", &rain_settings.period, 2, 1000);
+
+        ImGui::SeparatorText("Erosion");
+        ImGui::SliderFloat("Capacity", &erosion_settings.Kc, 0.0001f, 0.1f);
+        ImGui::SliderFloat("Dissolving", &erosion_settings.Ks, 0.0001f, 0.1f);
+        ImGui::SliderFloat("Deposition", &erosion_settings.Kd, 0.0001f, 0.1f);
+        ImGui::SliderFloat("Evaporation", &erosion_settings.Ke, 0.0f, 1.f);
+
+        glBlitNamedFramebuffer(
+            render_data.framebuffer, 0, 
+            0, 0, WINDOW_W, WINDOW_H, 
+            0, 0, WINDOW_W, WINDOW_H, 
+            GL_COLOR_BUFFER_BIT, GL_NEAREST
+        );
+
+        ImGui::End();
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window.get());
     }
     LOG_DBG("Closing the program...");

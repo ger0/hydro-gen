@@ -84,12 +84,14 @@ void main() {
 
     float sin_a = find_sin_alpha(pos);
     float c = Kc * (sin_a + 0.15) * max(0.15, length(vec2(u, v)));
+    
     if (terrain.b > 1.0) {
         //c = max(0.0, c - max(0.0, terrain.b - 2.f));
+
         // deep water doesn't erode as much
         c /= terrain.b;
     } else {
-        c *= terrain.b;
+        //c *= terrain.b;
     }
 
     float bt;
@@ -97,13 +99,13 @@ void main() {
 
     // dissolve sediment
     if (c > st) {
-        bt = terrain.r - Ks * (c - st);
-        s1 = st + Ks * (c - st);
+        bt = terrain.r - Ks * (c - st) * d_t;
+        s1 = st + Ks * (c - st) * d_t;
     } 
     // deposit sediment
     else {
-        bt = terrain.r + Kd * (st - c);
-        s1 = st - Kd * (st - c);
+        bt = terrain.r + Kd * (st - c) * d_t;
+        s1 = st - Kd * (st - c) * d_t;
     }
     vec4 flux = imageLoad(fluxmap, pos);
     vel.x = u;
@@ -111,8 +113,8 @@ void main() {
     vel.w = sin_a;
     imageStore(out_fluxmap, pos, flux);
     imageStore(out_velocitymap, pos, vel);
-    terrain.r = bt;
-    terrain.g = s1;
+    terrain.r = max(0, bt);
+    terrain.g = max(0, s1);
     terrain.w = terrain.b + bt;
     imageStore(out_heightmap, pos, terrain);
 

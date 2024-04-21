@@ -27,9 +27,6 @@ void main() {
     float r = max(0.0, gln_sfbm(gl_GlobalInvocationID.xy, opts));
 
     float incr = rain_amount * r;
-    /* if (time < 20.f) {
-        incr = 0.1 * r;
-    } */
     float mountain = terr.w - max_height * MOUNT_HGH;
     if (mountain > 0) {
         incr += mountain * mount_mtp * r / ((1.0 - MOUNT_HGH) * max_height);

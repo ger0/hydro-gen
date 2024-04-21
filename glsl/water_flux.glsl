@@ -92,53 +92,48 @@ void main() {
     out_flux.z += -slope.y;
     out_flux.w += slope.y; */
 
-    #define LOSS 0.99985
+    #define ENERGY_LOSS 0.99985
     out_flux.x = 
-        max(1e-32, LOSS * out_flux.x + d_t * A * (G * d_height.x) / L);
+        max(0, ENERGY_LOSS * out_flux.x + d_t * A * (G * d_height.x) / L);
     out_flux.y =  
-        max(1e-32, LOSS * out_flux.y + d_t * A * (G * d_height.y) / L);
+        max(0, ENERGY_LOSS * out_flux.y + d_t * A * (G * d_height.y) / L);
     out_flux.z =  
-        max(1e-32, LOSS * out_flux.z + d_t * A * (G * d_height.z) / L);
+        max(0, ENERGY_LOSS * out_flux.z + d_t * A * (G * d_height.z) / L);
     out_flux.w =
-        max(1e-32, LOSS * out_flux.w + d_t * A * (G * d_height.w) / L);
-
-    /* out_flux.x = min(1e-32, out_flux.x + d_t * A * (G * d_height.x) / L);
-    out_flux.y = min(1e-32, out_flux.y + d_t * A * (G * d_height.y) / L);
-    out_flux.z = min(1e-32, out_flux.z + d_t * A * (G * d_height.z) / L);
-    out_flux.w = min(1e-32, out_flux.w + d_t * A * (G * d_height.w) / L); */
+        max(0, ENERGY_LOSS * out_flux.w + d_t * A * (G * d_height.w) / L);
 
     // boundary checking */
     if (pos.x <= 0) {
-        out_flux.x = 0.0;
+        out_flux.x = 0;
     } else if (pos.x >= (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1)) {
-        out_flux.y = 0.0;
+        out_flux.y = 0;
     } 
     if (pos.y <= 0) {
-        out_flux.w = 0.0;
+        out_flux.w = 0;
     } else if (pos.y >= (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1)) {
-        out_flux.z = 0.0;
+        out_flux.z = 0;
     } 
 
     float sum_in_flux = in_flux.x + in_flux.y + in_flux.z + in_flux.w;
     float sum_out_flux = out_flux.x + out_flux.y + out_flux.z + out_flux.w;
 
      //scaling factor
-     /* float K = min(1.0, (terrain.b * L * L) / (sum_out_flux * d_t));
-     out_flux *= K;
-     sum_out_flux *= K; */
-    if ((sum_out_flux * d_t) > (L * L * terrain.b)) {
+    float K = min(1.0, (terrain.b * L * L) / (sum_out_flux * d_t));
+    out_flux *= K;
+    sum_out_flux *= K;
+    /* if ((sum_out_flux * d_t) > (L * L * terrain.b)) {
         float K = (terrain.b * L * L) / (sum_out_flux * d_t);
         out_flux *= K;
         sum_out_flux *= K;
-    }
+    } */
     float d_volume = d_t * (sum_in_flux - sum_out_flux);
     float d2 = d1 + (d_volume / (L * L));
 
-    terrain.b = d2;
+    terrain.b = max(0, d2);
     terrain.w = terrain.r + d2;
 
     // average water height
-    vel.z = max(0.001, (d1 + d2) / 2.0); 
+    vel.z = max(0.01, (d1 + d2) / 2.0); 
     imageStore(out_fluxmap, pos, out_flux);
     imageStore(out_velocitymap, pos, vel);
     imageStore(out_heightmap, pos, terrain);

@@ -51,7 +51,7 @@ struct Material_colors {
 // ambient colors
 const Material_colors ambient_cols = Material_colors(
     vec3(0.00014, 0.00084, 0.00018),
-    vec3(0.0002,  0.0002,  0.0002),
+    vec3(0.0008,  0.0008,  0.0008),
     vec3(0.0009,  0.0004,  0.0002),
     vec3(0.0015,  0.0015,  0.00041),
     vec3(0.004, 0.0038, 0.0039)
@@ -61,7 +61,7 @@ const Material_colors ambient_cols = Material_colors(
 const Material_colors diffuse_cols = Material_colors(
     //vec3(0.014, 0.074, 0.009) / 1.5,
     vec3(0.2068, 0.279, 0.01) * 1.3 / 5,
-    vec3(0.30,  0.29,  0.17) * 1.3 / 6,
+    vec3(0.40,  0.39,  0.37) * 1.3 / 6,
     //vec3(0.07,  0.04,  0.02) / 2.0,
     vec3(0.2068, 0.179, 0.00) * 1.3 / 6,
     vec3(0.15,  0.15,  0.041) / 2,
@@ -108,19 +108,27 @@ vec3 get_material_color(vec3 pos, vec3 norm, Material_colors material) {
     const vec3 up = vec3(0, 1, 0);
     // angle
 	float cos_a = dot(norm, -up);
-	/* if (angle > 0.6 && pos.y < (water_lvl + 2.3)) {
-	    return material.sand; */
-    /* if (angle < 0.55 && pos.y > (max_height * 0.45)) {
-        return material.rock; */
-    if (cos_a < 0.50) {
-        return material.rock;
-	} else if (cos_a < 0.88) {
-	    return material.dirt;
+
+    float mntn = min(1.0, smoothstep(max_height * 0.45, max_height * 0.65, pos.y));
+
+    vec3 col;
+    if (cos_a < 0.70) {
+        float rock = 1 - smoothstep(0.60, 0.70, cos_a);
+        col = mix(material.dirt, material.rock, rock);
+	} else if (cos_a < 0.95) {
+        float dirt = 1 - smoothstep(0.85, 0.95, cos_a);
+	    col = mix(material.grass, material.dirt, dirt);
 	} else {
-	    return material.grass;
+	    col = material.grass;
 	}
-	/* } else if (angle > 0.50 && pos.y > (max_height * 0.55)) {
-	    return material.snow; */
+	if (pos.y >= 0.45) {
+	    col = mix(col, material.rock, mntn);
+	    if (cos_a >= 0.85) {
+            float grass = smoothstep(0.85, 0.95, cos_a);
+            col = mix(col, material.grass, grass);
+        }
+	}
+	return col;
 }
 
 vec3 get_img_normal_w(readonly image2D img, vec2 pos) {
@@ -290,6 +298,10 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
         refl_sundot
     ); 
 
+    // sediment
+    float a = img_bilinear_g(heightmap, w_ray.pos.xz);
+    a = min(1.0, a * 1000.0);
+
     // reflections:
     // fresnel
     float cos_theta = dot(direction, w_norm);
@@ -297,6 +309,7 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
     // bouncing off to the sky
     if (wrefl_ray.dist >= max_dist) {
         water_col = mix(t_shad, w_shad.rgb, min(1.0, t_ray.dist / 2000000.0));
+        water_col = mix(water_col, diffuse_cols.dirt, a);
         water_col = mix(water_col, wrefl_skycol, fresnel);
         water_col = mix(w_shad.rgb, water_col, w_shad.w);
     } 
@@ -306,6 +319,7 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
         wrefl_ray.dist += w_ray.dist;
         // get the color of terrain from a ray reflected from the surface of water
         water_col = mix(t_shad, w_shad.rgb, min(1.0, t_ray.dist / 2000000.0));
+        water_col = mix(water_col, diffuse_cols.dirt, a);
         water_col = mix(
             water_col, 
             get_terrain_color(wrefl_ray, w_refl, refl_sundot),
@@ -337,7 +351,7 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
         return get_sky_color(direction, ray.dist, sundot);
     }
     // ray hitting the surface of water
-    if (water_h > 0.01f) {
+    if (water_h > 0.02) {
         // water buildup
         // float water_vol = 0.0;
         vec3 water_col = get_water_color(ray, direction, sundot);
@@ -378,7 +392,14 @@ Ray raymarch(
             t_height = img_bilinear_w(heightmap, sample_pos.xz);
         }
 
-        if (sample_pos.y > max_height && direction.y >= 0) {
+        if (
+            (sample_pos.y > max_height && direction.y >= 0) ||
+            (sample_pos.y <= 0 && direction.y < 0) ||
+            (sample_pos.x > hmap_dims.x && direction.x > 0) ||
+            (sample_pos.x < 0 && direction.x < 0) ||
+            (sample_pos.z > hmap_dims.y && direction.z > 0) ||
+            (sample_pos.z < 0 && direction.z < 0)
+        ) {
             break;
         }
         // hitting the ground ??
@@ -388,6 +409,9 @@ Ray raymarch(
                 vec4(sample_pos - (0.05 * direction), 0.0),
                 dist - (0.05)
             );
+        }
+        else if (d_height < 0) {
+            return Ray(vec4(origin + direction * dist, min_sdf), dist);
         }
         // penumbra
         min_sdf = min(min_sdf, 12 * d_dist / dist);

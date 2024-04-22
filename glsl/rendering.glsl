@@ -394,11 +394,7 @@ Ray raymarch(
 
         if (
             (sample_pos.y > max_height && direction.y >= 0) ||
-            (sample_pos.y <= 0 && direction.y < 0) ||
-            (sample_pos.x > hmap_dims.x && direction.x > 0) ||
-            (sample_pos.x < 0 && direction.x < 0) ||
-            (sample_pos.z > hmap_dims.y && direction.z > 0) ||
-            (sample_pos.z < 0 && direction.z < 0)
+            (sample_pos.y <= 0 && direction.y < 0)
         ) {
             break;
         }
@@ -453,5 +449,13 @@ void main() {
     vec3 color = get_pixel_color(pos, ray_dir);
     // gamma correction
     color = pow(color, vec3(1.0 / 2.2));
-    imageStore(out_tex, pixel, vec4(color, 0));
+    imageStore(out_tex, 3 * pixel + ivec2(0, 2), vec4(color, 0));
+    imageStore(out_tex, 3 * pixel + ivec2(0, 1), vec4(color, 0));
+    imageStore(out_tex, 3 * pixel + ivec2(2, 2), vec4(color, 0));
+    imageStore(out_tex, 3 * pixel + ivec2(1, 2), vec4(color, 0));
+    imageStore(out_tex, 3 * pixel + ivec2(2, 1), vec4(color, 0));
+    imageStore(out_tex, 3 * pixel + ivec2(1, 1), vec4(color, 0));
+    imageStore(out_tex, 3 * pixel + ivec2(2, 0), vec4(color, 0));
+    imageStore(out_tex, 3 * pixel + ivec2(1, 0), vec4(color, 0));
+    imageStore(out_tex, 3 * pixel, vec4(color, 0));
 }

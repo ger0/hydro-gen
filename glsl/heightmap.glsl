@@ -17,7 +17,7 @@ float rand(vec2 co) {
     return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
-#define SEED 49.0
+#define SEED 265.0
 
 void main() {
     ivec2 store_pos = ivec2(gl_GlobalInvocationID.xy);
@@ -25,7 +25,7 @@ void main() {
     //gln_tFBMOpts opts_ridge = gln_tFBMOpts(SEED, 0.50, 2.0, 0.0005, 1, 2, true, true);
     //float val_ridge = (gln_sfbm(store_pos, opts_ridge) + 1) / 1.5;
 
-    gln_tFBMOpts opts = gln_tFBMOpts(SEED, 0.40, 2.0, 0.0012, 1, 8, false, false);
+    gln_tFBMOpts opts = gln_tFBMOpts(SEED, 0.40, 2.0, 0.0045, 1, 8, false, false);
     float val = (gln_sfbm(store_pos, opts) + 1) / 2;
     // val = (pow(val + 0.5, 3) - 0.125) / 3.25;
     //float slope = (gl_GlobalInvocationID.x / (gl_NumWorkGroups.x * WRKGRP_SIZE_X));

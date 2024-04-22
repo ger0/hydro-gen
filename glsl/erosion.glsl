@@ -14,8 +14,6 @@ layout (binding = BIND_WRITE_HEIGHTMAP, rgba32f)
 // (fL, fR, fT, fB) left, right, top, bottom
 layout (binding = BIND_FLUXMAP, rgba32f)   
 	uniform readonly image2D fluxmap;
-layout (binding = BIND_WRITE_FLUXMAP, rgba32f)   
-	uniform writeonly image2D out_fluxmap;
 
 // velocity + suspended sediment vector
 // vec3((u, v), suspended)
@@ -99,23 +97,23 @@ void main() {
 
     // dissolve sediment
     if (c > st) {
-        bt = terrain.r - Ks * (c - st) * d_t;
-        s1 = st + Ks * (c - st) * d_t;
+        bt = terrain.r - Ks * (c - st);
+        s1 = st + Ks * (c - st);
     } 
     // deposit sediment
     else {
-        bt = terrain.r + Kd * (st - c) * d_t;
-        s1 = st - Kd * (st - c) * d_t;
+        bt = terrain.r + Kd * (st - c);
+        s1 = st - Kd * (st - c);
     }
-    vec4 flux = imageLoad(fluxmap, pos);
+
     vel.x = u;
     vel.y = v;
     vel.w = sin_a;
-    imageStore(out_fluxmap, pos, flux);
-    imageStore(out_velocitymap, pos, vel);
+
     terrain.r = max(0, bt);
     terrain.g = max(0, s1);
     terrain.w = terrain.b + bt;
-    imageStore(out_heightmap, pos, terrain);
 
+    imageStore(out_velocitymap, pos, vel);
+    imageStore(out_heightmap, pos, terrain);
 }

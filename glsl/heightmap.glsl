@@ -9,12 +9,6 @@ layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 layout (binding = BIND_HEIGHTMAP, rgba32f)
     uniform writeonly image2D dest_tex;
 
-layout (binding = BIND_FLUXMAP, rgba32f)
-    uniform writeonly image2D flux_tex;
-
-layout (binding = BIND_VELOCITYMAP, rgba32f)
-    uniform writeonly image2D vel_tex;
-
 uniform float height_scale;
 uniform float water_lvl;
 
@@ -46,6 +40,4 @@ void main() {
     terrain.w = terrain.r + terrain.b;
 
     imageStore(dest_tex, store_pos, terrain);
-    imageStore(vel_tex, store_pos, vec4(0,0,0,0));
-    imageStore(flux_tex, store_pos, vec4(0,0,0,0));
 }

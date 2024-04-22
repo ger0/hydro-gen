@@ -9,9 +9,9 @@ void resolve_includes(std::string& buff);
 
 namespace gl {
     void gen_texture(Texture& tex,
-            GLenum format = GL_RGBA,
-            GLenum type = GL_FLOAT,
-            const void* pixels = nullptr) {
+            GLenum format,
+            GLenum type,
+            const void* pixels) {
         glGenTextures(1, &tex.texture);
         glBindTexture(tex.target, tex.texture);
         glTexImage2D(
@@ -24,11 +24,18 @@ namespace gl {
             pixels
         );
     }
-    void bind_texture(Texture& tex) {
+    void bind_texture(Texture& tex, GLuint bind) {
+        glActiveTexture(GL_TEXTURE0 + bind); 
         glBindTexture(tex.target, tex.texture);
-    }
-    void unbind_texture(Texture& tex) {
-        glBindTexture(tex.target, 0);
+        glBindImageTexture(
+            bind, 
+            tex.texture, 
+            tex.level, 
+            tex.layered, 
+            tex.layer, 
+            tex.access, 
+            tex.format 
+        );
     }
 }
 
@@ -187,7 +194,7 @@ GLuint Shader_core::get_uniform_location(const char* name) const {
     return glGetUniformLocation(program, name);
 }
 
-void Shader_core::set_texture(gl::Texture tex, std::string str) {
+/* void Shader_core::set_texture(gl::Texture tex, std::string str) {
     gl::bind_texture(tex);
     auto iter = cached_bindings.find(str);
     GLuint binding;
@@ -206,7 +213,7 @@ void Shader_core::set_texture(gl::Texture tex, std::string str) {
         tex.access, 
         tex.format 
     );
-}
+} */
 
 template<>
 void Shader_core::set_uniform(const char* id, bool const& v) const {

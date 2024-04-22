@@ -37,6 +37,14 @@ float get_lerp_sed(vec2 back_coords) {
     return img_bilinear_g(heightmap, back_coords);
 }
 
+float get_rheight(ivec2 pos) {
+    if (pos.x < 0 || pos.x > (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
+    pos.y < 0 || pos.y > (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1)) {
+        return 999999999999.0;
+    }
+    return imageLoad(heightmap, pos).r;
+}
+
 void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
     vec4 vel = imageLoad(velocitymap, pos);
@@ -49,6 +57,19 @@ void main() {
     terrain.b *= (1 - Ke * d_t);
     terrain.g = st;
     terrain.w = terrain.r + terrain.b;
+
+
+    /* // thermal erosion
+    // total height difference
+
+    vec4 d_height;
+    d_rheight.x = terrain.w - get_rheight(pos + ivec2(-1, 0)); // L
+    d_rheight.x = terrain.w - get_rheight(pos + ivec2(-1, 1)); // LT
+    d_rheight.z = terrain.w - get_rheight(pos + ivec2( 0, 1)); // top
+    d_rheight.y = terrain.w - get_rheight(pos + ivec2( 1, 0)); // R
+    d_rheight.y = terrain.w - get_rheight(pos + ivec2( 1, 1)); // RT
+    d_rheight.w = terrain.w - get_rheight(pos + ivec2( 0,-1)); // bottom */
+
     imageStore(out_fluxmap, pos, flux);
     imageStore(out_velocitymap, pos, vel);
     imageStore(out_heightmap, pos, terrain);

@@ -17,8 +17,12 @@ struct Texture {
     GLuint      width;
     GLuint      height;
 };
-void gen_texture(Texture& tex);
-void bind_texture(Texture& tex);
+    void gen_texture(Texture& tex,
+        GLenum format = GL_RGBA,
+        GLenum type = GL_FLOAT,
+        const void* pixels = nullptr
+    );
+    void bind_texture(Texture& tex, GLuint bind);
 };
 
 class Shader_core {

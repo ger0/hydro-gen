@@ -61,17 +61,6 @@ static struct Camera {
 	bool boost  = false;	
 } camera;
 
-struct World_data {
-    GLfloat time;
-    GLuint heightmap;
-    GLuint out_heightmap;
-
-    GLuint water_flux;
-    GLuint out_water_flux;
-    GLuint water_vel;
-    GLuint out_water_vel;
-};
-
 struct Rain_settings {
     float amount = 0.01f;
     float mountain_thresh = 0.65f;
@@ -86,119 +75,197 @@ struct Erosion_settings {
     float Ke = 0.05;
 };
 
-void delete_world_textures(World_data& data) {
-    glDeleteTextures(1, &data.heightmap);
-    glDeleteTextures(1, &data.out_heightmap);
+// texture pairs for swapping
+struct Tex_pair {
+    gl::Texture t1; 
+    gl::Texture t2; 
 
+    GLuint r_bind;
+    GLuint w_bind;
 
-    glDeleteTextures(1, &data.water_flux);
-    glDeleteTextures(1, &data.out_water_flux);
+    u32 cntr = 0;
+    void swap() {
+        cntr++;
+        if (cntr % 2) {
+            t1.access = GL_WRITE_ONLY;
+            gl::bind_texture(t1, w_bind);
+            t2.access = GL_READ_ONLY;
+            gl::bind_texture(t2, r_bind);
+        } else {
+            t1.access = GL_READ_ONLY;
+            gl::bind_texture(t1, r_bind);
+            t2.access = GL_WRITE_ONLY;
+            gl::bind_texture(t2, w_bind);
+        }
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+};
 
-    glDeleteTextures(1, &data.water_vel);
-    glDeleteTextures(1, &data.out_water_vel);
+struct World_data {
+    GLfloat time;
+    Tex_pair heightmap;
+
+    // hydraulic erosion
+    Tex_pair flux;
+    Tex_pair velocity;
+
+    // thermal erosion
+    Tex_pair thermal_c;
+    Tex_pair thermal_d;
+};
+
+void delete_world_data(World_data& data) {
+    glDeleteTextures(1, &data.heightmap.t1.texture);
+    glDeleteTextures(1, &data.heightmap.t2.texture);
+
+    glDeleteTextures(1, &data.flux.t1.texture);
+    glDeleteTextures(1, &data.flux.t2.texture);
+
+    glDeleteTextures(1, &data.velocity.t1.texture);
+    glDeleteTextures(1, &data.velocity.t2.texture);
+
+    glDeleteTextures(1, &data.thermal_c.t1.texture);
+    glDeleteTextures(1, &data.thermal_c.t2.texture);
+
+    glDeleteTextures(1, &data.thermal_d.t1.texture);
+    glDeleteTextures(1, &data.thermal_d.t2.texture);
 }
 
-World_data gen_world_textures() {
-    // ----------- noise generation ---------------
-    auto gen_map_texture = [&](const GLuint width, const GLuint height) 
-        -> GLuint {
-        GLuint noise_texture;
-        glGenTextures(1, &noise_texture);
-
-        glBindTexture(GL_TEXTURE_2D, noise_texture);
-        glTexImage2D(
-            GL_TEXTURE_2D,
-            0,
-            GL_RGBA32F,
-            width, height,
-            0, 
-            GL_RGBA, GL_FLOAT,
-            nullptr
-        );
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        return noise_texture;
+World_data gen_world_data(const GLuint width, const GLuint height) {
+    // ------------- heightmap storing terrain + water + sediment data
+    Tex_pair heightmap = {
+        .t1 = gl::Texture {
+            .access = GL_READ_WRITE,
+            .width = width,
+            .height = height
+        },
+        .t2 = gl::Texture {
+            .access = GL_READ_WRITE,
+            .width = width,
+            .height = height
+        },
     };
+    heightmap.r_bind = BIND_HEIGHTMAP;
+    heightmap.w_bind = BIND_WRITE_HEIGHTMAP;
 
-    auto flux           = gen_map_texture(NOISE_SIZE, NOISE_SIZE);
-    auto out_flux       = gen_map_texture(NOISE_SIZE, NOISE_SIZE);
+    gl::gen_texture(heightmap.t1);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-    auto velocity       = gen_map_texture(NOISE_SIZE, NOISE_SIZE);
-    auto out_velocity   = gen_map_texture(NOISE_SIZE, NOISE_SIZE);
+    gl::gen_texture(heightmap.t2);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    auto heightmap      = gen_map_texture(NOISE_SIZE, NOISE_SIZE);
-    auto out_heightmap  = gen_map_texture(NOISE_SIZE, NOISE_SIZE);
-    // ----------- water tex generation ---------------
-    return World_data {
-        .heightmap      = heightmap,
-        .out_heightmap  = out_heightmap,
-        .water_flux     = flux,
-        .out_water_flux = out_flux,
-        .water_vel      = velocity,
-        .out_water_vel  = out_velocity
+    // ------------- water flux for hydraulic erosion ------------
+    Tex_pair flux = {
+        .t1 = gl::Texture {
+            .access = GL_READ_WRITE,
+            .width = width,
+            .height = height
+        },
+        .t2 = gl::Texture {
+            .access = GL_READ_WRITE,
+            .width = width,
+            .height = height
+        },
     };
-}
+    flux.r_bind = BIND_FLUXMAP;
+    flux.w_bind = BIND_WRITE_FLUXMAP;
 
-void prepare_erosion(Compute_program& program, World_data& tex) {
-    program.use();
-    program.set_uniform("max_height", MAX_HEIGHT);
-    glBindTexture(GL_TEXTURE_2D, tex.heightmap);
-    glBindImageTexture(
-        BIND_HEIGHTMAP, 
-        tex.heightmap, 0, 
-        GL_FALSE, 
-        0, 
-        GL_READ_ONLY, 
-        GL_RGBA32F
-    );
-    glBindTexture(GL_TEXTURE_2D, tex.out_heightmap);
-    glBindImageTexture(
-        BIND_WRITE_HEIGHTMAP, 
-        tex.out_heightmap, 0, 
-        GL_FALSE, 
-        0, 
-        GL_WRITE_ONLY, 
-        GL_RGBA32F
-    );
-    glBindTexture(GL_TEXTURE_2D, tex.water_flux);
-    glBindImageTexture(
-        BIND_FLUXMAP, 
-        tex.water_flux, 0, 
-        GL_FALSE, 
-        0, 
-        GL_READ_ONLY, 
-        GL_RGBA32F
-    );
-    glBindTexture(GL_TEXTURE_2D, tex.out_water_flux);
-    glBindImageTexture(
-        BIND_WRITE_FLUXMAP, 
-        tex.out_water_flux, 0, 
-        GL_FALSE, 
-        0, 
-        GL_WRITE_ONLY, 
-        GL_RGBA32F
-    );
-    glBindTexture(GL_TEXTURE_2D, tex.water_vel);
-    glBindImageTexture(
-        BIND_VELOCITYMAP, 
-        tex.water_vel, 0, 
-        GL_FALSE, 
-        0, 
-        GL_READ_ONLY, 
-        GL_RGBA32F
-    );
-    glBindTexture(GL_TEXTURE_2D, tex.out_water_vel);
-    glBindImageTexture(
-        BIND_WRITE_VELOCITYMAP, 
-        tex.out_water_vel, 0, 
-        GL_FALSE, 
-        0, 
-        GL_WRITE_ONLY, 
-        GL_RGBA32F
-    );
+    gl::gen_texture(flux.t1);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+    gl::gen_texture(flux.t2);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // ------------- water velocity for hydraulic erosion --------
+    Tex_pair velocity = {
+        .t1 = gl::Texture {
+            .access = GL_READ_WRITE,
+            .width = width,
+            .height = height
+        },
+        .t2 = gl::Texture {
+            .access = GL_READ_WRITE,
+            .width = width,
+            .height = height
+        },
+    };
+    velocity.r_bind = BIND_VELOCITYMAP;
+    velocity.w_bind = BIND_WRITE_VELOCITYMAP;
+
+    gl::gen_texture(velocity.t1);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+    gl::gen_texture(velocity.t2);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // ------------- cross    flux for thermal erosion -----------
+    Tex_pair thermal_c = {
+        .t1 = gl::Texture {
+            .access = GL_READ_WRITE,
+            .width = width,
+            .height = height
+        },
+        .t2 = gl::Texture {
+            .access = GL_READ_WRITE,
+            .width = width,
+            .height = height
+        },
+    };
+    thermal_c.r_bind = BIND_THERMALFLUX_C;
+    thermal_c.w_bind = BIND_WRITE_THERMALFLUX_C;
+
+    gl::gen_texture(thermal_c.t1);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+    gl::gen_texture(thermal_c.t2);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // ------------- diagonal flux for thermal erosion -----------
+    Tex_pair thermal_d = {
+        .t1 = gl::Texture {
+            .access = GL_READ_WRITE,
+            .width = width,
+            .height = height
+        },
+        .t2 = gl::Texture {
+            .access = GL_READ_WRITE,
+            .width = width,
+            .height = height
+        },
+    };
+    thermal_d.r_bind = BIND_THERMALFLUX_D;
+    thermal_d.w_bind = BIND_WRITE_THERMALFLUX_D;
+
+    gl::gen_texture(thermal_d.t1);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+    gl::gen_texture(thermal_d.t2);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    gl::bind_texture(heightmap.t1, BIND_HEIGHTMAP);
+    gl::bind_texture(heightmap.t2, BIND_WRITE_HEIGHTMAP);
+
+    gl::bind_texture(flux.t1, BIND_FLUXMAP);
+    gl::bind_texture(flux.t2, BIND_WRITE_FLUXMAP);
+    gl::bind_texture(velocity.t1, BIND_VELOCITYMAP);
+    gl::bind_texture(velocity.t2, BIND_WRITE_VELOCITYMAP);
+
+    gl::bind_texture(thermal_c.t1, BIND_THERMALFLUX_C);
+    gl::bind_texture(thermal_c.t2, BIND_WRITE_THERMALFLUX_C);
+
+    gl::bind_texture(thermal_d.t1, BIND_THERMALFLUX_D);
+    gl::bind_texture(thermal_d.t2, BIND_WRITE_THERMALFLUX_D);
+
     glBindTexture(GL_TEXTURE_2D, 0);
-}
+
+    return World_data {
+        .heightmap = heightmap,
+        .flux = flux,
+        .velocity = velocity,
+        .thermal_c = thermal_c,
+        .thermal_d = thermal_d
+    };
+};
 
 void dispatch_rain(Compute_program& program, const World_data& data, Rain_settings& set) {
     program.use();
@@ -206,128 +273,12 @@ void dispatch_rain(Compute_program& program, const World_data& data, Rain_settin
     program.set_uniform("rain_amount", set.amount);
     program.set_uniform("MOUNT_HGH", set.mountain_thresh);
     program.set_uniform("mount_mtp", set.mountain_multip);
+    program.set_uniform("max_height", MAX_HEIGHT);
 
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
     glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
 
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
-}
-
-// TODO: REFACTOR
-void swap_buffers(World_data tex) {
-    static u32 cntr = 0;
-    cntr++;
-    if (cntr % 2) {
-        glBindTexture(GL_TEXTURE_2D, tex.heightmap);
-        glBindImageTexture(
-            BIND_WRITE_HEIGHTMAP, 
-            tex.heightmap, 0, 
-            GL_FALSE, 
-            0, 
-            GL_READ_ONLY, 
-            GL_RGBA32F
-        );
-        glBindTexture(GL_TEXTURE_2D, tex.out_heightmap);
-        glBindImageTexture(
-            BIND_HEIGHTMAP, 
-            tex.out_heightmap, 0, 
-            GL_FALSE, 
-            0, 
-            GL_WRITE_ONLY, 
-            GL_RGBA32F
-        );
-        glBindTexture(GL_TEXTURE_2D, tex.water_flux);
-        glBindImageTexture(
-            BIND_WRITE_FLUXMAP, 
-            tex.water_flux, 0, 
-            GL_FALSE, 
-            0, 
-            GL_READ_ONLY, 
-            GL_RGBA32F
-        );
-        glBindTexture(GL_TEXTURE_2D, tex.out_water_flux);
-        glBindImageTexture(
-            BIND_FLUXMAP, 
-            tex.out_water_flux, 0, 
-            GL_FALSE, 
-            0, 
-            GL_WRITE_ONLY, 
-            GL_RGBA32F
-        );
-        glBindTexture(GL_TEXTURE_2D, tex.water_vel);
-        glBindImageTexture(
-            BIND_WRITE_VELOCITYMAP, 
-            tex.water_vel, 0, 
-            GL_FALSE, 
-            0, 
-            GL_READ_ONLY, 
-            GL_RGBA32F
-        );
-        glBindTexture(GL_TEXTURE_2D, tex.out_water_vel);
-        glBindImageTexture(
-            BIND_VELOCITYMAP, 
-            tex.out_water_vel, 0, 
-            GL_FALSE, 
-            0, 
-            GL_WRITE_ONLY, 
-            GL_RGBA32F
-        );
-    } else {
-        glBindTexture(GL_TEXTURE_2D, tex.heightmap);
-        glBindImageTexture(
-            BIND_HEIGHTMAP, 
-            tex.heightmap, 0, 
-            GL_FALSE, 
-            0, 
-            GL_READ_ONLY, 
-            GL_RGBA32F
-        );
-        glBindTexture(GL_TEXTURE_2D, tex.out_heightmap);
-        glBindImageTexture(
-            BIND_WRITE_HEIGHTMAP, 
-            tex.out_heightmap, 0, 
-            GL_FALSE, 
-            0, 
-            GL_WRITE_ONLY, 
-            GL_RGBA32F
-        );
-        glBindTexture(GL_TEXTURE_2D, tex.water_flux);
-        glBindImageTexture(
-            BIND_FLUXMAP, 
-            tex.water_flux, 0, 
-            GL_FALSE, 
-            0, 
-            GL_READ_ONLY, 
-            GL_RGBA32F
-        );
-        glBindTexture(GL_TEXTURE_2D, tex.out_water_flux);
-        glBindImageTexture(
-            BIND_WRITE_FLUXMAP, 
-            tex.out_water_flux, 0, 
-            GL_FALSE, 
-            0, 
-            GL_WRITE_ONLY, 
-            GL_RGBA32F
-        );
-        glBindTexture(GL_TEXTURE_2D, tex.water_vel);
-        glBindImageTexture(
-            BIND_VELOCITYMAP, 
-            tex.water_vel, 0, 
-            GL_FALSE, 
-            0, 
-            GL_READ_ONLY, 
-            GL_RGBA32F
-        );
-        glBindTexture(GL_TEXTURE_2D, tex.out_water_vel);
-        glBindImageTexture(
-            BIND_WRITE_VELOCITYMAP, 
-            tex.out_water_vel, 0, 
-            GL_FALSE, 
-            0, 
-            GL_WRITE_ONLY, 
-            GL_RGBA32F
-        );
-    }
 }
 
 void dispatch_erosion(
@@ -336,6 +287,7 @@ void dispatch_erosion(
         Erosion_settings& set
     ) {
     program.use();
+    program.set_uniform("max_height", MAX_HEIGHT);
     program.set_uniform("d_t", 0.002f);
     program.set_uniform("Kc", set.Kc);
     program.set_uniform("Ks", set.Ks);
@@ -346,82 +298,65 @@ void dispatch_erosion(
     glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
 
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
-    swap_buffers(data);
+
+    // swapping textures
+    data.heightmap.swap();
+    data.flux.swap();
+    data.velocity.swap();
 }
 
 struct Render_data {
     GLuint framebuffer;
-    GLuint output_texture;
+    gl::Texture output_texture;
     GLuint config_buffer;
 };
 
 void delete_renderer(Render_data& data) {
     glDeleteFramebuffers(1, &data.framebuffer);
-    glDeleteTextures(1, &data.output_texture);
+    glDeleteTextures(1, &data.output_texture.texture);
     glDeleteBuffers(1, &data.config_buffer);
 }
 
 bool prepare_rendering(
-        Render_data& data, 
+        Render_data& rndr, 
         Compute_program& program, 
-        World_data& textures
+        World_data& data
     ) {
     program.use();
 
-    glGenFramebuffers(1, &data.framebuffer);
+    glGenFramebuffers(1, &rndr.framebuffer);
     // output image rendered to framebuffer
-    glGenTextures(1, &data.output_texture);
-    glBindTexture(GL_TEXTURE_2D, data.output_texture);
-    glTexImage2D(
-        GL_TEXTURE_2D, 
-        0, 
-        GL_RGBA32F, 
-        WINDOW_W, WINDOW_H, 
-        0, 
-        GL_RGBA, GL_FLOAT, 
-        nullptr
-    );
+    rndr.output_texture = {
+        .target = GL_TEXTURE_2D, 
+        .access = GL_WRITE_ONLY,
+        .format = GL_RGBA32F, 
+        .width = WINDOW_W,
+        .height = WINDOW_H
+    };
+    gl::gen_texture(rndr.output_texture);
     // configuration
     constexpr struct Compute_config {
         alignas(sizeof(GLfloat)) GLfloat max_height    = MAX_HEIGHT;
         alignas(sizeof(GLint) * 2) ivec2 dims          = ivec2(NOISE_SIZE, NOISE_SIZE);
     } conf_buff;
 
-    glGenBuffers(1, &data.config_buffer);
+    glGenBuffers(1, &rndr.config_buffer);
 
-    glBindBuffer(GL_UNIFORM_BUFFER, data.config_buffer);
+    glBindBuffer(GL_UNIFORM_BUFFER, rndr.config_buffer);
     glBufferData(
         GL_UNIFORM_BUFFER, 
         sizeof(conf_buff), &conf_buff, 
         GL_STATIC_DRAW
     );
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    program.bind_uniform_block("config", data.config_buffer);
-
-    glBindTexture(GL_TEXTURE_2D, textures.heightmap);
-    glBindImageTexture(
-        BIND_HEIGHTMAP, 
-        textures.heightmap, 0, 
-        GL_FALSE, 
-        0, 
-        GL_READ_ONLY, 
-        GL_RGBA32F
-    );
-    glBindTexture(GL_TEXTURE_2D, data.output_texture);
-    glBindImageTexture(
-        BIND_DISPLAY_TEXTURE, 
-        data.output_texture, 0, 
-        GL_FALSE, 
-        0, 
-        GL_WRITE_ONLY, 
-        GL_RGBA32F
-    );
-    glBindFramebuffer(GL_FRAMEBUFFER, data.framebuffer);
+    program.bind_uniform_block("config", rndr.config_buffer);
+    gl::bind_texture(rndr.output_texture, BIND_DISPLAY_TEXTURE);
+    glBindFramebuffer(GL_FRAMEBUFFER, rndr.framebuffer);
     glFramebufferTexture2D(
         GL_FRAMEBUFFER,
         GL_COLOR_ATTACHMENT0, 
         GL_TEXTURE_2D, 
-        data.output_texture, 
+        rndr.output_texture.texture, 
         0
     );
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER)
@@ -563,52 +498,20 @@ int main(int argc, char* argv[]) {
     Compute_program erosion_sediment(erosion_sediment_file);
     Compute_program erosion_flux(erosion_flux_file);
 
-    // textures 
-    World_data world_data = gen_world_textures();
-    defer{ delete_world_textures(world_data);};
+    World_data world_data = gen_world_data(NOISE_SIZE, NOISE_SIZE);
+    defer{ delete_world_data(world_data);};
 
     // ------------ noise generation -----------------
     heightmap_shader.use();
-    glBindTexture(GL_TEXTURE_2D, world_data.heightmap);
-    glBindImageTexture(
-        BIND_HEIGHTMAP, 
-        world_data.heightmap, 0, 
-        GL_FALSE, 
-        0, 
-        GL_WRITE_ONLY, 
-        GL_RGBA32F
-    );
-    glBindTexture(GL_TEXTURE_2D, world_data.water_flux);
-    glBindImageTexture(
-        BIND_FLUXMAP, 
-        world_data.water_flux, 0, 
-        GL_FALSE, 
-        0, 
-        GL_WRITE_ONLY, 
-        GL_RGBA32F
-    );
-    glBindTexture(GL_TEXTURE_2D, world_data.water_vel);
-    glBindImageTexture(
-        BIND_VELOCITYMAP, 
-        world_data.water_vel, 0, 
-        GL_FALSE, 
-        0, 
-        GL_WRITE_ONLY, 
-        GL_RGBA32F
-    );
     heightmap_shader.set_uniform("height_scale", MAX_HEIGHT);
     heightmap_shader.set_uniform("water_lvl", WATER_HEIGHT);
+    gl::bind_texture(world_data.heightmap.t1, BIND_HEIGHTMAP);
     glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
 
     // ---------- prepare textures for rendering  ---------------
     Render_data render_data;
     prepare_rendering(render_data, render_shader, world_data);
     defer{delete_renderer(render_data);};
-    prepare_erosion(heightmap_rain, world_data);
-
-    prepare_erosion(erosion_flux, world_data);
-    prepare_erosion(erosion_erosion, world_data);
-    prepare_erosion(erosion_sediment, world_data);
 
     u32 frame_count = 0;
     float last_frame_rounded = 0.0;
@@ -658,15 +561,15 @@ int main(int argc, char* argv[]) {
         ImGui::NewFrame();
         ImGui::Begin("Debug");
         ImGui::Text("Camera pos: {%.2f %.2f %.2f}", 
-                camera.pos.x, 
-                camera.pos.y, 
-                camera.pos.z
-                );
+            camera.pos.x, 
+            camera.pos.y, 
+            camera.pos.z
+        );
         ImGui::Text("Camera dir: {%.2f %.2f %.2f}", 
-                camera.dir.x, 
-                camera.dir.y, 
-                camera.dir.z
-                );
+            camera.dir.x, 
+            camera.dir.y, 
+            camera.dir.z
+        );
         ImGui::Text("Frame time (ms): {%.2f}", frame_t);
         ImGui::Text("FPS: {%.2f}", 1000.0 / frame_t);
         ImGui::Text("Erosion updates: {%lu}", erosion_steps);

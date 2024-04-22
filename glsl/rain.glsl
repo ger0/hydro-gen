@@ -19,12 +19,26 @@ float rand(float n) {
     return fract(sin(n) * 1e4);
 }
 
+float hash(vec2 p) {
+    p  = 50.0 * fract( p*0.3183099 );
+    return fract(p.x*p.y*(p.x+p.y));
+}
+
 void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
     vec4 terr = imageLoad(heightmap, pos);
     //float r = rand(time * fract(sin(pos.x * 1e2)) * fract(cos(pos.y * 1e4)));
-    gln_tFBMOpts opts = gln_tFBMOpts(time, 0.5, 2.0, 0.05, 1, 2, false, false);
-    float r = max(0.0, gln_sfbm(gl_GlobalInvocationID.xy, opts));
+    gln_tFBMOpts opts = gln_tFBMOpts(
+        hash(gl_GlobalInvocationID.xy),
+        0.5,
+        2.0,
+        0.05,
+        1,
+        2,
+        false,
+        false
+    );
+    float r = max(0.0, rand(time) * gln_sfbm(gl_GlobalInvocationID.xy, opts));
 
     float incr = rain_amount * r;
     float mountain = terr.w - max_height * MOUNT_HGH;

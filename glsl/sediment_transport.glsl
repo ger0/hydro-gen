@@ -23,6 +23,16 @@ layout (binding = BIND_VELOCITYMAP, rgba32f)
 layout (binding = BIND_WRITE_VELOCITYMAP, rgba32f)   
 	uniform writeonly image2D out_velocitymap;
 
+layout (binding = BIND_THERMALFLUX_C, rgba32f)   
+	uniform readonly image2D thflux_c;
+layout (binding = BIND_WRITE_THERMALFLUX_C, rgba32f)   
+	uniform writeonly image2D thflux_c;
+
+layout (binding = BIND_THERMALFLUX_D, rgba32f)   
+	uniform readonly image2D thflux_d;
+layout (binding = BIND_WRITE_THERMALFLUX_D, rgba32f)   
+	uniform writeonly image2D thflux_d;
+
 
 uniform float max_height;
 uniform float d_t;
@@ -58,17 +68,20 @@ void main() {
     terrain.g = st;
     terrain.w = terrain.r + terrain.b;
 
-
     /* // thermal erosion
     // total height difference
 
-    vec4 d_height;
-    d_rheight.x = terrain.w - get_rheight(pos + ivec2(-1, 0)); // L
-    d_rheight.x = terrain.w - get_rheight(pos + ivec2(-1, 1)); // LT
-    d_rheight.z = terrain.w - get_rheight(pos + ivec2( 0, 1)); // top
-    d_rheight.y = terrain.w - get_rheight(pos + ivec2( 1, 0)); // R
-    d_rheight.y = terrain.w - get_rheight(pos + ivec2( 1, 1)); // RT
-    d_rheight.w = terrain.w - get_rheight(pos + ivec2( 0,-1)); // bottom */
+    // cross
+    thflux_c.x = terrain.w - get_rheight(pos + ivec2(-1, 0)); // L
+    thflux_c.y = terrain.w - get_rheight(pos + ivec2( 1, 0)); // R
+    thflux_c.z = terrain.w - get_rheight(pos + ivec2( 0, 1)); // T
+    thflux_c.w = terrain.w - get_rheight(pos + ivec2( 0,-1)); // B
+
+    // diagonal
+    thflux_d.x = terrain.w - get_rheight(pos + ivec2(-1, 1)); // LT
+    thflux_d.y = terrain.w - get_rheight(pos + ivec2( 1, 1)); // RT
+    thflux_d.x = terrain.w - get_rheight(pos + ivec2(-1,-1)); // LB
+    thflux_d.x = terrain.w - get_rheight(pos + ivec2( 1,-1)); // RB */
 
     imageStore(out_fluxmap, pos, flux);
     imageStore(out_velocitymap, pos, vel);

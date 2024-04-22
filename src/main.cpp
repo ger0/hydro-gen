@@ -150,8 +150,10 @@ World_data gen_world_data(const GLuint width, const GLuint height) {
 
     gl::gen_texture(heightmap.t1);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     gl::gen_texture(heightmap.t2);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     // ------------- water flux for hydraulic erosion ------------
@@ -172,8 +174,10 @@ World_data gen_world_data(const GLuint width, const GLuint height) {
 
     gl::gen_texture(flux.t1);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     gl::gen_texture(flux.t2);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     // ------------- water velocity for hydraulic erosion --------
@@ -194,8 +198,10 @@ World_data gen_world_data(const GLuint width, const GLuint height) {
 
     gl::gen_texture(velocity.t1);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     gl::gen_texture(velocity.t2);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     // ------------- cross    flux for thermal erosion -----------
@@ -216,8 +222,10 @@ World_data gen_world_data(const GLuint width, const GLuint height) {
 
     gl::gen_texture(thermal_c.t1);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     gl::gen_texture(thermal_c.t2);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     // ------------- diagonal flux for thermal erosion -----------
@@ -238,8 +246,10 @@ World_data gen_world_data(const GLuint width, const GLuint height) {
 
     gl::gen_texture(thermal_d.t1);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     gl::gen_texture(thermal_d.t2);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     gl::bind_texture(heightmap.t1, BIND_HEIGHTMAP);

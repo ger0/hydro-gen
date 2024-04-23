@@ -1,7 +1,7 @@
 #version 460
 
-#include "img_interpolation.glsl"
 #include "bindings.glsl"
+#include "img_interpolation.glsl"
 
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
@@ -31,7 +31,7 @@ const float A = 1.0;
 // length of the pipe
 const float L = 1.0;
 // gravity acceleration
-const float G = 9.81;
+uniform float G;
 // time step
 uniform float d_t;
 
@@ -76,21 +76,11 @@ void main() {
     d_height.z = terrain.w - get_wheight(pos + ivec2( 0, 1)); // top
     d_height.w = terrain.w - get_wheight(pos + ivec2( 0,-1)); // bottom
 
-    // terrain slope
-    vec2 slope;
-    slope.x = (get_wheight(pos + ivec2( 1, 0)) - get_wheight(pos + ivec2(-1, 0))) / 2.0; // dx
-    slope.y = (get_wheight(pos + ivec2( 0, 1)) - get_wheight(pos + ivec2( 0,-1))) / 2.0; // dz
-
     vec4 in_flux;
     in_flux.x = get_flux(pos + ivec2(-1, 0)).y; // from left
     in_flux.y = get_flux(pos + ivec2( 1, 0)).x; // from right
     in_flux.z = get_flux(pos + ivec2( 0, 1)).w; // from top
     in_flux.w = get_flux(pos + ivec2( 0,-1)).z; // from bottom 
-
-    /* out_flux.x += slope.x;
-    out_flux.y += -slope.x;
-    out_flux.z += -slope.y;
-    out_flux.w += slope.y; */
 
     #define ENERGY_LOSS 0.99985
     out_flux.x = 

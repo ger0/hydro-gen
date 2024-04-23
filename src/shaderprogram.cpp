@@ -126,7 +126,7 @@ GLuint Shader_core::load_shader(GLenum shader_type, std::string filename) {
 }
 
 Compute_program::Compute_program(std::string filename) {
-    LOG_DBG("Loading compute shader...");
+    LOG_DBG("Loading compute shader: {}", filename);
     compute = load_shader(GL_COMPUTE_SHADER, filename);
 
     program = glCreateProgram();

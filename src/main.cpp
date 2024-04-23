@@ -13,8 +13,8 @@
 
 #include "../glsl/bindings.glsl"
 
-constexpr u32 WINDOW_W = 1920;
-constexpr u32 WINDOW_H = 1080;
+constexpr u32 WINDOW_W = 1600;
+constexpr u32 WINDOW_H = 900;
 
 constexpr float MAX_HEIGHT = 256.f;
 constexpr float WATER_HEIGHT = 96.f;
@@ -33,6 +33,7 @@ constexpr auto render_comput_file       = "rendering.glsl";
 constexpr auto erosion_erosion_file     = "erosion.glsl";
 constexpr auto erosion_sediment_file    = "sediment_transport.glsl";
 constexpr auto erosion_flux_file        = "water_flux.glsl";
+constexpr auto erosion_thermal_file     = "thermal_transport.glsl";
 
 static bool shader_error = false;
 
@@ -66,13 +67,20 @@ struct Rain_settings {
     float mountain_thresh = 0.65f;
     float mountain_multip = 0.05f;
     int period = 48;
+    float drops = 0.05f;
 };
 
 struct Erosion_settings {
-    float Kc = 0.001;
-    float Ks = 0.001;
-    float Kd = 0.001;
-    float Ke = 0.05;
+    GLfloat Kc = 0.02;
+    GLfloat Ks = 0.02;
+    GLfloat Kd = 0.02;
+    GLfloat Ke = 0.05;
+    GLfloat G = 9.81;
+
+    GLfloat Kalpha = 1.3f;
+    GLfloat Kspeed = 75.f;
+
+    GLfloat d_t = 0.002;
 };
 
 // texture pairs for swapping
@@ -284,41 +292,63 @@ void dispatch_rain(Compute_program& program, const World_data& data, Rain_settin
     program.set_uniform("MOUNT_HGH", set.mountain_thresh);
     program.set_uniform("mount_mtp", set.mountain_multip);
     program.set_uniform("max_height", MAX_HEIGHT);
+    program.set_uniform("drops", set.drops);
 
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
     glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
-
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
 }
 
 void dispatch_erosion(
-        Compute_program& program,
+        Compute_program& wflux,
+        Compute_program& hydr,
+        Compute_program& sedim,
+        Compute_program& tflux,
         World_data& data,
         Erosion_settings& set
     ) {
-    program.use();
-    program.set_uniform("max_height", MAX_HEIGHT);
-    program.set_uniform("d_t", 0.002f);
-    program.set_uniform("Kc", set.Kc);
-    program.set_uniform("Ks", set.Ks);
-    program.set_uniform("Kd", set.Kd);
-    program.set_uniform("Ke", set.Ke);
 
-    glMemoryBarrier(GL_ALL_BARRIER_BITS);
-    glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
+    auto run = [&](Compute_program& program) {
+        program.use();
+        program.set_uniform("max_height", MAX_HEIGHT);
+        program.set_uniform("d_t", set.d_t);
+        program.set_uniform("Kc", set.Kc);
+        program.set_uniform("Ks", set.Ks);
+        program.set_uniform("Kd", set.Kd);
+        program.set_uniform("Ke", set.Ke);
+        program.set_uniform("G", set.G);
 
-    glMemoryBarrier(GL_ALL_BARRIER_BITS);
+        program.set_uniform("Kalpha", set.Kalpha);
+        program.set_uniform("Kspeed", set.Kspeed);
 
-    // swapping textures
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+        glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+    };
+
+    run(wflux);
     data.heightmap.swap();
     data.flux.swap();
     data.velocity.swap();
+
+    run(hydr);
+    data.heightmap.swap();
+    data.velocity.swap();
+
+    run(sedim);
+    data.thermal_c.swap();
+    data.thermal_d.swap();
+    data.heightmap.swap();
+
+    run(tflux);
+    data.heightmap.swap();
 }
 
 struct Render_data {
     GLuint framebuffer;
     gl::Texture output_texture;
     GLuint config_buffer;
+    GLfloat prec = 0.35;
 };
 
 void delete_renderer(Render_data& data) {
@@ -406,8 +436,9 @@ bool dispatch_rendering(
     shader.set_uniform("dir", camera.dir);
     shader.set_uniform("pos", camera.pos);
     shader.set_uniform("time", data.time);
+    shader.set_uniform("prec", rndr.prec);
 
-    glDispatchCompute(WINDOW_W / WRKGRP_SIZE_X, WINDOW_H / WRKGRP_SIZE_Y, 1);
+    glDispatchCompute(WINDOW_W / (WRKGRP_SIZE_X), WINDOW_H / (WRKGRP_SIZE_Y), 1);
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
@@ -507,6 +538,7 @@ int main(int argc, char* argv[]) {
     Compute_program erosion_erosion(erosion_erosion_file);
     Compute_program erosion_sediment(erosion_sediment_file);
     Compute_program erosion_flux(erosion_flux_file);
+    Compute_program erosion_thermal(erosion_thermal_file);
 
     World_data world_data = gen_world_data(NOISE_SIZE, NOISE_SIZE);
     defer{ delete_world_data(world_data);};
@@ -527,8 +559,7 @@ int main(int argc, char* argv[]) {
     float last_frame_rounded = 0.0;
     double frame_t = 0.0;
 
-    //const u32 max_rain_steps = 900000;
-    bool should_rain = true;
+    bool should_rain = false;
     u32 erosion_steps = 0;
 
     float mean_erosion_t = 0.f;
@@ -559,9 +590,14 @@ int main(int argc, char* argv[]) {
                 dispatch_rain(heightmap_rain, world_data, rain_settings);
             }
         } 
-        dispatch_erosion(erosion_flux, world_data, erosion_settings);
-        dispatch_erosion(erosion_erosion, world_data, erosion_settings);
-        dispatch_erosion(erosion_sediment, world_data, erosion_settings);
+        dispatch_erosion(
+            erosion_flux,
+            erosion_erosion, 
+            erosion_sediment, 
+            erosion_thermal, 
+            world_data, 
+            erosion_settings
+        );
 
         mean_erosion_t = glfwGetTime() / erosion_steps;
         erosion_steps++;
@@ -595,13 +631,26 @@ int main(int argc, char* argv[]) {
         ImGui::SliderFloat("Amount", &rain_settings.amount, 0.0f, 1.0f);
         ImGui::SliderFloat("Bonus %", &rain_settings.mountain_thresh, 0.0f, 1.0f);
         ImGui::SliderFloat("Bonus Amount", &rain_settings.mountain_multip, 0.0f, 2.5f);
-        ImGui::SliderInt("Tick period", &rain_settings.period, 2, 1000);
+        ImGui::SliderInt("Tick period", &rain_settings.period, 2, 10000);
+        ImGui::SliderFloat("Drops", &rain_settings.drops, 0.001, 0.1);
 
-        ImGui::SeparatorText("Erosion");
-        ImGui::SliderFloat("Capacity", &erosion_settings.Kc, 0.0001f, 0.1f);
-        ImGui::SliderFloat("Dissolving", &erosion_settings.Ks, 0.0001f, 0.1f);
-        ImGui::SliderFloat("Deposition", &erosion_settings.Kd, 0.0001f, 0.1f);
+        ImGui::SeparatorText("Hydraulic Erosion");
+        ImGui::SliderFloat("Capacity", &erosion_settings.Kc, 0.01f, 1.0f);
+        ImGui::SliderFloat("Dissolving", &erosion_settings.Ks, 0.01f, 1.0f);
+        ImGui::SliderFloat("Deposition", &erosion_settings.Kd, 0.01f, 1.0f);
         ImGui::SliderFloat("Evaporation", &erosion_settings.Ke, 0.0f, 1.f);
+        ImGui::SliderFloat("Gravitation", &erosion_settings.G, 0.1f, 10.f);
+
+        ImGui::SeparatorText("Thermal Erosion");
+        ImGui::SliderFloat("Talus angle (rad)", &erosion_settings.Kalpha, 0.00, 3.14 / 2.f);
+        ImGui::SliderFloat("Erosion speed", &erosion_settings.Kspeed, 0.1, 300.f);
+
+        ImGui::SeparatorText("Rendering");
+        ImGui::SliderFloat("Raymarching precision", &render_data.prec, 0.01f, 1.f);
+
+        ImGui::SeparatorText("General");
+        ImGui::SliderFloat("Time step", &erosion_settings.d_t, 0.0005f, 0.005f);
+
 
         glBlitNamedFramebuffer(
             render_data.framebuffer, 0, 

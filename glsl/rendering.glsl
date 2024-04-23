@@ -17,6 +17,8 @@ uniform vec3 pos;
 uniform float time;
 uniform bool should_draw_water;
 
+uniform float prec = 0.35;
+
 layout (rgba32f, binding = BIND_HEIGHTMAP) 
 	uniform readonly image2D heightmap;
 
@@ -300,7 +302,7 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
 
     // sediment
     float a = img_bilinear_g(heightmap, w_ray.pos.xz);
-    a = min(1.0, a * 1000.0);
+    a = min(1.0, a * 10e4);
 
     // reflections:
     // fresnel
@@ -394,11 +396,7 @@ Ray raymarch(
 
         if (
             (sample_pos.y > max_height && direction.y >= 0) ||
-            (sample_pos.y <= 0 && direction.y < 0) ||
-            (sample_pos.x > hmap_dims.x && direction.x > 0) ||
-            (sample_pos.x < 0 && direction.x < 0) ||
-            (sample_pos.z > hmap_dims.y && direction.z > 0) ||
-            (sample_pos.z < 0 && direction.z < 0)
+            (sample_pos.y <= 0 && direction.y < 0)
         ) {
             break;
         }
@@ -422,7 +420,7 @@ Ray raymarch(
             );
         }
         // TODO: dist can't be higher than max slope approximation 
-        d_dist = 0.35 * d_height;
+        d_dist = prec * d_height;
         dist += d_dist;
     }
     return Ray(

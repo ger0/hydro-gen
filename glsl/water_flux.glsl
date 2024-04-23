@@ -1,7 +1,7 @@
 #version 460
 
-#include "img_interpolation.glsl"
 #include "bindings.glsl"
+#include "img_interpolation.glsl"
 
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
@@ -31,7 +31,7 @@ const float A = 1.0;
 // length of the pipe
 const float L = 1.0;
 // gravity acceleration
-const float G = 9.81;
+uniform float G;
 // time step
 uniform float d_t;
 

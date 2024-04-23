@@ -17,6 +17,8 @@ uniform vec3 pos;
 uniform float time;
 uniform bool should_draw_water;
 
+uniform float prec = 0.35;
+
 layout (rgba32f, binding = BIND_HEIGHTMAP) 
 	uniform readonly image2D heightmap;
 
@@ -300,7 +302,7 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
 
     // sediment
     float a = img_bilinear_g(heightmap, w_ray.pos.xz);
-    a = min(1.0, a * 1000.0);
+    a = min(1.0, a * 10e4);
 
     // reflections:
     // fresnel
@@ -418,7 +420,7 @@ Ray raymarch(
             );
         }
         // TODO: dist can't be higher than max slope approximation 
-        d_dist = 0.35 * d_height;
+        d_dist = prec * d_height;
         dist += d_dist;
     }
     return Ray(
@@ -449,13 +451,5 @@ void main() {
     vec3 color = get_pixel_color(pos, ray_dir);
     // gamma correction
     color = pow(color, vec3(1.0 / 2.2));
-    imageStore(out_tex, 3 * pixel + ivec2(0, 2), vec4(color, 0));
-    imageStore(out_tex, 3 * pixel + ivec2(0, 1), vec4(color, 0));
-    imageStore(out_tex, 3 * pixel + ivec2(2, 2), vec4(color, 0));
-    imageStore(out_tex, 3 * pixel + ivec2(1, 2), vec4(color, 0));
-    imageStore(out_tex, 3 * pixel + ivec2(2, 1), vec4(color, 0));
-    imageStore(out_tex, 3 * pixel + ivec2(1, 1), vec4(color, 0));
-    imageStore(out_tex, 3 * pixel + ivec2(2, 0), vec4(color, 0));
-    imageStore(out_tex, 3 * pixel + ivec2(1, 0), vec4(color, 0));
-    imageStore(out_tex, 3 * pixel, vec4(color, 0));
+    imageStore(out_tex, pixel, vec4(color, 0));
 }

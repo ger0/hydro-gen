@@ -22,16 +22,21 @@ float rand(vec2 co) {
 void main() {
     ivec2 store_pos = ivec2(gl_GlobalInvocationID.xy);
 
-    //gln_tFBMOpts opts_ridge = gln_tFBMOpts(SEED, 0.50, 2.0, 0.0005, 1, 2, true, true);
-    //float val_ridge = (gln_sfbm(store_pos, opts_ridge) + 1) / 1.5;
+    gln_tFBMOpts opts_ridge = gln_tFBMOpts(SEED, 0.50, 2.0, 0.002, 1, 1, true, true);
+    float val_ridge = cos(((gln_sfbm(store_pos, opts_ridge) + 1) / 1.5) / 500.f);
+    val_ridge = 0.5 * val_ridge + 0.5;
 
-    gln_tFBMOpts opts = gln_tFBMOpts(SEED, 0.40, 2.0, 0.0045, 1, 8, false, false);
+    gln_tFBMOpts opts = gln_tFBMOpts(SEED, 0.44, 2.0, 0.0025, 1, 8, false, false);
     float val = (gln_sfbm(store_pos, opts) + 1) / 2;
-    // val = (pow(val + 0.5, 3) - 0.125) / 3.25;
+    // val *= val_ridge;
+    val *= (sin(gl_GlobalInvocationID.x / 800.f) * 0.6 + 0.4);
     //float slope = (gl_GlobalInvocationID.x / (gl_NumWorkGroups.x * WRKGRP_SIZE_X));
-    //val *= val_ridge;
-    val = val * (exp(val) - 1) / 1.718;
-    //val *= slope;
+    val *= val_ridge;
+    val *= ((pow(val + 0.5, 3) - 0.125) / 3.25) * 0.55 + 0.45;
+    val *= 1.65;
+    // val = val * (exp(val) - 1) / 1.718;
+    //val *= val * val;
+    // val *= slope;
     // give the terrain a little slope
     // water height
     //terrain.b = max(0.0, water_lvl - terrain.r);

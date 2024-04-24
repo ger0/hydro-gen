@@ -150,6 +150,40 @@ float img_bicubic_r(readonly image2D img, vec2 img_coords) {
     );
 }
 
+float img_bicubic_g(readonly image2D img, vec2 img_coords) {
+    vec2 img_size = imageSize(img);
+    vec2 inv_img_size = 1.0 / img_size;
+
+    img_coords = img_coords * img_size - 0.5;
+
+    vec2 fxy = fract(img_coords);
+    img_coords -= fxy;
+
+    vec4 xcubic = cubic(fxy.x);
+    vec4 ycubic = cubic(fxy.y);
+
+    vec4 c = img_coords.xxyy + vec2 (-0.5, +1.5).xyxy;
+
+    vec4 s = vec4(xcubic.xz + xcubic.yw, ycubic.xz + ycubic.yw);
+    vec4 offset = c + vec4 (xcubic.yw, ycubic.yw) / s;
+
+    offset *= inv_img_size.xxyy;
+
+    float sample0 = img_bilinear_g(img, offset.xz);
+    float sample1 = img_bilinear_g(img, offset.yz);
+    float sample2 = img_bilinear_g(img, offset.xw);
+    float sample3 = img_bilinear_g(img, offset.yw);
+
+    float sx = s.x / (s.x + s.y);
+    float sy = s.z / (s.z + s.w);
+
+    return mix(
+        mix(sample3, sample2, sx), 
+        mix(sample1, sample0, sx), 
+        sy
+    );
+}
+
 float img_bicubic_w(readonly image2D img, vec2 img_coords) {
     vec2 img_size = imageSize(img);
     vec2 inv_img_size = 1.0 / img_size;

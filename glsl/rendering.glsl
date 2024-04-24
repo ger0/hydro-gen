@@ -304,7 +304,7 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
 
     // sediment
     float a = img_bilinear_g(heightmap, w_ray.pos.xz);
-    a = min(1.0, a * 10e4);
+    a = min(1.0, a * 10);
 
     // reflections:
     // fresnel
@@ -348,7 +348,7 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
     Ray ray = raymarch(origin, direction, max_dist, max_steps, TOTAL);
 	float sundot = clamp(dot(direction, -light_dir), 0.0, 1.0);
 
-	vec2 pos = ray.pos.xz;
+	vec2 pos = ray.pos.xz * WORLD_SCALE;
 	float water_h = img_bilinear_b(heightmap, ray.pos.xz);
 	if (pos.x < 0 || pos.x >= float(imageSize(heightmap).x) ||
 	pos.y < 0 || pos.y >= float(imageSize(heightmap).y)) {

@@ -30,7 +30,7 @@ void main() {
     vec4 terr = imageLoad(heightmap, pos);
     //float r = rand(time * fract(sin(pos.x * 1e2)) * fract(cos(pos.y * 1e4)));
     gln_tFBMOpts opts = gln_tFBMOpts(
-        rand(time * 1.372914227e3),
+        fract(time * 1.372914227e3) * 1000.f,
         0.5,
         2.0,
         drops,
@@ -44,7 +44,7 @@ void main() {
     float incr = rain_amount * r;
     float mountain = terr.w - max_height * MOUNT_HGH;
     if (mountain > 0) {
-        incr = mountain * mount_mtp * r / ((1.0 - MOUNT_HGH) * max_height);
+        incr += mountain * mount_mtp * r / ((1.0 - MOUNT_HGH) * max_height);
     }
     terr.b += incr;
     terr.w = terr.r + terr.b;

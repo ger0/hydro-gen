@@ -80,11 +80,11 @@ static struct Game_state {
 
 
 struct Rain_settings {
-    float amount = 0.01f;
-    float mountain_thresh = 0.65f;
-    float mountain_multip = 0.05f;
-    int period = 48;
-    float drops = 0.05f;
+    float amount = 0.00001f;
+    float mountain_thresh = 0.55f;
+    float mountain_multip = 0.005f;
+    int period = 2;
+    float drops = 0.02f;
 };
 
 struct Map_settings {
@@ -93,7 +93,7 @@ struct Map_settings {
         alignas(sizeof(GLfloat)) GLfloat height_scale   = MAX_HEIGHT;
         alignas(sizeof(GLfloat)) GLfloat height_mult    = 1.0;
         alignas(sizeof(GLfloat)) GLfloat water_lvl      = WATER_HEIGHT;
-        alignas(sizeof(GLfloat)) GLfloat seed           = 0;
+        alignas(sizeof(GLfloat)) GLfloat seed           = 10000.f * rand() / (float)RAND_MAX;
         alignas(sizeof(GLfloat)) GLfloat persistance    = 0.44;
         alignas(sizeof(GLfloat)) GLfloat lacunarity     = 2.0;
         alignas(sizeof(GLfloat)) GLfloat scale          = 0.0025;
@@ -117,17 +117,18 @@ struct Map_settings {
 };
 
 struct Erosion_settings {
-    GLfloat Kc = 0.02;
-    GLfloat Ks = 0.02;
-    GLfloat Kd = 0.02;
+    GLfloat Kc = 0.015;
+    GLfloat Ks = 0.015;
+    GLfloat Kd = 0.0007;
     GLfloat Ke = 0.05;
     GLfloat G = 9.81;
     GLfloat ENERGY_LOSS = 0.99985;
 
-    GLfloat Kalpha = 1.3f;
-    GLfloat Kspeed = 75.f;
+    GLfloat Kalpha = 1.2f;
+    GLfloat Kspeed = 0.011f;
 
-    GLfloat d_t = 0.002;
+    // INCREASING TIMESTEP TOO MUCH WILL BREAK STABILITY
+    GLfloat d_t = 0.003;
 };
 
 // texture pairs for swapping
@@ -171,10 +172,14 @@ struct Tex_pair {
         gl::gen_texture(t1);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 
         gl::gen_texture(t2);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 
         gl::bind_texture(t1, r_bind);
         gl::bind_texture(t2, w_bind);
@@ -250,11 +255,12 @@ void dispatch_erosion(
         Erosion_settings& set
     ) {
 
+    float d_t = set.d_t * rand() / (float)RAND_MAX;
     auto run = [&](Compute_program& program) {
         program.use();
         program.set_uniform("max_height", MAX_HEIGHT);
         program.set_uniform("ENERGY_LOSS", set.ENERGY_LOSS);
-        program.set_uniform("d_t", set.d_t);
+        program.set_uniform("d_t", d_t);
         program.set_uniform("Kc", set.Kc);
         program.set_uniform("Ks", set.Ks);
         program.set_uniform("Kd", set.Kd);
@@ -290,14 +296,14 @@ void dispatch_erosion(
 struct Render_data {
     GLuint framebuffer;
     gl::Texture output_texture;
-    GLuint config_buffer;
+    gl::Uniform_buffer config_buff;
     GLfloat prec = 0.35;
 };
 
 void delete_renderer(Render_data& data) {
     glDeleteFramebuffers(1, &data.framebuffer);
-    glDeleteTextures(1, &data.output_texture.texture);
-    glDeleteBuffers(1, &data.config_buffer);
+    gl::delete_texture(data.output_texture);
+    gl::delete_uniform_buffer(data.config_buff);
 }
 
 bool prepare_rendering(
@@ -323,16 +329,9 @@ bool prepare_rendering(
         alignas(sizeof(GLint) * 2) ivec2 dims          = ivec2(NOISE_SIZE, NOISE_SIZE);
     } conf_buff;
 
-    glGenBuffers(1, &rndr.config_buffer);
-
-    glBindBuffer(GL_UNIFORM_BUFFER, rndr.config_buffer);
-    glBufferData(
-        GL_UNIFORM_BUFFER, 
-        sizeof(conf_buff), &conf_buff, 
-        GL_STATIC_DRAW
-    );
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    program.bind_uniform_block("config", rndr.config_buffer);
+    gl::gen_uniform_buffer(rndr.config_buff);
+    rndr.config_buff.push_data(conf_buff);
+    program.bind_uniform_block("config", rndr.config_buff.ubo);
     gl::bind_texture(rndr.output_texture, BIND_DISPLAY_TEXTURE);
     glBindFramebuffer(GL_FRAMEBUFFER, rndr.framebuffer);
     glFramebufferTexture2D(
@@ -453,9 +452,11 @@ void key_callback(GLFWwindow *window,
 	if (gkey(window, GLFW_KEY_LEFT_ALT)) {
 	    auto curs = glfwGetInputMode(window, GLFW_CURSOR);
 	    if (curs == GLFW_CURSOR_DISABLED) {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            io.ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
         } else {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            io.ConfigFlags |= ImGuiConfigFlags_NoMouse;
         }
         state.mouse_disabled = !state.mouse_disabled;
 	}
@@ -518,23 +519,23 @@ void draw_ui(
         state.should_rain = !state.should_rain;
     }
     ImGui::SeparatorText("Rain");
-    ImGui::SliderFloat("Amount", &rain.amount, 0.0f, 1.0f);
-    ImGui::SliderFloat("Bonus %", &rain.mountain_thresh, 0.0f, 1.0f);
-    ImGui::SliderFloat("Bonus Amount", &rain.mountain_multip, 0.0f, 2.5f);
+    ImGui::SliderFloat("Amount", &rain.amount, 0.0f, 1.0f, "%.5f");
+    ImGui::SliderFloat("Bonus (%)", &rain.mountain_thresh, 0.0f, 1.0f);
+    ImGui::SliderFloat("Bonus Amount", &rain.mountain_multip, 0.0f, 2.5f, "%.5f");
     ImGui::SliderInt("Tick period", &rain.period, 2, 10000);
     ImGui::SliderFloat("Drops", &rain.drops, 0.001, 0.1);
 
     ImGui::SeparatorText("Hydraulic Erosion");
-    ImGui::SliderFloat("Flux Energy Loss", &erosion.ENERGY_LOSS, 0.998, 1.0);
-    ImGui::SliderFloat("Capacity", &erosion.Kc, 0.0001f, 0.10f);
-    ImGui::SliderFloat("Dissolving", &erosion.Ks, 0.0001f, 0.10f);
-    ImGui::SliderFloat("Deposition", &erosion.Kd, 0.0001f, 0.10f);
+    ImGui::SliderFloat("Energy Kept (%)", &erosion.ENERGY_LOSS, 0.998, 1.0, "%.5f");
+    ImGui::SliderFloat("Capacity", &erosion.Kc, 0.0001f, 0.10f, "%.4f");
+    ImGui::SliderFloat("Solubility", &erosion.Ks, 0.0001f, 0.10f, "%.4f");
+    ImGui::SliderFloat("Deposition", &erosion.Kd, 0.0001f, 0.10f, "%.4f");
     ImGui::SliderFloat("Evaporation", &erosion.Ke, 0.0f, 1.00f);
     ImGui::SliderFloat("Gravitation", &erosion.G, 0.1f, 10.f);
 
     ImGui::SeparatorText("Thermal Erosion");
     ImGui::SliderAngle("Talus angle", &erosion.Kalpha, 0.00, 90.f);
-    ImGui::SliderFloat("Erosion speed", &erosion.Kspeed, 0.1, 200.f);
+    ImGui::SliderFloat("Erosion speed", &erosion.Kspeed, 0.01, 100.f, "%.3f", ImGuiSliderFlags_Logarithmic);
 
     ImGui::SeparatorText("General");
     ImGui::SliderFloat("Raymarching precision", &render.prec, 0.01f, 1.f);
@@ -543,12 +544,12 @@ void draw_ui(
 
     auto& map = map_settings.data;
     ImGui::Begin("Heightmap");
-    ImGui::SliderFloat("Seed", &map.seed, 0.0f, 1e5);
+    ImGui::SliderFloat("Seed", &map.seed, 0.0f, 1e4);
     ImGui::SliderFloat("Height multiplier", &map.height_mult, 0.1f, 2.f);
     ImGui::SliderFloat("Persistence", &map.persistance, 0.0f, 1.f);
     ImGui::SliderFloat("Lacunarity", &map.lacunarity, 0.0f, 4.f);
-    ImGui::SliderFloat("Scale", &map.scale, 0.0f, 0.01f);
-    ImGui::SliderFloat("Redistribution", &map.redistribution, 0.0f, 100.f);
+    ImGui::SliderFloat("Scale", &map.scale, 0.0f, 0.01f, "%.5f");
+    // ImGui::SliderFloat("Redistribution", &map.redistribution, 0.0f, 100.f);
     ImGui::SliderInt("Octaves", &map.octaves, 1, 10);
 
     ImGui::SeparatorText("Masking");
@@ -571,14 +572,7 @@ void draw_ui(
 }
 
 int main(int argc, char* argv[]) { 
-    uint seed;
     srand(time(NULL));
-    if (argc == 2) {
-        seed = strtoul(argv[1], NULL, 10);
-        LOG_DBG("SEED: %u", seed);
-    } else {
-        seed = rand();
-    }
 
     Uq_ptr<GLFWwindow, decltype(&destroy_window)> window(
         init_window(glm::uvec2{WINDOW_W, WINDOW_H}, "Game", &state.shader_error),

@@ -60,39 +60,38 @@ vec4 get_flux(ivec2 pos) {
 void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
     vec4 vel = imageLoad(velocitymap, pos);
-    // water velocity
-    float d_Wx = (
-        get_flux(pos + ivec2(-1, 0)).y -
-        get_flux(pos).x + 
-        get_flux(pos).y -
-        get_flux(pos + ivec2(1, 0)).x
-    ) / 2.0;
-    float u = d_Wx / (L * vel.z);
-
-    float d_Wy = (
-        get_flux(pos + ivec2(0, -1)).z -
-        get_flux(pos).w + 
-        get_flux(pos).z -
-        get_flux(pos + ivec2(0, 1)).w
-    ) / 2.0;
-    float v = d_Wy / (L * vel.z);
 
     float st = imageLoad(heightmap, pos).g;
     vec4 terrain = imageLoad(heightmap, pos);
 
+    // water velocity
+    float u = (
+        get_flux(pos + ivec2(-1, 0)).y -
+        get_flux(pos).x + 
+        get_flux(pos).y -
+        get_flux(pos + ivec2(1, 0)).x
+    ) / (L * vel.z);
+
+    float v = (
+        get_flux(pos + ivec2(0, -1)).z -
+        get_flux(pos).w + 
+        get_flux(pos).z -
+        get_flux(pos + ivec2(0, 1)).w
+    ) / (L * vel.z);
+
+    // find normal
     float sin_a = find_sin_alpha(pos);
-    float c = Kc * (sin_a + 0.12) * max(0.12, length(vec2(u, v)));
+    // float c = Kc * (sin_a + 0.15) * max(0.15, length(vec2(u, v)));
+    float c = Kc * abs(sin_a + 0.05) * length(vec2(u, v));
+    // float c = Kc * (sin_a) * length(vec2(u, v));
     
-        const float Kdmax = 10.0;
+    const float Kdmax = 10.0;
     if (terrain.b >= Kdmax) {
         //c = max(0.0, c - max(0.0, terrain.b - 2.f));
-
         // deep water doesn't erode as much
-        // c /= terrain.b;
-        c = 0;
+        c = 0.0;
 
     } else {
-        // c *= 0.15 + terrain.b * 0.75;
         c *= (Kdmax - terrain.b) / Kdmax;
     }
 
@@ -112,11 +111,10 @@ void main() {
 
     vel.x = u;
     vel.y = v;
-    vel.w = sin_a;
 
     terrain.r = max(0, bt);
     terrain.g = max(0, s1);
-    terrain.w = terrain.b + bt;
+    terrain.w = terrain.b + terrain.r;
 
     imageStore(out_velocitymap, pos, vel);
     imageStore(out_heightmap, pos, terrain);

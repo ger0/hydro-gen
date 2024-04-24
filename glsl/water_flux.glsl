@@ -36,14 +36,6 @@ uniform float G;
 // time step
 uniform float d_t;
 
-float get_rheight(ivec2 pos) {
-    if (pos.x < 0 || pos.x > (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
-    pos.y < 0 || pos.y > (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1)) {
-        return 999999999999.0;
-    }
-    return imageLoad(heightmap, pos).r;
-}
-
 float get_wheight(ivec2 pos) {
     if (pos.x < 0 || pos.x > (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
     pos.y < 0 || pos.y > (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1)) {
@@ -117,13 +109,13 @@ void main() {
         sum_out_flux *= K;
     } */
     float d_volume = d_t * (sum_in_flux - sum_out_flux);
-    float d2 = d1 + (d_volume / (L * L));
+    float d2 = max(0, d1 + (d_volume / (L * L)));
 
-    terrain.b = max(0, d2);
+    terrain.b = d2;
     terrain.w = terrain.r + d2;
 
     // average water height
-    vel.z = max(0.01, (d1 + d2) / 2.0); 
+    vel.z = max(1e-1, d1 + d2); 
     imageStore(out_fluxmap, pos, out_flux);
     imageStore(out_velocitymap, pos, vel);
     imageStore(out_heightmap, pos, terrain);

@@ -31,19 +31,12 @@ const float L = 1.0;
 const float a = L;
 
 float get_lerp_sed(vec2 back_coords) {
-    if (back_coords.x <= 0.0 || back_coords.x >= (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1.0) ||
-    back_coords.y <= 0.0 || back_coords.y >= (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1.0)) {
+    if (back_coords.x < 0.0 || back_coords.x > (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1.0) ||
+    back_coords.y < 0.0 || back_coords.y > (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1.0)) {
         return 0.00;
     }
-    return img_bilinear_g(heightmap, back_coords);
-}
-
-vec4 get_img(readonly image2D img, ivec2 pos) {
-    if (pos.x < 0 || pos.x > (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
-    pos.y < 0 || pos.y > (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1)) {
-       return vec4(0, 0, 0, 0); 
-    }
-    return imageLoad(img, pos);
+    //return img_bilinear_g(heightmap, back_coords);
+    return img_bicubic_g(heightmap, back_coords);
 }
 
 float get_rheight(ivec2 pos) {

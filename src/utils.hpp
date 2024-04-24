@@ -18,7 +18,7 @@ using i64 = int_fast64_t;
 using i32 = int;
 using i16 = int_fast16_t;
 
-using byte = unsigned char;
+using byte = uint_least8_t;
 
 template <typename... T>
 using Uq_ptr = std::unique_ptr<T...>;

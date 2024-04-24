@@ -17,13 +17,33 @@ struct Texture {
     GLuint      width;
     GLuint      height;
 };
-    void gen_texture(Texture& tex,
-        GLenum format = GL_RGBA,
-        GLenum type = GL_FLOAT,
-        const void* pixels = nullptr
-    );
-    void bind_texture(Texture& tex, GLuint bind);
+void gen_texture(Texture& tex,
+    GLenum format = GL_RGBA,
+    GLenum type = GL_FLOAT,
+    const void* pixels = nullptr
+);
+void delete_texture(Texture& tex);
+void bind_texture(Texture& tex, GLuint bind);
+
+struct Uniform_buffer {
+    GLuint ubo;
+
+    template <typename T>
+    void push_data(T& data, int type = GL_STATIC_DRAW) {
+        glBindBuffer(GL_UNIFORM_BUFFER, ubo);
+        glBufferData(
+            GL_UNIFORM_BUFFER, 
+            sizeof(data), &data, 
+            type
+        );
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    }
 };
+void gen_uniform_buffer(Uniform_buffer& buff);
+void delete_uniform_buffer(Uniform_buffer& buff);
+
+};
+
 
 class Shader_core {
 protected:

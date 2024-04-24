@@ -1,4 +1,4 @@
-#define WORLD_SCALE (0.50)
+#define WORLD_SCALE (1.00)
 
 #define WRKGRP_SIZE_X 8
 #define WRKGRP_SIZE_Y 8

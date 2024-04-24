@@ -37,6 +37,15 @@ namespace gl {
             tex.format 
         );
     }
+    void delete_texture(Texture& tex) {
+        glDeleteTextures(1, &tex.texture);
+    }
+    void gen_uniform_buffer(Uniform_buffer& buff) {
+        glGenBuffers(1, &buff.ubo);
+    }
+    void delete_uniform_buffer(Uniform_buffer& buff) {
+        glDeleteBuffers(1, &buff.ubo);
+    }
 }
 
 enum Log_type {

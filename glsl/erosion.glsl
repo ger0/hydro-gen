@@ -83,13 +83,17 @@ void main() {
     float sin_a = find_sin_alpha(pos);
     float c = Kc * (sin_a + 0.12) * max(0.12, length(vec2(u, v)));
     
-    if (terrain.b > 1.0) {
+        const float Kdmax = 10.0;
+    if (terrain.b >= Kdmax) {
         //c = max(0.0, c - max(0.0, terrain.b - 2.f));
 
         // deep water doesn't erode as much
-        c /= terrain.b;
+        // c /= terrain.b;
+        c = 0;
+
     } else {
-        c *= 0.15 + terrain.b * 0.75;
+        // c *= 0.15 + terrain.b * 0.75;
+        c *= (Kdmax - terrain.b) / Kdmax;
     }
 
     float bt;

@@ -10,6 +10,7 @@ layout (std140) uniform config {
     ivec2 hmap_dims;
 };
 
+// TODO: Move this out to a special buffer
 uniform mat4 perspective;
 uniform mat4 view;
 uniform vec3 dir;
@@ -98,8 +99,9 @@ Ray raymarch(vec3 orig, vec3 dir, const float max_dst, const int max_iter, const
 // convert coords to world coordinates
 vec4 to_world(vec4 coord);
 
+// TODO: remove
 float fog_mix(float fog) {
-    return clamp(fog * fog * fog, 0.0, 1.0); 
+    return clamp(fog * fog, 0.0, 1.0); 
 }
 
 float water_mix(float water) {
@@ -159,7 +161,7 @@ vec3 get_img_normal(readonly image2D img, vec2 pos) {
 
 vec3 get_fog_color(vec3 col, float ray_dist, float sundot) {
     // fog
-    float fo = 1.0 - exp(-pow(0.15 * ray_dist / (max_dist / 16.0), 2.5));
+    float fo = 1.0 - exp(-pow(0.15 * ray_dist / (max_dist), 2.5));
     vec3 fco = 0.65 * vec3(0.4, 0.65, 1.0) + 
         0.1 * vec3(1.0, 0.8, 0.5) * pow(sundot * 1.5, 4.0);
     return mix(col, fco, fo);
@@ -346,7 +348,12 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
     Ray ray = raymarch(origin, direction, max_dist, max_steps, TOTAL);
 	float sundot = clamp(dot(direction, -light_dir), 0.0, 1.0);
 
+	vec2 pos = ray.pos.xz;
 	float water_h = img_bilinear_b(heightmap, ray.pos.xz);
+	if (pos.x < 0 || pos.x >= float(imageSize(heightmap).x) ||
+	pos.y < 0 || pos.y >= float(imageSize(heightmap).y)) {
+	    water_h = max_dist;
+	}
 
     // no hit - sky
     if (ray.dist >= max_dist) {

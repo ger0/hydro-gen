@@ -9,40 +9,82 @@ layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 layout (binding = BIND_HEIGHTMAP, rgba32f)
     uniform writeonly image2D dest_tex;
 
-uniform float height_scale;
-uniform float water_lvl;
+layout (std140) uniform map_cfg {
+    float   height_scale;
+    float   height_multiplier;
+    float   water_lvl;
+    float   seed;
+    float   persistance;
+    float   lacunarity;
+    float   scale;
+    float   redistribution;
+    int     octaves;  
+
+    bool    mask_round;
+    bool    mask_exp;
+    bool    mask_power;
+    bool    mask_slope;
+};
 
 // Function to generate a random float in the range [0, 1]
 float rand(vec2 co) {
     return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
-#define SEED 265.0
+float round_mask(float val, vec2 uv) {
+    float v = 1.0 - (pow(uv.x - 0.5, 2.0) + pow(uv.y - 0.5, 2.0) + 0.75);
+    // v = pow(v, 1.0 / 2.0);
+    return val * max(0.0, v * 6.0);
+}
+
+float slope_mask(float v, vec2 uv) {
+    return v * uv.x;
+}
+
+float power_mask(float val) {
+    return val * (((pow(val + 0.5, 3) - 0.125) / 3.25) * 0.55 + 0.45);
+}
+
+float exp_mask(float val) {
+    return val * (exp(val) - 1) / 1.718;
+}
 
 void main() {
     ivec2 store_pos = ivec2(gl_GlobalInvocationID.xy);
-
-    gln_tFBMOpts opts_ridge = gln_tFBMOpts(SEED, 0.50, 2.0, 0.002, 1, 1, true, true);
-    float val_ridge = cos(((gln_sfbm(store_pos, opts_ridge) + 1) / 1.5) / 500.f);
-    val_ridge = 0.5 * val_ridge + 0.5;
-
-    gln_tFBMOpts opts = gln_tFBMOpts(SEED, 0.44, 2.0, 0.0025, 1, 8, false, false);
+    vec2 uv = gl_GlobalInvocationID.xy / vec2(imageSize(dest_tex).xy);
+    gln_tFBMOpts opts = gln_tFBMOpts(
+        seed,
+        persistance,
+        lacunarity,
+        scale,
+        1.0,
+        octaves,
+        false,
+        false
+    );
     float val = (gln_sfbm(store_pos, opts) + 1) / 2;
-    // val *= val_ridge;
-    val *= (sin(gl_GlobalInvocationID.x / 800.f) * 0.6 + 0.4);
-    //float slope = (gl_GlobalInvocationID.x / (gl_NumWorkGroups.x * WRKGRP_SIZE_X));
-    val *= val_ridge;
-    val *= ((pow(val + 0.5, 3) - 0.125) / 3.25) * 0.55 + 0.45;
-    val *= 1.65;
-    // val = val * (exp(val) - 1) / 1.718;
-    //val *= val * val;
-    // val *= slope;
-    // give the terrain a little slope
+    
+    if (mask_round) {
+        val = round_mask(val, uv);
+    }
+    if (mask_exp) {
+        val = exp_mask(val);
+    }
+    if (mask_power) {
+        val = power_mask(val);
+    }
+    if (mask_slope) {
+        val = slope_mask(val, uv);
+    }
+    
     // water height
-    //terrain.b = max(0.0, water_lvl - terrain.r);
     //terrain.b += 1.4;
-    vec4 terrain = vec4(val * height_scale, 0.0, 0.0, 0.0);
-    terrain.w = terrain.r + terrain.b;
+    // terrain.b = max(0.0, 2.0 - terrain.r);
 
+    vec4 terrain = vec4(
+        min(height_scale, val * height_scale * height_multiplier), 0.0, 0.0, 0.0
+    );
+    terrain.w = terrain.r + terrain.b;
     imageStore(dest_tex, store_pos, terrain);
+    //imageStore(dest_tex, store_pos, vec4(seed, lacunarity, persistance, height_scale));
 }

@@ -51,7 +51,7 @@ void GLAPIENTRY gl_error_callback(
     }
 
     if (type == GL_DEBUG_TYPE_ERROR) {
-        (*(bool*)user) = true;
+        // (*(bool*)user) = true;
         LOG_ERR("GL_{}, source = {}, message = {}", 
                 type_str,
                 source_str,
@@ -99,7 +99,7 @@ void init_imgui(GLFWwindow* window) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
-    ImGui::StyleColorsClassic();
+    ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 460");
 }

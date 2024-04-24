@@ -25,6 +25,7 @@ layout (binding = BIND_WRITE_VELOCITYMAP, rgba32f)
 	uniform writeonly image2D out_velocitymap;
 
 uniform float max_height;
+uniform float ENERGY_LOSS;
 
 // cross-section area of a pipe
 const float A = 1.0;
@@ -82,7 +83,6 @@ void main() {
     in_flux.z = get_flux(pos + ivec2( 0, 1)).w; // from top
     in_flux.w = get_flux(pos + ivec2( 0,-1)).z; // from bottom 
 
-    #define ENERGY_LOSS 0.99985
     out_flux.x = 
         max(0, ENERGY_LOSS * out_flux.x + d_t * A * (G * d_height.x) / L);
     out_flux.y =  

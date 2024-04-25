@@ -1,7 +1,7 @@
 #version 460
 
 #include "bindings.glsl"
-#include "img_interpolation.glsl"
+#line 5
 
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
@@ -115,7 +115,7 @@ void main() {
     terrain.w = terrain.r + d2;
 
     // average water height
-    vel.z = max(1e-1, d1 + d2); 
+    vel.z = max(1e-2, d1 + d2); 
     imageStore(out_fluxmap, pos, out_flux);
     imageStore(out_velocitymap, pos, vel);
     imageStore(out_heightmap, pos, terrain);

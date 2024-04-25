@@ -1,8 +1,7 @@
 #version 460
 
 #include "bindings.glsl"
-#include "img_interpolation.glsl"
-
+#line 5
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
 // (dirt height, rock height, water height, total height)
@@ -61,8 +60,8 @@ void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
     vec4 vel = imageLoad(velocitymap, pos);
 
-    float st = imageLoad(heightmap, pos).g;
     vec4 terrain = imageLoad(heightmap, pos);
+    float st = terrain.g;
 
     // water velocity
     float u = (
@@ -81,11 +80,11 @@ void main() {
 
     // find normal
     float sin_a = find_sin_alpha(pos);
-    // float c = Kc * (sin_a + 0.15) * max(0.15, length(vec2(u, v)));
-    float c = Kc * abs(sin_a + 0.05) * length(vec2(u, v));
+    float c = Kc * (sin_a + 0.15) * max(0.15, length(vec2(u, v)));
+    // float c = Kc * (sin_a + 0.15) * length(vec2(u, v));
     // float c = Kc * (sin_a) * length(vec2(u, v));
     
-    const float Kdmax = 10.0;
+    const float Kdmax = 6.0;
     if (terrain.b >= Kdmax) {
         //c = max(0.0, c - max(0.0, terrain.b - 2.f));
         // deep water doesn't erode as much

@@ -1,6 +1,5 @@
 #include "shaderprogram.hpp"
 #include "utils.hpp"
-#include <algorithm>
 #include <glm/gtc/type_ptr.hpp>
 
 using namespace glm;
@@ -114,9 +113,7 @@ void resolve_includes(std::string& buff) {
             buff.erase(include_start, include_end - include_start);
 
             std::string include = load_shader_file(include_path.c_str());
-            constexpr char n_line = '\n';
-            int n_lines = std::count(include.cbegin(), include.cend(), n_line);
-            LOG_DBG("    Shader filename \t {:30} total lines: {}", include_path, n_lines);
+            LOG_DBG("    Included shader: \t {:30}", include_path);
             buff.insert(include_start, include);
         }
     }

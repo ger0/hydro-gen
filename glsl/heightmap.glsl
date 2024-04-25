@@ -2,6 +2,7 @@
 
 #include "bindings.glsl"
 #include "simplex_noise.glsl"
+#line 6
 
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
@@ -33,8 +34,8 @@ float rand(vec2 co) {
 
 float round_mask(float val, vec2 uv) {
     float v = 1.0 - (pow(uv.x - 0.5, 2.0) + pow(uv.y - 0.5, 2.0) + 0.75);
-    // v = pow(v, 1.0 / 2.0);
-    return val * max(0.0, v * 6.0);
+    v = pow(v, 1.0 / 2.0);
+    return val * max(0.0, v * 1.0);
 }
 
 float slope_mask(float v, vec2 uv) {
@@ -47,6 +48,13 @@ float power_mask(float val) {
 
 float exp_mask(float val) {
     return val * (exp(val) - 1) / 1.718;
+}
+
+float distort(float x, float y) {
+    // Optionally, you can scale your internal noise frequency
+    // or layer several octaves of noise to control the wiggly shapes.
+    float wiggleDensity = 4.7f; 
+    return gln_simplex(vec2(x * wiggleDensity, y * wiggleDensity));
 }
 
 void main() {
@@ -62,7 +70,29 @@ void main() {
         false,
         false
     );
-    float val = (gln_sfbm(store_pos, opts) + 1) / 2;
+    /* gln_tFBMOpts up_opts = gln_tFBMOpts(
+        seed,
+        persistance,
+        lacunarity,
+        scale,
+        2.0,
+        octaves,
+        true,
+        true
+    ); */
+
+    /* vec2 dist = vec2(
+        distort(store_pos.x / 1e7 + 2.3, store_pos.y / 1e7 + 2.9),
+        distort(store_pos.x / 1e7 - 3.1, store_pos.y / 1e7 - 4.3)
+    ); */
+
+    //float val = (gln_sfbm(vec2(store_pos) + dist, opts) + 1) / 2.0;
+    float val = (gln_sfbm(vec2(store_pos), opts) + 1) / 2.0;
+    //float up_val = (gln_sfbm(store_pos, up_opts) + 1.0) / 2.0;
+    //up_val = power_mask(up_val);
+    //up_val = exp_mask(up_val);
+    /* val += up_val * height_multiplier;
+    val /= 2.0; */
     
     if (mask_round) {
         val = round_mask(val, uv);

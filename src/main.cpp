@@ -20,20 +20,21 @@ constexpr float MAX_HEIGHT = 256.f;
 constexpr float WATER_HEIGHT = 96.f;
 
 constexpr float Z_NEAR = 0.1f;
-constexpr float Z_FAR = 2048.f * 5;
+constexpr float Z_FAR = 2048.f;
 constexpr float FOV = 90.f;
 constexpr float ASPECT_RATIO = float(WINDOW_W) / WINDOW_H;
 
 constexpr GLuint NOISE_SIZE = 864;
 
 // shader filenames
-constexpr auto noise_comput_file        = "heightmap.glsl";
-constexpr auto rain_comput_file         = "rain.glsl";
-constexpr auto render_comput_file       = "rendering.glsl";
-constexpr auto erosion_erosion_file     = "erosion.glsl";
-constexpr auto erosion_sediment_file    = "sediment_transport.glsl";
-constexpr auto erosion_flux_file        = "water_flux.glsl";
-constexpr auto erosion_thermal_file     = "thermal_transport.glsl";
+constexpr auto noise_comput_file            = "heightmap.glsl";
+constexpr auto rain_comput_file             = "rain.glsl";
+constexpr auto render_comput_file           = "rendering.glsl";
+
+constexpr auto erosion_hydro_flux_file      = "hydro_flux.glsl";
+constexpr auto erosion_hydro_erosion_file   = "hydro_erosion.glsl";
+constexpr auto erosion_thermal_flux_file    = "thermal_erosion.glsl";
+constexpr auto erosion_sediment_file        = "sediment_transport.glsl";
 
 using glm::normalize, glm::cross;
 using glm::vec2, glm::vec3, glm::ivec2, glm::ivec3;
@@ -76,6 +77,8 @@ static struct Game_state {
     u32 erosion_steps = 0;
     float erosion_time;
     float erosion_mean_t = 0.f;
+
+    float target_fps = 60.f;
 } state;
 
 
@@ -119,7 +122,7 @@ struct Map_settings {
 struct Erosion_settings {
     GLfloat Kc = 0.015;
     GLfloat Ks = 0.015;
-    GLfloat Kd = 0.0007;
+    GLfloat Kd = 0.011;
     GLfloat Ke = 0.05;
     GLfloat G = 9.81;
     GLfloat ENERGY_LOSS = 0.99985;
@@ -247,10 +250,10 @@ void dispatch_rain(Compute_program& program, const World_data& data, Rain_settin
 }
 
 void dispatch_erosion(
-        Compute_program& wflux,
-        Compute_program& hydr,
-        Compute_program& sedim,
+        Compute_program& hflux,
+        Compute_program& heros,
         Compute_program& tflux,
+        Compute_program& sedim,
         World_data& data,
         Erosion_settings& set
     ) {
@@ -275,21 +278,20 @@ void dispatch_erosion(
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
     };
 
-    run(wflux);
+    run(hflux);
     data.heightmap.swap();
     data.flux.swap();
     data.velocity.swap();
 
-    run(hydr);
+    run(heros);
     data.heightmap.swap();
     data.velocity.swap();
 
-    run(sedim);
+    run(tflux);
     data.thermal_c.swap();
     data.thermal_d.swap();
-    data.heightmap.swap();
 
-    run(tflux);
+    run(sedim);
     data.heightmap.swap();
 }
 
@@ -297,7 +299,9 @@ struct Render_data {
     GLuint framebuffer;
     gl::Texture output_texture;
     gl::Uniform_buffer config_buff;
-    GLfloat prec = 0.35;
+
+    float   prec = 0.35;
+    bool    display_sediment = false;
 };
 
 void delete_renderer(Render_data& data) {
@@ -354,7 +358,8 @@ bool prepare_rendering(
 bool dispatch_rendering(
         Compute_program& shader, 
         Render_data &rndr, 
-        World_data& data
+        World_data& data,
+        Erosion_settings& eros
     ) {
     using glm::perspective, glm::lookAt, glm::radians;
     shader.use();
@@ -379,6 +384,8 @@ bool dispatch_rendering(
     shader.set_uniform("pos", camera.pos);
     shader.set_uniform("time", data.time);
     shader.set_uniform("prec", rndr.prec);
+    shader.set_uniform("display_sediment", rndr.display_sediment);
+    shader.set_uniform("sediment_max_cap", eros.Kc);
 
     glDispatchCompute(WINDOW_W / (WRKGRP_SIZE_X), WINDOW_H / (WRKGRP_SIZE_Y), 1);
 
@@ -389,15 +396,16 @@ bool dispatch_rendering(
 
 void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
     auto& imo = ImGui::GetIO();
-    if (imo.WantCaptureMouse || state.mouse_disabled) {
-        return;
-    }
 
 	float xoffset = xpos - mouse_last.x;
 	// reversed since y-coordinates range from bottom to top
 	float yoffset = mouse_last.y - ypos; 
 	mouse_last.x = xpos;
 	mouse_last.y = ypos;
+
+    if (imo.WantCaptureMouse || state.mouse_disabled) {
+        return;
+    }
 
 	const float sensitivity = 0.1f;
 	xoffset *= sensitivity;
@@ -539,6 +547,8 @@ void draw_ui(
 
     ImGui::SeparatorText("General");
     ImGui::SliderFloat("Raymarching precision", &render.prec, 0.01f, 1.f);
+    ImGui::Checkbox("Display sediment", &render.display_sediment);
+    ImGui::SliderFloat("Target_fps", &state.target_fps, 2.f, 120.f);
     ImGui::SliderFloat("Time step", &erosion.d_t, 0.0005f, 0.05f);
     ImGui::End();
 
@@ -588,14 +598,15 @@ int main(int argc, char* argv[]) {
     init_imgui(window.get());
     defer { destroy_imgui(); };
 
-    Compute_program heightmap_shader(noise_comput_file);
-    Compute_program heightmap_rain(rain_comput_file);
-    Compute_program render_shader(render_comput_file);
+    Compute_program renderer(render_comput_file);
 
-    Compute_program erosion_erosion(erosion_erosion_file);
-    Compute_program erosion_sediment(erosion_sediment_file);
-    Compute_program erosion_flux(erosion_flux_file);
-    Compute_program erosion_thermal(erosion_thermal_file);
+    Compute_program comput_map(noise_comput_file);
+    Compute_program comput_rain(rain_comput_file);
+
+    Compute_program comput_hydro_flux(erosion_hydro_flux_file);
+    Compute_program comput_hydro_erosion(erosion_hydro_erosion_file);
+    Compute_program comput_thermal_flux(erosion_thermal_flux_file);
+    Compute_program comput_sediment(erosion_sediment_file);
 
     World_data world_data = gen_world_data(NOISE_SIZE, NOISE_SIZE);
     defer{delete_world_data(world_data);};
@@ -605,11 +616,11 @@ int main(int argc, char* argv[]) {
     Erosion_settings erosion_settings;
 
     Map_settings map_settings;
-    gen_heightmap(map_settings, heightmap_shader, world_data, state);
+    gen_heightmap(map_settings, comput_map, world_data, state);
 
     // ---------- prepare textures for rendering  ---------------
     Render_data render_data;
-    prepare_rendering(render_data, render_shader, world_data);
+    prepare_rendering(render_data, renderer, world_data);
     defer{delete_renderer(render_data);};
 
     while (!glfwWindowShouldClose(window.get()) && (!state.shader_error)) {
@@ -617,10 +628,10 @@ int main(int argc, char* argv[]) {
         world_data.time = glfwGetTime();
 
         if(
-            (world_data.time - state.last_frame + state.erosion_mean_t) >= (1 / 60.f) &&
+            (world_data.time - state.last_frame + state.erosion_mean_t) >= (1 / state.target_fps) &&
             state.should_render
         ) {
-            if (!dispatch_rendering(render_shader, render_data, world_data)) {
+            if (!dispatch_rendering(renderer, render_data, world_data, erosion_settings)) {
                 return EXIT_FAILURE;
             }
             state.delta_frame = world_data.time - state.last_frame;
@@ -638,27 +649,26 @@ int main(int argc, char* argv[]) {
             state.erosion_steps++;
             if (state.should_rain) {
                 if (!(state.erosion_steps % rain_settings.period)) {
-                    dispatch_rain(heightmap_rain, world_data, rain_settings);
+                    dispatch_rain(comput_rain, world_data, rain_settings);
                 }
             } 
             float erosion_d_time = glfwGetTime();
             dispatch_erosion(
-                erosion_flux,
-                erosion_erosion, 
-                erosion_sediment, 
-                erosion_thermal, 
+                comput_hydro_flux,
+                comput_hydro_erosion, 
+                comput_sediment, 
+                comput_thermal_flux, 
                 world_data, 
                 erosion_settings
             );
             erosion_d_time = glfwGetTime() - erosion_d_time;
             state.erosion_time += erosion_d_time;
             // calculate average erosion update time
-            if (!(state.erosion_steps % 10)) {
-                state.erosion_mean_t = state.erosion_time / 10.f;
+            if (!(state.erosion_steps % 100)) {
+                state.erosion_mean_t = state.erosion_time / 100.f;
                 state.erosion_time = 0;
             }
         }
-
 
         glBlitNamedFramebuffer(
             render_data.framebuffer, 0, 
@@ -667,7 +677,14 @@ int main(int argc, char* argv[]) {
             GL_COLOR_BUFFER_BIT, GL_NEAREST
         );
 
-        draw_ui(world_data, rain_settings, erosion_settings, render_data, map_settings, heightmap_shader);
+        draw_ui(
+            world_data, 
+            rain_settings, 
+            erosion_settings, 
+            render_data, 
+            map_settings, 
+            comput_map
+        );
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window.get());
     }

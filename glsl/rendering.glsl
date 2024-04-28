@@ -18,6 +18,7 @@ uniform vec3 dir;
 uniform vec3 pos;
 uniform float time;
 uniform bool should_draw_water;
+uniform bool DEBUG_PREVIEW;
 
 uniform float prec = 0.35;
 
@@ -107,7 +108,7 @@ float fog_mix(float fog) {
 }
 
 float water_mix(float water) {
-    return pow(water, 1.0 / 8.0); 
+    return clamp((water - 1e-4) * 100, 0, 1); 
 }
 
 vec3 get_material_color(vec3 pos, vec3 norm, Material_colors material) {
@@ -280,7 +281,7 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
     vec3 refract_dir = refractCameraRay(w_norm, direction, 1.0 / 1.3);
     Ray t_ray = raymarch(
         w_ray.pos.xyz, -refract_dir,
-        max_dist / 4.0, max_steps / 4,
+        max_dist / 8.0, max_steps / 4,
         TERRAIN
     );
     float water_vol = t_ray.dist;
@@ -298,8 +299,7 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
 
     // get shading for the water surface
     vec4 w_shad = get_shade(w_ray.pos.xyz, w_norm, true);
-
-    vec3 water_col = t_shad;
+    vec3 water_col;
 
     // get the color of sky reflected on water
 	float refl_sundot = clamp(dot(w_refl, -light_dir), 0.0, 1.0);
@@ -310,8 +310,7 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
     ); 
 
     // sediment
-    float a = img_bilinear_g(heightmap, w_ray.pos.xz);
-    a = min(1.0, a * 10);
+    float a = img_bilinear_g(heightmap, w_ray.pos.xz) / sediment_max_cap;
 
     // reflections:
     // fresnel
@@ -320,9 +319,10 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
     // bouncing off to the sky
     if (wrefl_ray.dist >= max_dist) {
         water_col = mix(w_shad.rgb, diffuse_cols.dirt, a);
-        water_col = mix(t_shad, water_col, min(1.0, t_ray.dist / 2000000.0));
+        water_col = mix(t_shad, water_col, min(1.0, water_vol / 2.0));
         water_col = mix(water_col, wrefl_skycol, fresnel);
         water_col = mix(w_shad.rgb, water_col, w_shad.w);
+        // water_col = mix(t_shad, water_col, water_mix(water_vol));
     } 
     // else sampling the reflection of a terrain
     else {
@@ -330,7 +330,7 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
         wrefl_ray.dist += w_ray.dist;
         // get the color of terrain from a ray reflected from the surface of water
         water_col = mix(w_shad.rgb, diffuse_cols.dirt, a);
-        water_col = mix(t_shad, water_col, min(1.0, t_ray.dist / 2000000.0));
+        water_col = mix(t_shad, water_col, min(1.0, water_vol / 2.0));
         water_col = mix(
             water_col, 
             get_terrain_color(wrefl_ray, w_refl, refl_sundot),
@@ -347,6 +347,7 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
             wrefl_skycol,
             fog_mix(wrefl_ray.dist / (max_dist))
         );
+        // water_col = mix(t_shad, water_col, water_mix(water_vol));
     }
     return water_col;
 }
@@ -357,6 +358,8 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
 
 	vec2 pos = ray.pos.xz * WORLD_SCALE;
 	float water_h = img_bilinear_b(heightmap, ray.pos.xz);
+    water_h = min(1.0, smoothstep(1e-4, 1.0, water_h));
+
 	if (pos.x < 0 || pos.x >= float(imageSize(heightmap).x) ||
 	pos.y < 0 || pos.y >= float(imageSize(heightmap).y)) {
 	    water_h = max_dist;
@@ -369,7 +372,7 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
         color = get_sky_color(direction, ray.dist, sundot);
     }
     // ray hitting the surface of water
-    else if (water_h > 1e-3) {
+    else if (water_h > 1e-4) {
         // water buildup
         vec3 water_col = get_water_color(ray, direction, sundot);
         water_col = get_fog_color(water_col, ray.dist, sundot);
@@ -402,6 +405,11 @@ Ray raymarch(
 ) {
     float dist = 0.001;
     float d_dist = 0.1;
+
+    if (terr_type == TERRAIN) {
+        dist = 0.0;
+        d_dist = 0.1e-12;
+    }
 
     // shadow penumbra
     float min_sdf = 1.0;
@@ -465,6 +473,17 @@ void main() {
     vec2 uv = vec2(pixel) / 
         vec2(gl_NumWorkGroups.xy * gl_WorkGroupSize.xy);
 
+    if (DEBUG_PREVIEW) {
+        imageStore(
+            out_tex, pixel, vec4(
+                img_bilinear_r(heightmap, vec2(pixel)) / max_height,
+                img_bilinear_g(heightmap, vec2(pixel)) / sediment_max_cap,
+                img_bilinear_b(heightmap, vec2(pixel)),
+                0
+            )
+        );
+        return;
+    }
     vec2 clip = 2.0 * uv - 1.0;
 
     vec4 ray_start  = to_world(vec4(0.0, 0.0, -1.0, 1.0));

@@ -62,29 +62,32 @@ void main() {
 
     vec4 terrain = imageLoad(heightmap, pos);
     float st = terrain.g;
-
     // water velocity
-    float u = (
-        get_flux(pos + ivec2(-1, 0)).y -
-        get_flux(pos).x + 
-        get_flux(pos).y -
-        get_flux(pos + ivec2(1, 0)).x
-    ) / (L * vel.z);
-
-    float v = (
-        get_flux(pos + ivec2(0, -1)).z -
-        get_flux(pos).w + 
-        get_flux(pos).z -
-        get_flux(pos + ivec2(0, 1)).w
-    ) / (L * vel.z);
+    // float dd = clamp(smoothstep(0.01, 6, vel.z - 0.01), 0.01, 6.0);
+    float dd = vel.z;
+    if (dd < 1e-4) {
+        vel.xy = vec2(0,0);
+    } else {
+        vel.x = (
+            get_flux(pos + ivec2(-1, 0)).y -
+            get_flux(pos).x + 
+            get_flux(pos).y -
+            get_flux(pos + ivec2(1, 0)).x
+        ) / (L * dd);
+        vel.y = (
+            get_flux(pos + ivec2(0, -1)).z -
+            get_flux(pos).w + 
+            get_flux(pos).z -
+            get_flux(pos + ivec2(0, 1)).w
+        ) / (L * dd);
+    }
 
     // find normal
     float sin_a = find_sin_alpha(pos);
-    float c = Kc * (sin_a + 0.15) * max(0.15, length(vec2(u, v)));
-    // float c = Kc * (sin_a + 0.15) * length(vec2(u, v));
-    // float c = Kc * (sin_a) * length(vec2(u, v));
+    float c = Kc * max(0.05, sin_a) * length(vel.xy);
+    // float c = Kc * sin_a * length(vel.xy);
     
-    const float Kdmax = 6.0;
+    /* const float Kdmax = 6.0;
     if (terrain.b >= Kdmax) {
         //c = max(0.0, c - max(0.0, terrain.b - 2.f));
         // deep water doesn't erode as much
@@ -92,7 +95,7 @@ void main() {
 
     } else {
         c *= (Kdmax - terrain.b) / Kdmax;
-    }
+    } */
 
     float bt;
     float s1;
@@ -101,18 +104,18 @@ void main() {
     if (c > st) {
         bt = terrain.r - d_t * Ks * (c - st);
         s1 = st + d_t * Ks * (c - st);
+        // terrain.b = terrain.b + d_t * Ks * (c - st);
     } 
     // deposit sediment
     else {
         bt = terrain.r + d_t * Kd * (st - c);
         s1 = st - d_t * Kd * (st - c);
+        // terrain.b = terrain.b - d_t * Kd * (st - c);
     }
-
-    vel.x = u;
-    vel.y = v;
 
     terrain.r = max(0, bt);
     terrain.g = max(0, s1);
+    terrain.b = max(0, terrain.b);
     terrain.w = terrain.b + terrain.r;
 
     imageStore(out_velocitymap, pos, vel);

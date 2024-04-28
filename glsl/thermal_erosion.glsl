@@ -65,8 +65,10 @@ void main() {
         }
     }
 
-    float S = d_t * Kspeed * a * H / 2.0;
     vec4 out_thfl[2];
+
+    // speed of erosion when above the kalpha threshold
+    float sharpness = 1.0;
 
     float bk = 0.0;
     // cross
@@ -84,6 +86,11 @@ void main() {
             }
             float alph = atan(b / (d / WORLD_SCALE));
             if (alph > Kalpha) {
+                float newsh = 1.0 + alph - Kalpha;
+                if (newsh > sharpness) {
+                    sharpness = newsh;
+                }
+                
                 bk += b;
                 // mark for outflow
                 out_thfl[j][i] = 1;
@@ -92,6 +99,8 @@ void main() {
             out_thfl[j][i] = 0;
         }
     }
+    sharpness *= sharpness * sharpness;
+    float S = d_t * Kspeed * sharpness * a * H / 2.0;
 
     for (uint j = 0; j < 2; j++) {
         for (uint i = 0; i < 4; i++) {

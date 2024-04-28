@@ -115,7 +115,7 @@ void main() {
     terrain.w = terrain.r + d2;
 
     // average water height
-    vel.z = max(1e-2, d1 + d2); 
+    vel.z = (d1 + d2); 
     imageStore(out_fluxmap, pos, out_flux);
     imageStore(out_velocitymap, pos, vel);
     imageStore(out_heightmap, pos, terrain);

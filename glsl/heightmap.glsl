@@ -51,8 +51,6 @@ float exp_mask(float val) {
 }
 
 float distort(float x, float y) {
-    // Optionally, you can scale your internal noise frequency
-    // or layer several octaves of noise to control the wiggly shapes.
     float wiggleDensity = 4.7f; 
     return gln_simplex(vec2(x * wiggleDensity, y * wiggleDensity));
 }
@@ -81,13 +79,13 @@ void main() {
         true
     ); */
 
-    /* vec2 dist = vec2(
+    vec2 dist = vec2(
         distort(store_pos.x / 1e7 + 2.3, store_pos.y / 1e7 + 2.9),
         distort(store_pos.x / 1e7 - 3.1, store_pos.y / 1e7 - 4.3)
-    ); */
+    );
 
-    //float val = (gln_sfbm(vec2(store_pos) + dist, opts) + 1) / 2.0;
-    float val = (gln_sfbm(vec2(store_pos), opts) + 1) / 2.0;
+    float val = (gln_sfbm(vec2(store_pos) + dist, opts) + 1) / 2.0;
+    // float val = (gln_sfbm(vec2(store_pos), opts) + 1) / 2.0;
     //float up_val = (gln_sfbm(store_pos, up_opts) + 1.0) / 2.0;
     //up_val = power_mask(up_val);
     //up_val = exp_mask(up_val);

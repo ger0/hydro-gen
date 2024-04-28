@@ -125,7 +125,7 @@ struct Erosion_settings {
     GLfloat Kd = 0.011;
     GLfloat Ke = 0.05;
     GLfloat G = 9.81;
-    GLfloat ENERGY_LOSS = 0.99985;
+    GLfloat ENERGY_KEPT = 1.0;
 
     GLfloat Kalpha = 1.2f;
     GLfloat Kspeed = 0.011f;
@@ -262,7 +262,7 @@ void dispatch_erosion(
     auto run = [&](Compute_program& program) {
         program.use();
         program.set_uniform("max_height", MAX_HEIGHT);
-        program.set_uniform("ENERGY_LOSS", set.ENERGY_LOSS);
+        program.set_uniform("ENERGY_LOSS", set.ENERGY_KEPT);
         program.set_uniform("d_t", d_t);
         program.set_uniform("Kc", set.Kc);
         program.set_uniform("Ks", set.Ks);
@@ -302,6 +302,7 @@ struct Render_data {
 
     float   prec = 0.35;
     bool    display_sediment = false;
+    bool    debug_preview = false;
 };
 
 void delete_renderer(Render_data& data) {
@@ -386,6 +387,7 @@ bool dispatch_rendering(
     shader.set_uniform("prec", rndr.prec);
     shader.set_uniform("display_sediment", rndr.display_sediment);
     shader.set_uniform("sediment_max_cap", eros.Kc);
+    shader.set_uniform("DEBUG_PREVIEW", rndr.debug_preview);
 
     glDispatchCompute(WINDOW_W / (WRKGRP_SIZE_X), WINDOW_H / (WRKGRP_SIZE_Y), 1);
 
@@ -534,7 +536,7 @@ void draw_ui(
     ImGui::SliderFloat("Drops", &rain.drops, 0.001, 0.1);
 
     ImGui::SeparatorText("Hydraulic Erosion");
-    ImGui::SliderFloat("Energy Kept (%)", &erosion.ENERGY_LOSS, 0.998, 1.0, "%.5f");
+    ImGui::SliderFloat("Energy Kept (%)", &erosion.ENERGY_KEPT, 0.998, 1.0, "%.5f");
     ImGui::SliderFloat("Capacity", &erosion.Kc, 0.0001f, 0.10f, "%.4f");
     ImGui::SliderFloat("Solubility", &erosion.Ks, 0.0001f, 0.10f, "%.4f");
     ImGui::SliderFloat("Deposition", &erosion.Kd, 0.0001f, 0.10f, "%.4f");
@@ -548,6 +550,7 @@ void draw_ui(
     ImGui::SeparatorText("General");
     ImGui::SliderFloat("Raymarching precision", &render.prec, 0.01f, 1.f);
     ImGui::Checkbox("Display sediment", &render.display_sediment);
+    ImGui::Checkbox("Heightmap view", &render.debug_preview);
     ImGui::SliderFloat("Target_fps", &state.target_fps, 2.f, 120.f);
     ImGui::SliderFloat("Time step", &erosion.d_t, 0.0005f, 0.05f);
     ImGui::End();

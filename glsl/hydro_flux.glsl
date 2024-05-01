@@ -112,7 +112,7 @@ void main() {
     float d2 = max(0, d1 + (d_volume / (L * L)));
 
     terrain.b = d2;
-    terrain.w = terrain.r + d2;
+    terrain.w = terrain.r + d2 + terrain.g;
 
     // average water height
     vel.z = (d1 + d2); 

@@ -28,20 +28,25 @@ uniform float  sediment_max_cap = 0.1;
 layout (rgba32f, binding = BIND_HEIGHTMAP) 
 	uniform readonly image2D heightmap;
 
+layout (rgba32f, binding = BIND_SEDIMENTMAP) 
+	uniform readonly image2D sedimentmap;
+
 layout (rgba32f, binding = BIND_DISPLAY_TEXTURE) 
 	uniform writeonly image2D out_tex;
 
 // HEIGHTMAP VARIABLES
-const int TERRAIN   = 0x00;
-const int SEDIMENT  = 0x01;
+const int ROCK      = 0x00;
+const int DIRT      = 0x01;
 const int WATER     = 0x02;
 const int TOTAL     = 0x03;
+const int TERRAIN   = 0x04;
+const int SEDIMENT  = 0x05;
 
 // max raymarching distance
 const float max_dist    = 2048.0;
 const int   max_steps   = 1024;
 
-const vec3 light_dir    = normalize(vec3(0.0, -0.6, -1.0));
+const vec3 light_dir    = normalize(vec3(0.0, -0.7, -1.0));
 const vec3 light_color  = normalize(vec3(0.09, 0.075, 0.04));
 
 // diffuse colours
@@ -77,6 +82,7 @@ const Material_colors diffuse_cols = Material_colors(
 struct Ray {
     vec4 pos;
     float dist; 
+    vec4 terr;
 };
 
 // functions
@@ -84,11 +90,11 @@ struct Ray {
 float fog_mix(float fog);
 float water_mix(float water);
 // returns a color depending on the heightmap
-vec3 get_material_color(vec3 pos, vec3 norm, Material_colors material);
+vec3 get_material_color(Ray ray, vec3 norm, Material_colors material);
 // get a interpolated normal based on image2D
 vec3 get_img_normal(readonly image2D img, vec2 pos);
 // retrieve color from the material hit by the ray
-vec4 get_shade(vec3 ray_pos, vec3 normal, bool is_water);
+vec4 get_shade(Ray ray, vec3 normal, bool is_water);
 // retrieve color from the terrain hit by the ray 
 vec3 get_shade_terr(vec3 ray_pos, vec3 normal);
 // returns the color of the fog based on camera and sun direction
@@ -111,38 +117,33 @@ float water_mix(float water) {
     return clamp((water - 1e-4) * 100, 0, 1); 
 }
 
-vec3 get_material_color(vec3 pos, vec3 norm, Material_colors material) {
+vec3 get_material_color(Ray ray, vec3 norm, Material_colors material) {
     const vec3 up = vec3(0, 1, 0);
     // angle
 	float cos_a = dot(norm, -up);
 
+	float rock = smoothstep(0.0, 1.0, min(1.0, ray.terr.r));
+	float dirt = smoothstep(0.0, 1.0, min(1.0, ray.terr.g));
+
+	vec4 sediment = img_bilinear(sedimentmap, ray.pos.xz);
+	float sed_dirt = clamp(sediment.r / sediment_max_cap, 0.0, 1.0);
+	float sed_rock = clamp(sediment.g / sediment_max_cap, 0.0, 1.0);
+    
     vec3 col;
-    if (cos_a < 0.60) {
-        float rock = 1 - smoothstep(0.45, 0.60, cos_a);
-        col = mix(material.rock, material.rock * 1.2, rock);
+	col = material.rock;
+	if (dirt > 0.0) {
+	    if (cos_a < 0.95) {
+            float dirt_cos = 1 - smoothstep(0.85, 0.95, cos_a);
+	        col = mix(material.grass, material.dirt, dirt_cos);
+	    } else {
+	        col = material.grass;
+	    }
+	    col = mix(material.rock, col, dirt);
+    } else {
+        col = material.rock;
     }
-    else if (cos_a < 0.70) {
-        float rock = 1 - smoothstep(0.60, 0.70, cos_a);
-        col = mix(material.dirt, material.rock, rock);
-	} else if (cos_a < 0.95) {
-        float dirt = 1 - smoothstep(0.85, 0.95, cos_a);
-	    col = mix(material.grass, material.dirt, dirt);
-	} else {
-	    col = material.grass;
-	}
-	if (cos_a > 0.85) {
-        float sed = img_bilinear_g(heightmap, pos.xz) / sediment_max_cap;
-        float sediment = min(1.0, smoothstep(0.85, 0.93, sed));
-        col = mix(col, material.sand, sediment);
-	}
-	if (pos.y >= 0.55 * max_height) {
-        float mntn = min(1.0, smoothstep(max_height * 0.55, max_height * 0.65, pos.y));
-	    col = mix(col, material.rock, mntn);
-	    if (cos_a >= 0.85) {
-            float grass = smoothstep(0.85, 0.95, cos_a);
-            col = mix(col, material.grass, grass);
-        }
-	}
+    col = mix(col, material.sand, sed_rock);
+    col = mix(col, material.dirt, sed_dirt);
 	return col;
 }
 
@@ -159,14 +160,16 @@ vec3 get_img_normal_w(readonly image2D img, vec2 pos) {
 }
 
 vec3 get_img_normal(readonly image2D img, vec2 pos) {
-        float dx = (
-            img_bilinear_r(img, pos + vec2( 1.0, 0)) - 
-            img_bilinear_r(img, pos + vec2(-1.0, 0))
-        );
-        float dz = (
-            img_bilinear_r(img, pos + vec2(0, 1.0)) -
-            img_bilinear_r(img, pos + vec2(0,-1.0))
-        );
+    vec2 r = img_bilinear(img, pos + vec2( 1.0, 0)).rg;
+    vec2 l = img_bilinear(img, pos + vec2(-1.0, 0)).rg;
+    vec2 b = img_bilinear(img, pos + vec2( 0,-1.0)).rg;
+    vec2 t = img_bilinear(img, pos + vec2( 0, 1.0)).rg;
+    float dx = (
+        r.r + r.g - l.r - l.g
+    );
+    float dz = (
+        t.r + t.g - b.r - b.g
+    );
     return normalize(cross(vec3(2.0, dx, 0), vec3(0, dz, 2.0)));
 }
 
@@ -202,14 +205,14 @@ vec3 get_sky_color(vec3 direction, float ray_dist, float sundot) {
     );
 }
 
-vec4 get_shade(vec3 ray_pos, vec3 normal, bool is_water) {
+vec4 get_shade(Ray ray, vec3 normal, bool is_water) {
     // shadow 
     // difference to the point above which there's no possible surface
-    float shadow_diff = max_height - ray_pos.y;
+    float shadow_diff = max_height - ray.pos.y;
     float shadow_scale = shadow_diff / -light_dir.y;
     float shadow_max = length(light_dir * shadow_scale);
     // casting a shadow ray towards the sun
-    Ray shadow = raymarch(ray_pos, -light_dir, shadow_max, max_steps / 2, TERRAIN);
+    Ray shadow = raymarch(ray.pos.xyz, -light_dir, shadow_max, max_steps / 2, TERRAIN);
 
     vec3 ambient;
     float amb_factor = clamp(0.5 + 0.5 * normal.y, 0.0, 1.0);
@@ -221,9 +224,9 @@ vec4 get_shade(vec3 ray_pos, vec3 normal, bool is_water) {
         //diffuse = sky_color * 0.1;
         diffuse = vec3(0.108, 0.187, 0.288) * 0.1;
     } else {
-        ambient = get_material_color(ray_pos.xyz, normal, ambient_cols);
+        ambient = get_material_color(ray, normal, ambient_cols);
         diffuse = get_material_color(
-            ray_pos.xyz, 
+            ray, 
             normal, 
             diffuse_cols
         );
@@ -240,8 +243,8 @@ vec4 get_shade(vec3 ray_pos, vec3 normal, bool is_water) {
     return outp;
 }
 
-vec3 get_shade_terr(vec3 ray_pos, vec3 normal) {
-    return get_shade(ray_pos, normal, false).xyz;
+vec3 get_shade_terr(Ray ray, vec3 normal) {
+    return get_shade(ray, normal, false).xyz;
 }
 
 vec3 get_terrain_color(Ray ray, vec3 direction, float sundot) {
@@ -249,7 +252,7 @@ vec3 get_terrain_color(Ray ray, vec3 direction, float sundot) {
         heightmap, 
         ray.pos.xz 
     );
-    vec3 col = get_shade_terr(ray.pos.xyz, normal);
+    vec3 col = get_shade_terr(ray, normal);
     col = get_fog_color(col, ray.dist, sundot);
     col = mix(
         col,
@@ -298,8 +301,8 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
     // wrefl_ray.dist += w_ray.dist;
 
     // get shading for the water surface
-    vec4 w_shad = get_shade(w_ray.pos.xyz, w_norm, true);
-    vec3 water_col;
+    vec4 w_shad = get_shade(w_ray, w_norm, true);
+    vec3 water_col = w_shad.rgb;
 
     // get the color of sky reflected on water
 	float refl_sundot = clamp(dot(w_refl, -light_dir), 0.0, 1.0);
@@ -309,16 +312,13 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
         refl_sundot
     ); 
 
-    // sediment
-    float a = img_bilinear_g(heightmap, w_ray.pos.xz) / sediment_max_cap;
-
     // reflections:
     // fresnel
     float cos_theta = dot(direction, w_norm);
     float fresnel = max(pow(1.0 - cos_theta, 2.0), 0.06);
     // bouncing off to the sky
     if (wrefl_ray.dist >= max_dist) {
-        water_col = mix(w_shad.rgb, diffuse_cols.dirt, a);
+        //water_col = mix(w_shad.rgb, diffuse_cols.dirt, a);
         water_col = mix(t_shad, water_col, min(1.0, water_vol / 2.0));
         water_col = mix(water_col, wrefl_skycol, fresnel);
         water_col = mix(w_shad.rgb, water_col, w_shad.w);
@@ -328,8 +328,8 @@ vec3 get_water_color(Ray w_ray, vec3 direction, float sundot) {
     else {
         // get colour of the sampled terrain
         wrefl_ray.dist += w_ray.dist;
+        // water_col = mix(w_shad.rgb, diffuse_cols.dirt, a);
         // get the color of terrain from a ray reflected from the surface of water
-        water_col = mix(w_shad.rgb, diffuse_cols.dirt, a);
         water_col = mix(t_shad, water_col, min(1.0, water_vol / 2.0));
         water_col = mix(
             water_col, 
@@ -357,7 +357,9 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
 	float sundot = clamp(dot(direction, -light_dir), 0.0, 1.0);
 
 	vec2 pos = ray.pos.xz * WORLD_SCALE;
-	float water_h = img_bilinear_b(heightmap, ray.pos.xz);
+	// float water_h = img_bilinear_b(heightmap, ray.pos.xz);
+
+	float water_h = ray.terr.b;
     water_h = min(1.0, smoothstep(1e-4, 1.0, water_h));
 
 	if (pos.x < 0 || pos.x >= float(imageSize(heightmap).x) ||
@@ -389,11 +391,10 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
     }
 
     if (display_sediment) {
-        color = mix(
-            color,
-            vec3(1.0,0,0),
-            img_bilinear_g(heightmap, ray.pos.xz) / sediment_max_cap
-        );
+        float r = img_bilinear_r(sedimentmap, ray.pos.xz) / sediment_max_cap;
+        float g = img_bilinear_g(sedimentmap, ray.pos.xz) / sediment_max_cap;
+        color.r = min(1.0, r);
+        color.g = min(1.0, g);
     }
     return color;
 }
@@ -414,16 +415,19 @@ Ray raymarch(
     // shadow penumbra
     float min_sdf = 1.0;
     float t_height = 0.0;
+    vec4 terr = vec4(0.0);
 
     for (int i = 0; i < max_steps; ++i) {
         vec3 sample_pos = origin + direction * dist;
 
+        terr = img_bilinear(heightmap, sample_pos.xz);
+
         if (terr_type == TERRAIN) {
-            t_height = img_bilinear_r(heightmap, sample_pos.xz);
+            t_height = terr.r + terr.g;
         } 
         // ELSE TOTAL
         else {
-            t_height = img_bilinear_w(heightmap, sample_pos.xz);
+            t_height = terr.w;
         }
 
         if (
@@ -437,18 +441,20 @@ Ray raymarch(
         if (abs(d_height) <= 0.05) {
             return Ray(
                 vec4(sample_pos - (0.05 * direction), 0.0),
-                dist - (0.05)
+                dist - (0.05),
+                img_bilinear(heightmap, (sample_pos - (0.05 * direction)).xz)
             );
         }
         else if (d_height < 0) {
-            return Ray(vec4(origin + direction * dist, min_sdf), dist);
+            return Ray(vec4(origin + direction * dist, min_sdf), dist, terr);
         }
         // penumbra
         min_sdf = min(min_sdf, 12 * d_dist / dist);
         if (dist > max_dist) {
             return Ray(
                 vec4(sample_pos, min_sdf),
-                max_dist
+                max_dist,
+                terr
             );
         }
         // TODO: dist can't be higher than max slope approximation 
@@ -457,7 +463,8 @@ Ray raymarch(
     }
     return Ray(
         vec4(origin + direction * max_dist, min_sdf),
-        max_dist
+        max_dist,
+        terr
     );
 }
 
@@ -477,7 +484,7 @@ void main() {
         imageStore(
             out_tex, pixel, vec4(
                 img_bilinear_r(heightmap, vec2(pixel)) / max_height,
-                img_bilinear_g(heightmap, vec2(pixel)) / sediment_max_cap,
+                img_bilinear_g(heightmap, vec2(pixel)) / max_height,
                 img_bilinear_b(heightmap, vec2(pixel)),
                 0
             )

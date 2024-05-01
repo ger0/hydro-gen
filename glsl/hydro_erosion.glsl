@@ -14,6 +14,11 @@ layout (binding = BIND_WRITE_HEIGHTMAP, rgba32f)
 layout (binding = BIND_FLUXMAP, rgba32f)   
 	uniform readonly image2D fluxmap;
 
+layout (binding = BIND_SEDIMENTMAP, rgba32f)   
+	uniform readonly image2D sedimap;
+layout (binding = BIND_WRITE_SEDIMENTMAP, rgba32f)   
+	uniform writeonly image2D out_sedimap;
+
 // velocity + suspended sediment vector
 // vec3((u, v), suspended)
 layout (binding = BIND_VELOCITYMAP, rgba32f)   
@@ -36,14 +41,21 @@ uniform float Ks;
 // sediment deposition constant
 uniform float Kd;
 
-float find_sin_alpha(ivec2 pos) {
-	float r_b = imageLoad(heightmap, pos + ivec2(1, 0)).r;
-	float l_b = imageLoad(heightmap, pos - ivec2(1, 0)).r;
-	float d_b = imageLoad(heightmap, pos + ivec2(0, 1)).r;
-	float u_b = imageLoad(heightmap, pos - ivec2(0, 1)).r;
+float find_sin_alpha(ivec2 pos, int layer) {
+    float r_b = 0.0;
+    float l_b = 0.0;
+    float d_b = 0.0;
+    float u_b = 0.0;
 
-	float dbdx = (r_b-l_b) / (2.0* L);
-	float dbdy = (r_b-l_b) / (2.0* L);
+    for (int i = 0; i <= layer; i++) {
+	    r_b += imageLoad(heightmap, pos + ivec2(1, 0))[i];
+	    l_b += imageLoad(heightmap, pos - ivec2(1, 0))[i];
+	    d_b += imageLoad(heightmap, pos + ivec2(0, 1))[i];
+	    u_b += imageLoad(heightmap, pos - ivec2(0, 1))[i];
+	}
+
+	float dbdx = (r_b-l_b) / (2.0 * L);
+	float dbdy = (r_b-l_b) / (2.0 * L);
 
 	return sqrt(dbdx*dbdx+dbdy*dbdy)/sqrt(1+dbdx*dbdx+dbdy*dbdy);
 }
@@ -61,7 +73,8 @@ void main() {
     vec4 vel = imageLoad(velocitymap, pos);
 
     vec4 terrain = imageLoad(heightmap, pos);
-    float st = terrain.g;
+    // float st = terrain.g;
+    vec4 sediment = imageLoad(sedimap, pos);
     // water velocity
     // float dd = clamp(smoothstep(0.01, 6, vel.z - 0.01), 0.01, 6.0);
     float dd = vel.z;
@@ -82,42 +95,39 @@ void main() {
         ) / (L * dd);
     }
 
-    // find normal
-    float sin_a = find_sin_alpha(pos);
-    float c = Kc * max(0.05, sin_a) * length(vel.xy);
-    // float c = Kc * sin_a * length(vel.xy);
-    
-    /* const float Kdmax = 6.0;
-    if (terrain.b >= Kdmax) {
-        //c = max(0.0, c - max(0.0, terrain.b - 2.f));
-        // deep water doesn't erode as much
-        c = 0.0;
+    // how much sediment from other layers is already in the water
+    float cap = 0.0;
+    for (int i = (SED_LAYERS - 1); i >= 0; i--) {
+        float sin_a = find_sin_alpha(pos, i);
+        // sediment capacity constant for a layer
+        float Klc = Kc * (10 * i + 1);
+        float Kls = Ks * (10 * i + 1);
+        float Kld = Kd * (10 * i + 1);
+        // sediment transport capacity
+        float c = Klc * max(0.05, sin_a) * length(vel.xy) - cap;
 
-    } else {
-        c *= (Kdmax - terrain.b) / Kdmax;
-    } */
+        float bt;
+        float s1;
+        float st = sediment[i];
 
-    float bt;
-    float s1;
+        // dissolve sediment
+        if (c > st) {
+            bt = terrain[i] - d_t * Kls * (c - st);
+            s1 = st + d_t * Kls * (c - st);
+        } 
+        // deposit sediment
+        else {
+            bt = terrain[i] + d_t * Kld * (st - c);
+            s1 = st - d_t * Kld * (st - c);
+        }
 
-    // dissolve sediment
-    if (c > st) {
-        bt = terrain.r - d_t * Ks * (c - st);
-        s1 = st + d_t * Ks * (c - st);
-        // terrain.b = terrain.b + d_t * Ks * (c - st);
-    } 
-    // deposit sediment
-    else {
-        bt = terrain.r + d_t * Kd * (st - c);
-        s1 = st - d_t * Kd * (st - c);
-        // terrain.b = terrain.b - d_t * Kd * (st - c);
+        sediment[i] = s1;
+        cap += s1;
+
+        terrain[i] = max(0, bt);
     }
-
-    terrain.r = max(0, bt);
-    terrain.g = max(0, s1);
-    terrain.b = max(0, terrain.b);
-    terrain.w = terrain.b + terrain.r;
-
+    terrain.w = terrain.r + terrain.g + terrain.b;
     imageStore(out_velocitymap, pos, vel);
+    imageStore(out_sedimap, pos, sediment);
     imageStore(out_heightmap, pos, terrain);
 }

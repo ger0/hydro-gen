@@ -105,14 +105,16 @@ void main() {
         val = slope_mask(val, uv);
     }
     
-    // water height
-    //terrain.b += 1.4;
-    // terrain.b = max(0.0, 2.0 - terrain.r);
-
     vec4 terrain = vec4(
-        min(height_scale, val * height_scale * height_multiplier), 0.0, 0.0, 0.0
+        min(height_scale, val * height_scale * height_multiplier), 
+        9.0, 
+        0.0, 
+        0.0
     );
-    terrain.w = terrain.r + terrain.b;
+    // water height
+    // terrain.b += 84.4;
+    // terrain.b = max(0.0, 84.0 - terrain.r);
+    terrain.w = terrain.r + terrain.g + terrain.b;
     imageStore(dest_tex, store_pos, terrain);
     //imageStore(dest_tex, store_pos, vec4(seed, lacunarity, persistance, height_scale));
 }

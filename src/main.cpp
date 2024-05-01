@@ -120,9 +120,9 @@ struct Map_settings {
 };
 
 struct Erosion_settings {
-    GLfloat Kc = 0.015;
-    GLfloat Ks = 0.015;
-    GLfloat Kd = 0.011;
+    GLfloat Kc = 0.002;
+    GLfloat Ks = 0.001;
+    GLfloat Kd = 0.001;
     GLfloat Ke = 0.05;
     GLfloat G = 9.81;
     GLfloat ENERGY_KEPT = 1.0;
@@ -202,6 +202,7 @@ struct World_data {
     // hydraulic erosion
     Tex_pair flux;
     Tex_pair velocity;
+    Tex_pair sediment;
 
     // thermal erosion
     Tex_pair thermal_c;
@@ -212,6 +213,7 @@ World_data gen_world_data(const GLuint width, const GLuint height) {
     Tex_pair heightmap(GL_READ_WRITE, width, height, BIND_HEIGHTMAP, BIND_WRITE_HEIGHTMAP);
     Tex_pair flux(GL_READ_WRITE, width, height, BIND_FLUXMAP, BIND_WRITE_FLUXMAP);
     Tex_pair velocity(GL_READ_WRITE, width, height, BIND_VELOCITYMAP, BIND_WRITE_VELOCITYMAP);
+    Tex_pair sediment(GL_READ_WRITE, width, height, BIND_SEDIMENTMAP, BIND_WRITE_SEDIMENTMAP);
 
     // ------------- cross    flux for thermal erosion -----------
     Tex_pair thermal_c(GL_READ_WRITE, width, height, BIND_THERMALFLUX_C, BIND_WRITE_THERMALFLUX_C);
@@ -222,6 +224,7 @@ World_data gen_world_data(const GLuint width, const GLuint height) {
         .heightmap = heightmap,
         .flux = flux,
         .velocity = velocity,
+        .sediment = sediment,
         .thermal_c = thermal_c,
         .thermal_d = thermal_d
     };
@@ -231,6 +234,7 @@ void delete_world_data(World_data& data) {
     data.heightmap.delete_textures();
     data.velocity.delete_textures();
     data.flux.delete_textures();
+    data.sediment.delete_textures();
     data.thermal_c.delete_textures();
     data.thermal_d.delete_textures();
 }
@@ -259,7 +263,7 @@ void dispatch_erosion(
     ) {
 
     float d_t = set.d_t * rand() / (float)RAND_MAX;
-    auto run = [&](Compute_program& program) {
+    auto run = [&](Compute_program& program, GLint layer = 0) {
         program.use();
         program.set_uniform("max_height", MAX_HEIGHT);
         program.set_uniform("ENERGY_LOSS", set.ENERGY_KEPT);
@@ -269,6 +273,7 @@ void dispatch_erosion(
         program.set_uniform("Kd", set.Kd);
         program.set_uniform("Ke", set.Ke);
         program.set_uniform("G", set.G);
+        program.set_uniform("t_layer", layer);
 
         program.set_uniform("Kalpha", set.Kalpha);
         program.set_uniform("Kspeed", set.Kspeed);
@@ -286,13 +291,19 @@ void dispatch_erosion(
     run(heros);
     data.heightmap.swap();
     data.velocity.swap();
+    data.sediment.swap();
 
-    run(tflux);
-    data.thermal_c.swap();
-    data.thermal_d.swap();
+    for (int i = 0; i < SED_LAYERS; i++) {
+        run(tflux, i);
+        /* data.thermal_c.swap();
+        data.thermal_d.swap(); */
+        data.heightmap.swap();
+        // data.sediment.swap();
+    }
 
     run(sedim);
     data.heightmap.swap();
+    data.sediment.swap();
 }
 
 struct Render_data {
@@ -659,8 +670,8 @@ int main(int argc, char* argv[]) {
             dispatch_erosion(
                 comput_hydro_flux,
                 comput_hydro_erosion, 
-                comput_sediment, 
                 comput_thermal_flux, 
+                comput_sediment, 
                 world_data, 
                 erosion_settings
             );

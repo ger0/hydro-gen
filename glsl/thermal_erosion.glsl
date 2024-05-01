@@ -6,40 +6,23 @@
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
 layout (binding = BIND_HEIGHTMAP, rgba32f)   
-	uniform coherent image2D heightmap;
-layout (binding = BIND_WRITE_HEIGHTMAP, rgba32f)   
-	uniform writeonly image2D out_heightmap;
+	uniform readonly image2D heightmap;
 
-layout (binding = BIND_THERMALFLUX_C, rgba32f)   
-	uniform coherent image2D thflux_c;
-
-layout (binding = BIND_THERMALFLUX_D, rgba32f)   
-	uniform coherent image2D thflux_d;
-
-/* layout (binding = BIND_WRITE_THERMALFLUX_C, rgba32f)   
+layout (binding = BIND_WRITE_THERMALFLUX_C, rgba32f)   
 	uniform writeonly image2D out_thflux_c;
 
 layout (binding = BIND_WRITE_THERMALFLUX_D, rgba32f)   
-	uniform writeonly image2D out_thflux_d; */
+	uniform writeonly image2D out_thflux_d;
 
 uniform float max_height;
 uniform float d_t;
 
-uniform float Ke;
 uniform float Kalpha;
 uniform float Kspeed;
 uniform int t_layer;
 
 const float L = 1.0;
 const float a = L;
-
-vec4 get_thflux(coherent image2D img, ivec2 pos) {
-    if (pos.x < 0 || pos.x > (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
-    pos.y < 0 || pos.y > (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1)) {
-       return vec4(0, 0, 0, 0); 
-    }
-    return imageLoad(img, pos);
-}
 
 vec4 get_height(ivec2 pos) {
     if (pos.x < 0 || pos.x > (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
@@ -49,15 +32,7 @@ vec4 get_height(ivec2 pos) {
     return imageLoad(heightmap, pos);
 }
 
-float sum_flux(vec4 tflux) {
-    float sum_tfl = 0;
-    for (uint i = 0; i < 4; i++) {
-        sum_tfl = tflux[i];        
-    }
-    return sum_tfl;
-}
-
-void calculate_outflow(ivec2 pos, vec4 terrain, int layer) {
+void store_outflow(ivec2 pos, vec4 terrain, int layer) {
     // total height difference
     vec4 d_h[2] = {vec4(0), vec4(0)};
 
@@ -87,14 +62,11 @@ void calculate_outflow(ivec2 pos, vec4 terrain, int layer) {
             }
         }
     }
-    // getting the height difference for ONE LAYER ONLY
-    // H = d_layerh[jmax][imax];
     H = min(terrain[layer], H);
-
     vec4 out_thfl[2] = {vec4(0), vec4(0)};
-    //float layer_total = 0.0;
     float bk = 0.0;
 
+    float sharpness = 1.0;
     for (uint j = 0; j < 2; j++) {
         for (uint i = 0; i < 4; i++) {
             float b = d_h[j][i];
@@ -111,11 +83,11 @@ void calculate_outflow(ivec2 pos, vec4 terrain, int layer) {
             float Kl_alph = Kalpha / float(layer + 1);
             // float Kl_alph = Kalpha;
             if (alph > Kl_alph) {
-                // float newsh = 1.0 + alph - Kl_alph;
-                /* if (newsh > sharpness) {
+                // speed up when the angle is too big
+                float newsh = 1.0 + alph - Kl_alph;
+                if (newsh > sharpness) {
                     sharpness = newsh;
                 }
-                 */
                 bk += b;
                 // mark for outflow
                 out_thfl[j][i] = 1;
@@ -124,10 +96,10 @@ void calculate_outflow(ivec2 pos, vec4 terrain, int layer) {
             out_thfl[j][i] = 0;
         }
     }
-    // sharpness *= sharpness * sharpness;
-    // float S = d_t * Kspeed * sharpness * a * H / 2.0;
+    sharpness *= sharpness * sharpness;
     float Klspeed = Kspeed * float(layer + 1);
-    float S = d_t * Kspeed * a * H / 2.0;
+    float S = d_t * Kspeed * sharpness * a * H / 2.0;
+    // float S = d_t * Kspeed * a * H / 2.0;
 
     for (uint j = 0; j < 2; j++) {
         for (uint i = 0; i < 4; i++) {
@@ -138,53 +110,12 @@ void calculate_outflow(ivec2 pos, vec4 terrain, int layer) {
             }
         }
     }
-    imageStore(thflux_c, pos, out_thfl[0]);
-    imageStore(thflux_d, pos, out_thfl[1]);
-}
-
-float gather_inflow(ivec2 pos) {
-    // thermal erosion
-    float in_flux = 0.0;
-    // cross
-    in_flux += get_thflux(thflux_c, pos + ivec2(-1, 0)).y; // L
-    in_flux += get_thflux(thflux_c, pos + ivec2( 1, 0)).x; // R
-    in_flux += get_thflux(thflux_c, pos + ivec2( 0, 1)).w; // T
-    in_flux += get_thflux(thflux_c, pos + ivec2( 0,-1)).z; // B 
-
-    // diagonal
-    in_flux += get_thflux(thflux_d, pos + ivec2(-1, 1)).w; // LT
-    in_flux += get_thflux(thflux_d, pos + ivec2( 1, 1)).z; // RT
-    in_flux += get_thflux(thflux_d, pos + ivec2(-1,-1)).y; // LB
-    in_flux += get_thflux(thflux_d, pos + ivec2( 1,-1)).x; // RB
-
-    float sum_flux = 0.0;
-    vec4 out_flux[2];
-    out_flux[0] = imageLoad(thflux_c, pos);
-    out_flux[1] = imageLoad(thflux_d, pos);
-    for (uint j = 0; j < 2; j++) {
-        for (uint i = 0; i < 4; i++) {
-            sum_flux -= out_flux[j][i];
-        }
-    }
-    sum_flux += in_flux;
-    return sum_flux;
+    imageStore(out_thflux_c, pos, out_thfl[0]);
+    imageStore(out_thflux_d, pos, out_thfl[1]);
 }
 
 void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
     vec4 terrain = imageLoad(heightmap, pos);
-
-    // ------------------------ thermal erosion -------------------------
-    calculate_outflow(pos, terrain, t_layer);
-    memoryBarrierImage();
-    barrier();
-
-    terrain[t_layer] += gather_inflow(pos);
-    imageStore(heightmap, pos, terrain);
-    imageStore(thflux_c, pos, vec4(0));
-    imageStore(thflux_d, pos, vec4(0));
-    memoryBarrierImage();
-    barrier();
-
-    imageStore(out_heightmap, pos, terrain);
+    store_outflow(pos, terrain, t_layer);
 }

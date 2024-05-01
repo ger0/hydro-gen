@@ -100,11 +100,13 @@ void main() {
     for (int i = (SED_LAYERS - 1); i >= 0; i--) {
         float sin_a = find_sin_alpha(pos, i);
         // sediment capacity constant for a layer
-        float Klc = Kc * (10 * i + 1);
+        // float Klc = Kc * (10 * i + 1);
+        float Klc = Kc;
         float Kls = Ks * (10 * i + 1);
-        float Kld = Kd * (10 * i + 1);
+        float Kld = Kd * (100 * i + 1);
         // sediment transport capacity
-        float c = Klc * max(0.05, sin_a) * length(vel.xy) - cap;
+        // float c = Klc * max(0.05, sin_a) * length(vel.xy) - cap;
+        float c = Klc * sin_a * length(vel.xy) - cap;
 
         float bt;
         float s1;
@@ -114,6 +116,14 @@ void main() {
         if (c > st) {
             bt = terrain[i] - d_t * Kls * (c - st);
             s1 = st + d_t * Kls * (c - st);
+
+            // we can't take more sediment than it's possible
+            float dterr = 0.0;
+            if (bt < 0.0) {
+                dterr = abs(bt);
+            }
+            bt += dterr;
+            s1 -= dterr;
         } 
         // deposit sediment
         else {

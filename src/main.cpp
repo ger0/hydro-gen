@@ -27,14 +27,15 @@ constexpr float ASPECT_RATIO = float(WINDOW_W) / WINDOW_H;
 constexpr GLuint NOISE_SIZE = 864;
 
 // shader filenames
-constexpr auto noise_comput_file            = "heightmap.glsl";
-constexpr auto rain_comput_file             = "rain.glsl";
-constexpr auto render_comput_file           = "rendering.glsl";
+constexpr auto noise_comput_file                = "heightmap.glsl";
+constexpr auto rain_comput_file                 = "rain.glsl";
+constexpr auto render_comput_file               = "rendering.glsl";
 
-constexpr auto erosion_hydro_flux_file      = "hydro_flux.glsl";
-constexpr auto erosion_hydro_erosion_file   = "hydro_erosion.glsl";
-constexpr auto erosion_thermal_flux_file    = "thermal_erosion.glsl";
-constexpr auto erosion_sediment_file        = "sediment_transport.glsl";
+constexpr auto erosion_hydro_flux_file          = "hydro_flux.glsl";
+constexpr auto erosion_hydro_erosion_file       = "hydro_erosion.glsl";
+constexpr auto erosion_thermal_flux_file        = "thermal_erosion.glsl";
+constexpr auto erosion_thermal_transport_file   = "thermal_transport.glsl";
+constexpr auto erosion_sediment_file            = "sediment_transport.glsl";
 
 using glm::normalize, glm::cross;
 using glm::vec2, glm::vec3, glm::ivec2, glm::ivec3;
@@ -257,6 +258,7 @@ void dispatch_erosion(
         Compute_program& hflux,
         Compute_program& heros,
         Compute_program& tflux,
+        Compute_program& ttrans,
         Compute_program& sedim,
         World_data& data,
         Erosion_settings& set
@@ -295,10 +297,12 @@ void dispatch_erosion(
 
     for (int i = 0; i < SED_LAYERS; i++) {
         run(tflux, i);
-        /* data.thermal_c.swap();
-        data.thermal_d.swap(); */
+        data.thermal_c.swap();
+        data.thermal_d.swap();
+        // data.heightmap.swap();
+
+        run(ttrans, i);
         data.heightmap.swap();
-        // data.sediment.swap();
     }
 
     run(sedim);
@@ -620,6 +624,7 @@ int main(int argc, char* argv[]) {
     Compute_program comput_hydro_flux(erosion_hydro_flux_file);
     Compute_program comput_hydro_erosion(erosion_hydro_erosion_file);
     Compute_program comput_thermal_flux(erosion_thermal_flux_file);
+    Compute_program comput_thermal_trans(erosion_thermal_transport_file);
     Compute_program comput_sediment(erosion_sediment_file);
 
     World_data world_data = gen_world_data(NOISE_SIZE, NOISE_SIZE);
@@ -671,6 +676,7 @@ int main(int argc, char* argv[]) {
                 comput_hydro_flux,
                 comput_hydro_erosion, 
                 comput_thermal_flux, 
+                comput_thermal_trans, 
                 comput_sediment, 
                 world_data, 
                 erosion_settings

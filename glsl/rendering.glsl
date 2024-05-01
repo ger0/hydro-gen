@@ -126,13 +126,17 @@ vec3 get_material_color(Ray ray, vec3 norm, Material_colors material) {
 	float dirt = smoothstep(0.0, 1.0, min(1.0, ray.terr.g));
 
 	vec4 sediment = img_bilinear(sedimentmap, ray.pos.xz);
-	float sed_dirt = clamp(sediment.r / sediment_max_cap, 0.0, 1.0);
-	float sed_rock = clamp(sediment.g / sediment_max_cap, 0.0, 1.0);
+	float sed_rock = clamp(sediment.r / sediment_max_cap, 0.0, 1.0);
+	float sed_dirt = clamp(sediment.g / sediment_max_cap, 0.0, 1.0);
     
     vec3 col;
 	col = material.rock;
 	if (dirt > 0.0) {
-	    if (cos_a < 0.95) {
+	    if (cos_a < 0.75) {
+            float wet_dirt_cos = 1 - smoothstep(0.25, 0.75, cos_a);
+	        col = mix(material.dirt, material.dirt * 0.4, wet_dirt_cos);
+	    }
+	    else if (cos_a < 0.95) {
             float dirt_cos = 1 - smoothstep(0.85, 0.95, cos_a);
 	        col = mix(material.grass, material.dirt, dirt_cos);
 	    } else {
@@ -140,10 +144,11 @@ vec3 get_material_color(Ray ray, vec3 norm, Material_colors material) {
 	    }
 	    col = mix(material.rock, col, dirt);
     } else {
-        col = material.rock;
+        float steep_rock = 1 - smoothstep(0.00, 0.65, cos_a);
+        col = mix(material.rock, material.rock * 0.5, steep_rock);
     }
     col = mix(col, material.sand, sed_rock);
-    col = mix(col, material.dirt, sed_dirt);
+    col = mix(col, material.dirt * 0.4, sed_dirt);
 	return col;
 }
 
@@ -159,6 +164,7 @@ vec3 get_img_normal_w(readonly image2D img, vec2 pos) {
     return normalize(cross(vec3(2.0, dx, 0), vec3(0, dz, 2.0)));
 }
 
+// terrain normal
 vec3 get_img_normal(readonly image2D img, vec2 pos) {
     vec2 r = img_bilinear(img, pos + vec2( 1.0, 0)).rg;
     vec2 l = img_bilinear(img, pos + vec2(-1.0, 0)).rg;
@@ -391,10 +397,10 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
     }
 
     if (display_sediment) {
-        float r = img_bilinear_r(sedimentmap, ray.pos.xz) / sediment_max_cap;
-        float g = img_bilinear_g(sedimentmap, ray.pos.xz) / sediment_max_cap;
-        color.r = min(1.0, r);
-        color.g = min(1.0, g);
+        float r = min(1.0, img_bilinear_r(sedimentmap, ray.pos.xz) / sediment_max_cap);
+        float g = min(1.0, img_bilinear_g(sedimentmap, ray.pos.xz) / sediment_max_cap);
+        color = mix(color, vec3(1,0,0), r);
+        color = mix(color, vec3(0,1,0), g);
     }
     return color;
 }
@@ -483,8 +489,9 @@ void main() {
     if (DEBUG_PREVIEW) {
         imageStore(
             out_tex, pixel, vec4(
-                img_bilinear_r(heightmap, vec2(pixel)) / max_height,
-                img_bilinear_g(heightmap, vec2(pixel)) / max_height,
+                (img_bilinear_r(heightmap, vec2(pixel)) + 
+                img_bilinear_g(heightmap, vec2(pixel))) / max_height,
+                img_bilinear_g(sedimentmap, vec2(pixel)) / sediment_max_cap,
                 img_bilinear_b(heightmap, vec2(pixel)),
                 0
             )

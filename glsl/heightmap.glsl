@@ -107,7 +107,7 @@ void main() {
     
     vec4 terrain = vec4(
         min(height_scale, val * height_scale * height_multiplier), 
-        9.0, 
+        1.0 + rand(store_pos), 
         0.0, 
         0.0
     );

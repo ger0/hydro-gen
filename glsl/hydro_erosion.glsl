@@ -50,12 +50,12 @@ float find_sin_alpha(ivec2 pos, int layer) {
     for (int i = 0; i <= layer; i++) {
 	    r_b += imageLoad(heightmap, pos + ivec2(1, 0))[i];
 	    l_b += imageLoad(heightmap, pos - ivec2(1, 0))[i];
-	    d_b += imageLoad(heightmap, pos + ivec2(0, 1))[i];
-	    u_b += imageLoad(heightmap, pos - ivec2(0, 1))[i];
+	    d_b += imageLoad(heightmap, pos - ivec2(0, 1))[i];
+	    u_b += imageLoad(heightmap, pos + ivec2(0, 1))[i];
 	}
 
 	float dbdx = (r_b-l_b) / (2.0 * L);
-	float dbdy = (r_b-l_b) / (2.0 * L);
+	float dbdy = (u_b-d_b) / (2.0 * L);
 
 	return sqrt(dbdx*dbdx+dbdy*dbdy)/sqrt(1+dbdx*dbdx+dbdy*dbdy);
 }
@@ -105,8 +105,8 @@ void main() {
         float Kls = Ks * (10 * i + 1);
         float Kld = Kd * (100 * i + 1);
         // sediment transport capacity
-        // float c = Klc * max(0.05, sin_a) * length(vel.xy) - cap;
-        float c = Klc * sin_a * length(vel.xy) - cap;
+        float c = Klc * max(0.05, abs(sin_a)) * length(vel.xy) - cap;
+        // float c = Klc * sin_a * length(vel.xy) - cap;
 
         float bt;
         float s1;

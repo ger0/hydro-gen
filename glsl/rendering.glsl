@@ -46,7 +46,7 @@ const int SEDIMENT  = 0x05;
 const float max_dist    = 2048.0;
 const int   max_steps   = 1024;
 
-const vec3 light_dir    = normalize(vec3(0.0, -0.7, -1.0));
+const vec3 light_dir    = normalize(vec3(0.0, -0.7, 1.0));
 const vec3 light_color  = normalize(vec3(0.09, 0.075, 0.04));
 
 // diffuse colours
@@ -508,5 +508,18 @@ void main() {
     vec3 color = get_pixel_color(pos, ray_dir);
     // gamma correction
     color = pow(color, vec3(1.0 / 2.2));
+
+#ifdef LOW_RES_DIV3
+    imageStore(out_tex, pixel * 3, vec4(color, 0));
+    imageStore(out_tex, pixel * 3 + ivec2(1, 0), vec4(color, 0));
+    imageStore(out_tex, pixel * 3 + ivec2(2, 0), vec4(color, 0));
+    imageStore(out_tex, pixel * 3 + ivec2(0, 1), vec4(color, 0));
+    imageStore(out_tex, pixel * 3 + ivec2(0, 2), vec4(color, 0));
+    imageStore(out_tex, pixel * 3 + ivec2(1, 1), vec4(color, 0));
+    imageStore(out_tex, pixel * 3 + ivec2(2, 1), vec4(color, 0));
+    imageStore(out_tex, pixel * 3 + ivec2(1, 2), vec4(color, 0));
+    imageStore(out_tex, pixel * 3 + ivec2(2, 2), vec4(color, 0));
+#else
     imageStore(out_tex, pixel, vec4(color, 0));
+#endif
 }

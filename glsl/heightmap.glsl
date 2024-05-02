@@ -39,7 +39,7 @@ float round_mask(float val, vec2 uv) {
 }
 
 float slope_mask(float v, vec2 uv) {
-    return v * uv.x;
+    return 0.25 * v + 0.75 * (v * uv.x * uv.y);
 }
 
 float power_mask(float val) {
@@ -107,7 +107,7 @@ void main() {
     
     vec4 terrain = vec4(
         min(height_scale, val * height_scale * height_multiplier), 
-        1.0 + rand(store_pos), 
+        4.0 + rand(store_pos), 
         0.0, 
         0.0
     );

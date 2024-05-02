@@ -1,6 +1,8 @@
 #define WORLD_SCALE (1.00)
 #define SED_LAYERS (2)
 
+// #define LOW_RES_DIV3
+
 #define WRKGRP_SIZE_X 8
 #define WRKGRP_SIZE_Y 8
 

@@ -404,7 +404,11 @@ bool dispatch_rendering(
     shader.set_uniform("sediment_max_cap", eros.Kc);
     shader.set_uniform("DEBUG_PREVIEW", rndr.debug_preview);
 
-    glDispatchCompute(WINDOW_W / (WRKGRP_SIZE_X), WINDOW_H / (WRKGRP_SIZE_Y), 1);
+#ifdef LOW_RES_DIV3
+    glDispatchCompute(WINDOW_W / (3 * WRKGRP_SIZE_X), WINDOW_H / (3 * WRKGRP_SIZE_Y), 1);
+#else
+    glDispatchCompute(WINDOW_W / WRKGRP_SIZE_X, WINDOW_H / WRKGRP_SIZE_Y, 1);
+#endif
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);

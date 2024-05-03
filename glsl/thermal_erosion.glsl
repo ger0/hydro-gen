@@ -14,11 +14,6 @@ layout (binding = BIND_WRITE_THERMALFLUX_C, rgba32f)
 layout (binding = BIND_WRITE_THERMALFLUX_D, rgba32f)   
 	uniform writeonly image2D out_thflux_d;
 
-uniform float max_height;
-uniform float d_t;
-
-uniform float Kalpha;
-uniform float Kspeed;
 uniform int t_layer;
 
 const float L = 1.0;

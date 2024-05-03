@@ -10,6 +10,15 @@ layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 layout (binding = BIND_HEIGHTMAP, rgba32f)
     uniform writeonly image2D dest_tex;
 
+layout (binding = BIND_VELOCITYMAP, rgba32f)
+    uniform writeonly image2D dest_vel;
+
+layout (binding = BIND_FLUXMAP, rgba32f)
+    uniform writeonly image2D dest_flux;
+
+layout (binding = BIND_SEDIMENTMAP, rgba32f)
+    uniform writeonly image2D dest_sediment;
+
 layout (std140) uniform map_cfg {
     float   height_scale;
     float   height_multiplier;
@@ -116,5 +125,9 @@ void main() {
     // terrain.b = max(0.0, 84.0 - terrain.r);
     terrain.w = terrain.r + terrain.g + terrain.b;
     imageStore(dest_tex, store_pos, terrain);
+
+    imageStore(dest_vel, store_pos, vec4(0));
+    imageStore(dest_flux, store_pos, vec4(0));
+    imageStore(dest_sediment, store_pos, vec4(0));
     //imageStore(dest_tex, store_pos, vec4(seed, lacunarity, persistance, height_scale));
 }

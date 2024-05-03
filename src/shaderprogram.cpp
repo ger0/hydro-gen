@@ -183,13 +183,16 @@ void Shader_core::use() const {
     glUseProgram(program);
 }
 
-void Compute_program::bind_uniform_block(const char* variable, GLuint bind) const  {
+void Compute_program::bind_uniform_block(const char* variable, gl::Uniform_buffer &buff) const  {
+    // this->use();
+    // glBindBuffer(GL_UNIFORM_BUFFER, buff.ubo);
     GLuint idx = glGetUniformBlockIndex(program, variable);
     if (idx == GL_INVALID_INDEX) {
         LOG_ERR("ERROR: Invalid buffer block index");
     }
-    // glUniformBlockBinding(program, idx, bind);
-    glBindBufferBase(GL_UNIFORM_BUFFER, idx, bind);
+    glUniformBlockBinding(program, idx, buff.binding);
+    // glMemoryBarrier(GL_UNIFORM_BARRIER_BIT);
+    // glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 
 GLuint Shader_core::get_attrib_location(const char* attribute) const {

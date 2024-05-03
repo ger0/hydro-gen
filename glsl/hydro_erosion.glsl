@@ -26,21 +26,9 @@ layout (binding = BIND_VELOCITYMAP, rgba32f)
 layout (binding = BIND_WRITE_VELOCITYMAP, rgba32f)   
 	uniform writeonly image2D out_velocitymap;
 
-uniform float max_height;
-float max_flux = max_height * 1000000000;
-
 #define PI 3.1415926538
 
 const float L = 1.0;
-// time step
-uniform float d_t;
-// sediment capacity constant
-uniform float Kc;
-// sediment dissolving constant
-uniform float Ks;
-// sediment deposition constant
-uniform float Kd;
-
 float find_sin_alpha(ivec2 pos, int layer) {
     float r_b = 0.0;
     float l_b = 0.0;
@@ -78,7 +66,7 @@ void main() {
     // water velocity
     // float dd = clamp(smoothstep(0.01, 6, vel.z - 0.01), 0.01, 6.0);
     float dd = vel.z;
-    if (dd < 1e-4) {
+    if (dd < 1e-8) {
         vel.xy = vec2(0,0);
     } else {
         vel.x = (
@@ -137,6 +125,7 @@ void main() {
         terrain[i] = max(0, bt);
     }
     terrain.w = terrain.r + terrain.g + terrain.b;
+    vel.w = G;
     imageStore(out_velocitymap, pos, vel);
     imageStore(out_sedimap, pos, sediment);
     imageStore(out_heightmap, pos, terrain);

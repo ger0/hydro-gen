@@ -1,8 +1,9 @@
 #version 460
+#extension GL_ARB_uniform_buffer_object : require
 
 #include "bindings.glsl"
 #include "img_interpolation.glsl"
-#line 6
+#line 7
 
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
@@ -380,7 +381,7 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
         color = get_sky_color(direction, ray.dist, sundot);
     }
     // ray hitting the surface of water
-    else if (water_h > 1e-4) {
+    else if (water_h > 1e-8) {
         // water buildup
         vec3 water_col = get_water_color(ray, direction, sundot);
         water_col = get_fog_color(water_col, ray.dist, sundot);
@@ -510,15 +511,15 @@ void main() {
     color = pow(color, vec3(1.0 / 2.2));
 
 #ifdef LOW_RES_DIV3
-    imageStore(out_tex, pixel * 3, vec4(color, 0));
-    imageStore(out_tex, pixel * 3 + ivec2(1, 0), vec4(color, 0));
-    imageStore(out_tex, pixel * 3 + ivec2(2, 0), vec4(color, 0));
-    imageStore(out_tex, pixel * 3 + ivec2(0, 1), vec4(color, 0));
-    imageStore(out_tex, pixel * 3 + ivec2(0, 2), vec4(color, 0));
-    imageStore(out_tex, pixel * 3 + ivec2(1, 1), vec4(color, 0));
-    imageStore(out_tex, pixel * 3 + ivec2(2, 1), vec4(color, 0));
-    imageStore(out_tex, pixel * 3 + ivec2(1, 2), vec4(color, 0));
-    imageStore(out_tex, pixel * 3 + ivec2(2, 2), vec4(color, 0));
+    imageStore(out_tex, pixel * 3, vec4(color, hmap_dims.x));
+    imageStore(out_tex, pixel * 3 + ivec2(1, 0), vec4(color, hmap_dims.x));
+    imageStore(out_tex, pixel * 3 + ivec2(2, 0), vec4(color, hmap_dims.x));
+    imageStore(out_tex, pixel * 3 + ivec2(0, 1), vec4(color, hmap_dims.x));
+    imageStore(out_tex, pixel * 3 + ivec2(0, 2), vec4(color, hmap_dims.x));
+    imageStore(out_tex, pixel * 3 + ivec2(1, 1), vec4(color, hmap_dims.x));
+    imageStore(out_tex, pixel * 3 + ivec2(2, 1), vec4(color, hmap_dims.x));
+    imageStore(out_tex, pixel * 3 + ivec2(1, 2), vec4(color, hmap_dims.x));
+    imageStore(out_tex, pixel * 3 + ivec2(2, 2), vec4(color, hmap_dims.x));
 #else
     imageStore(out_tex, pixel, vec4(color, 0));
 #endif

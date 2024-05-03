@@ -27,10 +27,13 @@ void bind_texture(Texture& tex, GLuint bind);
 
 struct Uniform_buffer {
     GLuint ubo;
+    GLuint binding;
 
     template <typename T>
-    void push_data(T& data, int type = GL_STATIC_DRAW) {
+    void push_data(T& data, GLuint binding, int type = GL_STATIC_DRAW) {
+        this->binding = binding;
         glBindBuffer(GL_UNIFORM_BUFFER, ubo);
+        glBindBufferBase(GL_UNIFORM_BUFFER, binding, ubo);
         glBufferData(
             GL_UNIFORM_BUFFER, 
             sizeof(data), &data, 
@@ -73,7 +76,7 @@ class Compute_program : public Shader_core {
 private:
     GLuint compute;
 public:
-    void bind_uniform_block(const char* var, GLuint bind) const;
+    void bind_uniform_block(const char* var, gl::Uniform_buffer &buff) const;
     Compute_program(std::string comput_files);
     ~Compute_program();
 };

@@ -21,9 +21,6 @@ layout (binding = BIND_SEDIMENTMAP, rgba32f)
 layout (binding = BIND_WRITE_SEDIMENTMAP, rgba32f)   
 	uniform writeonly image2D out_sedimap;
 
-uniform float Ke;
-uniform float d_t;
-
 vec4 img_bilinear(readonly image2D img, vec2 sample_pos) {
     ivec2 pos = ivec2(sample_pos);
     vec2 s_pos = fract(sample_pos);

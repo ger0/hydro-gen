@@ -53,14 +53,14 @@ protected:
     GLuint program;
     GLuint load_shader(GLenum shader_type, std::string filename);
     std::unordered_map<std::string, GLuint> cached_bindings;
+
+    // GLuint get_attrib_location(const char* attribute) const;
+    GLuint get_uniform_location(std::string uniform);
 public:
     void use() const;
-    GLuint get_attrib_location(const char* attribute) const;
-    GLuint get_uniform_location(const char* uniform) const;
 
     template<typename T>
-    void set_uniform(const char* id, T const& v) const;
-    void set_texture(gl::Texture texture, std::string str);
+    void set_uniform(const char* id, T const& v);
 };
 
 class Shader_program : public Shader_core {

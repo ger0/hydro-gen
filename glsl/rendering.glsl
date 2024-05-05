@@ -381,7 +381,7 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
         color = get_sky_color(direction, ray.dist, sundot);
     }
     // ray hitting the surface of water
-    else if (water_h > 1e-8) {
+    else if (water_h > 1e-12) {
         // water buildup
         vec3 water_col = get_water_color(ray, direction, sundot);
         water_col = get_fog_color(water_col, ray.dist, sundot);

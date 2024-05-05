@@ -13,6 +13,9 @@
 
 #include "../glsl/bindings.glsl"
 
+// TODO: REMOVE
+bool should_hydro_erode = true;
+
 constexpr u32 WINDOW_W = 1600;
 constexpr u32 WINDOW_H = 900;
 
@@ -24,7 +27,7 @@ constexpr float Z_FAR = 2048.f;
 constexpr float FOV = 90.f;
 constexpr float ASPECT_RATIO = float(WINDOW_W) / WINDOW_H;
 
-constexpr GLuint NOISE_SIZE = 512;
+constexpr GLuint NOISE_SIZE = 128;
 
 // shader filenames
 constexpr auto noise_comput_file                = "heightmap.glsl";
@@ -36,6 +39,7 @@ constexpr auto erosion_hydro_erosion_file       = "hydro_erosion.glsl";
 constexpr auto erosion_thermal_flux_file        = "thermal_erosion.glsl";
 constexpr auto erosion_thermal_transport_file   = "thermal_transport.glsl";
 constexpr auto erosion_sediment_file            = "sediment_transport.glsl";
+constexpr auto erosion_smooth_file              = "smoothing.glsl";
 
 using glm::normalize, glm::cross;
 using glm::vec2, glm::vec3, glm::ivec2, glm::ivec3;
@@ -136,15 +140,15 @@ struct Map_settings {
 struct Erosion_settings {
     gl::Uniform_buffer buffer;
     Erosion_data data = {
-        .Kc = 0.020,
-        .Ks = 0.001,
-        .Kd = 0.001,
-        .Ke = 0.05,
-        .G = 9.81,
+        .Kc = 0.060,
+        .Ks = 0.00036,
+        .Kd = 0.00006,
+        .Ke = 0.003,
+        .G = 1.0,
         .ENERGY_KEPT = 1.0,
         .Kalpha = 1.2f,
-        .Kspeed = 0.25f,
-        .d_t = 0.003
+        .Kspeed = 8.25f,
+        .d_t = 0.001,
     };
     void push_data() {
         buffer.push_data(this->data, BIND_UNIFORM_EROSION);
@@ -198,14 +202,14 @@ struct Tex_pair {
         gl::gen_texture(t1);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
         gl::gen_texture(t2);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
         gl::bind_texture(t1, r_bind);
         gl::bind_texture(t2, w_bind);
@@ -265,9 +269,11 @@ void delete_world_data(World_data& data) {
 void dispatch_rain(Compute_program& program, const World_data& data, Rain_settings& set) {
     program.use();
     program.set_uniform("time", data.time);
-    glMemoryBarrier(GL_ALL_BARRIER_BITS);
+    // glMemoryBarrier(GL_ALL_BARRIER_BITS);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
-    glMemoryBarrier(GL_ALL_BARRIER_BITS);
+    // glMemoryBarrier(GL_ALL_BARRIER_BITS);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
 
 void dispatch_erosion(
@@ -276,6 +282,7 @@ void dispatch_erosion(
         Compute_program& tflux,
         Compute_program& ttrans,
         Compute_program& sedim,
+        Compute_program& smooth,
         World_data& data,
         Erosion_settings& set
     ) {
@@ -284,6 +291,7 @@ void dispatch_erosion(
         if (layer != -1) {
             program.set_uniform("t_layer", layer);
         }
+        // program.set_uniform("should_hydro_erode", should_hydro_erode);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -311,6 +319,9 @@ void dispatch_erosion(
     run(sedim);
     data.heightmap.swap();
     data.sediment.swap();
+
+    run(smooth);
+    data.heightmap.swap();
 }
 
 struct Render_data {
@@ -573,6 +584,9 @@ void draw_ui(
     if (ImGui::Button("Set Erosion Settings")) {
         erosion.push_data();
     }
+    if (ImGui::Button(should_hydro_erode ? "STOP HYDRO EROSION" : "ERODEEEE!!!")) {
+        should_hydro_erode = !should_hydro_erode;
+    }
 
     ImGui::SeparatorText("General");
     ImGui::SliderFloat("Raymarching precision", &render.prec, 0.01f, 1.f);
@@ -639,6 +653,7 @@ int main(int argc, char* argv[]) {
     Compute_program comput_thermal_flux(erosion_thermal_flux_file);
     Compute_program comput_thermal_trans(erosion_thermal_transport_file);
     Compute_program comput_sediment(erosion_sediment_file);
+    Compute_program comput_smooth(erosion_smooth_file);
 
     World_data world_data = gen_world_data(NOISE_SIZE, NOISE_SIZE);
     defer{delete_world_data(world_data);};
@@ -702,6 +717,7 @@ int main(int argc, char* argv[]) {
                 comput_thermal_flux, 
                 comput_thermal_trans, 
                 comput_sediment, 
+                comput_smooth, 
                 world_data, 
                 erosion_settings
             );

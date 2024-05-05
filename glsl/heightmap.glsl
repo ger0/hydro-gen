@@ -116,10 +116,22 @@ void main() {
     
     vec4 terrain = vec4(
         min(height_scale, val * height_scale * height_multiplier), 
-        4.0 + rand(store_pos), 
+        10.0 /* + rand(store_pos) */ ,
         0.0, 
         0.0
     );
+    /* terrain = vec4(
+        store_pos.x * 2.0,
+        0,
+        0,
+        0
+    ); */
+    /* terrain = vec4(
+        10.0,
+        20.0, 
+        0.0, 
+        0.0
+    ); */
     // water height
     // terrain.b += 84.4;
     // terrain.b = max(0.0, 84.0 - terrain.r);

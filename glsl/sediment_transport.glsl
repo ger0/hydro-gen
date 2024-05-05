@@ -43,28 +43,39 @@ vec4 img_bilinear(readonly image2D img, vec2 sample_pos) {
 }
 
 vec4 get_lerp_sed(vec2 back_coords) {
-    if (back_coords.x < 0.0 || back_coords.x > (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1.0) ||
-    back_coords.y < 0.0 || back_coords.y > (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1.0)) {
-        return vec4(0.0);
-    }
     return img_bilinear(sedimap, back_coords);
 }
 
 vec4 get_img(readonly image2D img, ivec2 pos) {
-    if (pos.x < 0 || pos.x > (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
-    pos.y < 0 || pos.y > (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1)) {
-       return vec4(0, 0, 0, 0); 
-    }
     return imageLoad(img, pos);
+}
+
+// Semi-Lagrangian MacCormack method for backward advection
+vec2 mac_cormack_backward(vec2 currentCoords, readonly image2D velocityField, float dt) {
+    // Forward advection
+    vec2 velocity = img_bilinear(velocityField, currentCoords).xy;
+    vec2 advectedCoords = currentCoords - velocity * dt;
+
+    // Backward advection
+    vec2 advectedVelocity = img_bilinear(velocityField, advectedCoords).xy;
+    vec2 backCoords = currentCoords + advectedVelocity * dt;
+
+    // MacCormack correction
+    vec2 correctedVelocity = img_bilinear(velocityField, backCoords).xy;
+    return 0.5 * (backCoords + (currentCoords - correctedVelocity * dt));
 }
 
 void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
 
     vec4 vel = imageLoad(velocitymap, pos);
-	vec2 v = vel.xy;
     vec2 back_coords = vec2(pos.x - vel.x * d_t, pos.y - vel.y * d_t);
+    // vec2 coords = mac_cormack_backward(gl_GlobalInvocationID.xy, velocitymap, d_t);
     vec4 st = get_lerp_sed(back_coords);
+    // vec4 st = imageLoad(sedimap, pos);
+    // vec4 pre_st = imageLoad(sedimap, pos);
+    // trying to counter mass loss?
+    // st = (100.0 * st + pre_st) / 101.0;
 
     vec4 terrain = imageLoad(heightmap, pos);
     terrain.b *= (1 - Ke * d_t);

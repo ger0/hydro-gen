@@ -70,8 +70,9 @@ void main() {
 
     vec4 vel = imageLoad(velocitymap, pos);
     vec2 back_coords = vec2(pos.x - vel.x * d_t, pos.y - vel.y * d_t);
-    // vec2 coords = mac_cormack_backward(gl_GlobalInvocationID.xy, velocitymap, d_t);
+    // vec2 back_coords = mac_cormack_backward(gl_GlobalInvocationID.xy, velocitymap, d_t);
     vec4 st = get_lerp_sed(back_coords);
+
     // vec4 st = imageLoad(sedimap, pos);
     // vec4 pre_st = imageLoad(sedimap, pos);
     // trying to counter mass loss?

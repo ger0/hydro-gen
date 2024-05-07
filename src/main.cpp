@@ -88,28 +88,28 @@ static struct Game_state {
 
 
 struct Rain_settings {
-    gl::Uniform_buffer buffer;
+    gl::Buffer buffer;
     Rain_data data {
         .max_height = MAX_HEIGHT,
-        .amount = 0.00001f,
+        .amount = 0.01f,
         .mountain_thresh = 0.55f,
-        .mountain_multip = 0.005f,
-        .period = 2,
+        .mountain_multip = 0.05f,
+        .period = 512,
         .drops = 0.02f
     };
     void push_data() {
         buffer.push_data(this->data, BIND_UNIFORM_RAIN_SETTINGS);
     }
     Rain_settings() {
-        gl::gen_uniform_buffer(this->buffer);
+        gl::gen_buffer(this->buffer);
     }
     ~Rain_settings() {
-        gl::delete_uniform_buffer(this->buffer);
+        gl::del_buffer(this->buffer);
     }
 };
 
 struct Map_settings {
-    gl::Uniform_buffer buffer;
+    gl::Buffer buffer;
     struct Data {
         alignas(sizeof(GLfloat)) GLfloat height_scale   = MAX_HEIGHT;
         alignas(sizeof(GLfloat)) GLfloat height_mult    = 1.0;
@@ -130,15 +130,15 @@ struct Map_settings {
         buffer.push_data(this->data, BIND_UNIFORM_MAP_SETTINGS);
     }
     Map_settings() {
-        gl::gen_uniform_buffer(this->buffer);
+        gl::gen_buffer(this->buffer);
     }
     ~Map_settings() {
-        gl::delete_uniform_buffer(this->buffer);
+        gl::del_buffer(this->buffer);
     }
 };
 
 struct Erosion_settings {
-    gl::Uniform_buffer buffer;
+    gl::Buffer buffer;
     Erosion_data data = {
         .Kc = 0.060,
         .Ks = 0.00036,
@@ -154,10 +154,10 @@ struct Erosion_settings {
         buffer.push_data(this->data, BIND_UNIFORM_EROSION);
     }
     Erosion_settings() {
-        gl::gen_uniform_buffer(this->buffer);
+        gl::gen_buffer(this->buffer);
     }
     ~Erosion_settings() {
-        gl::delete_uniform_buffer(this->buffer);
+        gl::del_buffer(this->buffer);
     }
 };
 
@@ -234,6 +234,8 @@ struct World_data {
     // thermal erosion
     Tex_pair thermal_c;
     Tex_pair thermal_d;
+
+    gl::Buffer mass_buffer;
 };
 
 World_data gen_world_data(const GLuint width, const GLuint height) {
@@ -246,6 +248,15 @@ World_data gen_world_data(const GLuint width, const GLuint height) {
     Tex_pair thermal_c(GL_READ_WRITE, width, height, BIND_THERMALFLUX_C, BIND_WRITE_THERMALFLUX_C);
     // ------------- diagonal flux for thermal erosion -----------
     Tex_pair thermal_d(GL_READ_WRITE, width, height, BIND_THERMALFLUX_D, BIND_WRITE_THERMALFLUX_D);
+    Mass_count mass_struct {
+        // 0.f, 0.f, 0.f, 0.f, 0.f, 0.f
+        0, 0, 0, 0, 0, 0 
+    };
+    gl::Buffer mass_buffer {
+        .type = GL_SHADER_STORAGE_BUFFER
+    };
+    gl::gen_buffer(mass_buffer);
+    mass_buffer.push_data(mass_struct, BIND_STORAGE_MASS_COUNT);
 
     return World_data {
         .heightmap = heightmap,
@@ -253,7 +264,8 @@ World_data gen_world_data(const GLuint width, const GLuint height) {
         .velocity = velocity,
         .sediment = sediment,
         .thermal_c = thermal_c,
-        .thermal_d = thermal_d
+        .thermal_d = thermal_d,
+        .mass_buffer = mass_buffer
     };
 };
 
@@ -264,6 +276,7 @@ void delete_world_data(World_data& data) {
     data.sediment.delete_textures();
     data.thermal_c.delete_textures();
     data.thermal_d.delete_textures();
+    gl::del_buffer(data.mass_buffer);
 }
 
 void dispatch_rain(Compute_program& program, const World_data& data, Rain_settings& set) {
@@ -327,7 +340,7 @@ void dispatch_erosion(
 struct Render_data {
     GLuint framebuffer;
     gl::Texture output_texture;
-    gl::Uniform_buffer config_buff;
+    gl::Buffer config_buff;
 
     float   prec = 0.35;
     bool    display_sediment = false;
@@ -337,7 +350,7 @@ struct Render_data {
 void delete_renderer(Render_data& data) {
     glDeleteFramebuffers(1, &data.framebuffer);
     gl::delete_texture(data.output_texture);
-    gl::delete_uniform_buffer(data.config_buff);
+    gl::del_buffer(data.config_buff);
 }
 
 bool prepare_rendering(
@@ -363,7 +376,7 @@ bool prepare_rendering(
         alignas(sizeof(GLint) * 2) ivec2 dims          = ivec2(NOISE_SIZE, NOISE_SIZE);
     } conf_buff;
 
-    gl::gen_uniform_buffer(rndr.config_buff);
+    gl::gen_buffer(rndr.config_buff);
     rndr.config_buff.push_data(conf_buff, BIND_UNIFORM_CONFIG);
     program.bind_uniform_block("config", rndr.config_buff);
     gl::bind_texture(rndr.output_texture, BIND_DISPLAY_TEXTURE);
@@ -514,6 +527,7 @@ void gen_heightmap(
     program.use();
     map.push_data();
     program.bind_uniform_block("map_cfg", map.buffer);
+    // program.bind_storage_buffer("mass_data", world_data.mass_buffer);
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
     glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
     glMemoryBarrier(GL_ALL_BARRIER_BITS);

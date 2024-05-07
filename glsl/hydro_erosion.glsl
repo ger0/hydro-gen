@@ -65,7 +65,7 @@ void main() {
     // water velocity
     // float dd = clamp(smoothstep(0.01, 6, vel.z - 0.01), 0.01, 6.0);
     float dd = vel.z;
-    if (dd < 1e-12) {
+    if (dd < 1e-04) {
         vel.xy = vec2(0, 0);
     } else {
         vel.x = (
@@ -89,11 +89,11 @@ void main() {
         // sediment capacity constant for a layer
         // float Klc = Kc * (10 * i + 1);
         float Klc = Kc;
-        float Kls = d_t * Ks * (100.0 * i + 1.0);
-        float Kld = d_t * Kd * (100.0 * i + 1.0);
+        float Kls = d_t * Ks * (10.0 * i + 1.0);
+        float Kld = d_t * Kd * (10.0 * i + 1.0);
         // sediment transport capacity
-        // float c = Klc * max(0.05, abs(sin_a)) * length(vel.xy);
-        float c = max(0.0, Klc * sin_a * length(vel.xy) - cap);
+        float c = max(0.0, Klc * max(0.10, sin_a) * length(vel.xy) - cap);
+        // float c = max(0.0, Klc * sin_a * length(vel.xy) - cap);
 
         float bt;
         float s1;

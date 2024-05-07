@@ -39,11 +39,11 @@ namespace gl {
     void delete_texture(Texture& tex) {
         glDeleteTextures(1, &tex.texture);
     }
-    void gen_uniform_buffer(Uniform_buffer& buff) {
-        glGenBuffers(1, &buff.ubo);
+    void gen_buffer(Buffer& buff) {
+        glGenBuffers(1, &buff.bo);
     }
-    void delete_uniform_buffer(Uniform_buffer& buff) {
-        glDeleteBuffers(1, &buff.ubo);
+    void del_buffer(Buffer& buff) {
+        glDeleteBuffers(1, &buff.bo);
     }
 }
 
@@ -183,16 +183,20 @@ void Shader_core::use() const {
     glUseProgram(program);
 }
 
-void Compute_program::bind_uniform_block(const char* variable, gl::Uniform_buffer &buff) const  {
-    // this->use();
-    // glBindBuffer(GL_UNIFORM_BUFFER, buff.ubo);
+void Compute_program::bind_uniform_block(const char* variable, gl::Buffer &buff) const  {
     GLuint idx = glGetUniformBlockIndex(program, variable);
     if (idx == GL_INVALID_INDEX) {
         LOG_ERR("ERROR: Invalid buffer block index");
     }
     glUniformBlockBinding(program, idx, buff.binding);
-    // glMemoryBarrier(GL_UNIFORM_BARRIER_BIT);
-    // glBindBuffer(GL_UNIFORM_BUFFER, 0);
+}
+
+void Compute_program::bind_storage_buffer(const char* variable, gl::Buffer &buff) const {
+    GLuint idx = glGetProgramResourceIndex(program, GL_SHADER_STORAGE_BLOCK, variable);
+    if (idx == GL_INVALID_INDEX) {
+        LOG_ERR("ERROR: Invalid shader buffer index");
+    }
+    glShaderStorageBlockBinding(program, idx, buff.binding);
 }
 
 /* GLuint Shader_core::get_attrib_location(const char* attribute) const {

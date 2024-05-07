@@ -36,6 +36,10 @@ layout (std140) uniform map_cfg {
     bool    mask_slope;
 };
 
+layout (std430, binding = BIND_STORAGE_MASS_COUNT) buffer Mass_storage {
+    Mass_count mass;
+};
+
 // Function to generate a random float in the range [0, 1]
 float rand(vec2 co) {
     return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
@@ -114,9 +118,12 @@ void main() {
         val = slope_mask(val, uv);
     }
     
+    float rock_val = min(height_scale, val * height_scale * height_multiplier);
+    float dirt_val = 10.0;
+
     vec4 terrain = vec4(
-        min(height_scale, val * height_scale * height_multiplier), 
-        10.0 /* + rand(store_pos) */ ,
+        rock_val,
+        dirt_val,
         0.0, 
         0.0
     );
@@ -137,9 +144,10 @@ void main() {
     // terrain.b = max(0.0, 84.0 - terrain.r);
     terrain.w = terrain.r + terrain.g + terrain.b;
     imageStore(dest_tex, store_pos, terrain);
-
     imageStore(dest_vel, store_pos, vec4(0));
     imageStore(dest_flux, store_pos, vec4(0));
     imageStore(dest_sediment, store_pos, vec4(0));
+
+    // atomicAdd(mass.orig_dirt, dirt_val);
     //imageStore(dest_tex, store_pos, vec4(seed, lacunarity, persistance, height_scale));
 }

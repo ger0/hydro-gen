@@ -29,15 +29,19 @@
 #define BIND_UNIFORM_MAP_SETTINGS 2
 #define BIND_UNIFORM_RAIN_SETTINGS 3
 
+#define BIND_STORAGE_MASS_COUNT 4
+
 #if defined(GL_core_profile)
     #define BLOCK layout (std140, binding = BIND_UNIFORM_EROSION) uniform
     #define GL(X) X
     #define FLOAT float
     #define INT int
+    #define UINT uint
 #else 
     #define BLOCK struct
     #define FLOAT GLfloat
     #define INT GLint
+    #define UINT GLuint
     #define GL(X) alignas(sizeof(X)) X
 #endif
 
@@ -52,18 +56,13 @@ BLOCK Erosion_data {
     GL(FLOAT) Kspeed;
     GL(FLOAT) d_t;
 };
+
 #undef BLOCK
 
 #if defined(GL_core_profile)
     #define BLOCK layout (std140, binding = BIND_UNIFORM_RAIN_SETTINGS) uniform
-    #define GL(X) X
-    #define FLOAT float
-    #define INT int
 #else 
     #define BLOCK struct
-    #define FLOAT GLfloat
-    #define INT GLint
-    #define GL(X) alignas(sizeof(X)) X
 #endif
 
 struct Rain_data {
@@ -75,7 +74,13 @@ struct Rain_data {
     GL(FLOAT)   drops;
 };
 
-#undef FLOAT
-#undef INT
-#undef GL
+// countering the loss of sediment mass
+struct Mass_count {
+    GL(FLOAT)   orig_rock;
+    GL(FLOAT)   orig_dirt;
 
+    GL(FLOAT)   curr_rock;
+    GL(FLOAT)   curr_dirt;
+    GL(FLOAT)   sedi_rock;
+    GL(FLOAT)   sedi_dirt;
+};

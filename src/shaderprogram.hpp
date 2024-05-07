@@ -25,25 +25,30 @@ void gen_texture(Texture& tex,
 void delete_texture(Texture& tex);
 void bind_texture(Texture& tex, GLuint bind);
 
-struct Uniform_buffer {
-    GLuint ubo;
-    GLuint binding;
+struct Buffer {
+    GLuint  bo;
+    GLuint  binding;
+    GLint   type = GL_UNIFORM_BUFFER;
 
     template <typename T>
-    void push_data(T& data, GLuint binding, int type = GL_STATIC_DRAW) {
+    void push_data(
+        T& data,
+        GLuint binding, 
+        int mode = GL_STATIC_DRAW
+    ) {
         this->binding = binding;
-        glBindBuffer(GL_UNIFORM_BUFFER, ubo);
-        glBindBufferBase(GL_UNIFORM_BUFFER, binding, ubo);
+        glBindBuffer(type, bo);
+        glBindBufferBase(type, binding, bo);
         glBufferData(
-            GL_UNIFORM_BUFFER, 
+            type, 
             sizeof(data), &data, 
-            type
+            mode
         );
-        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+        glBindBuffer(type, 0);
     }
 };
-void gen_uniform_buffer(Uniform_buffer& buff);
-void delete_uniform_buffer(Uniform_buffer& buff);
+void gen_buffer(Buffer& buff);
+void del_buffer(Buffer& buff);
 
 };
 
@@ -76,7 +81,8 @@ class Compute_program : public Shader_core {
 private:
     GLuint compute;
 public:
-    void bind_uniform_block(const char* var, gl::Uniform_buffer &buff) const;
+    void bind_uniform_block(const char* var, gl::Buffer &buff) const;
+    void bind_storage_buffer(const char* variable, gl::Buffer &buff) const;
     Compute_program(std::string comput_files);
     ~Compute_program();
 };

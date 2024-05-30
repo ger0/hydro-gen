@@ -12,6 +12,10 @@ layout (std140) uniform config {
     ivec2 hmap_dims;
 };
 
+layout(std430, binding = BIND_PARTICLE_BUFFER) buffer ParticleBuffer {
+    Particle particles[];
+};
+
 // TODO: Move this out to a special buffer
 uniform mat4 perspective;
 uniform mat4 view;

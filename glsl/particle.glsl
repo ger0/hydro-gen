@@ -29,11 +29,47 @@ float random(uint x) {
     return float(hash(x)) / float(0xFFFFFFFFu);
 }
 
+vec4 get_heightmap(vec2 sample_pos) {
+    ivec2 pos = ivec2(sample_pos);
+    vec2 s_pos = fract(sample_pos);
+    vec4 v1 = mix(
+        imageLoad(heightmap, ivec2(pos)), 
+        imageLoad(heightmap, ivec2(pos) + ivec2(1, 0)),
+        s_pos.x
+    );
+    vec4 v2 = mix(
+        imageLoad(heightmap, ivec2(pos) + ivec2(0, 1)), 
+        imageLoad(heightmap, ivec2(pos) + ivec2(1, 1)),
+        s_pos.x
+    );
+    vec4 value = mix(
+        v1, 
+        v2, 
+        s_pos.y
+    );
+    return value;
+}
+
+vec3 get_terr_normal(vec2 pos) {
+    vec2 r = get_heightmap(pos + vec2( 1.0, 0)).rg;
+    vec2 l = get_heightmap(pos + vec2(-1.0, 0)).rg;
+    vec2 b = get_heightmap(pos + vec2( 0,-1.0)).rg;
+    vec2 t = get_heightmap(pos + vec2( 0, 1.0)).rg;
+    float dx = (
+        r.r + r.g - l.r - l.g
+    );
+    float dz = (
+        t.r + t.g - b.r - b.g
+    );
+    return normalize(cross(vec3(2.0, dx, 0), vec3(0, dz, 2.0)));
+}
+
 void main() {
     uint id = gl_GlobalInvocationID.x;
     vec2 pos = vec2(
-        random(uint(id * time * 1000.0)),
-        random(uint((id + 1) * time * 1000.0))
+        random(uint(id * time * 1000.0)) * 100.0,
+        random(uint((id + 1) * time * 1000.0)) * 100.0
     );
     particles[id].position = pos;
+    vec3 norm = get_terr_normal()
 }

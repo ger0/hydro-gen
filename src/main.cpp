@@ -238,6 +238,7 @@ struct World_data {
     Tex_pair thermal_c;
     Tex_pair thermal_d;
 
+    gl::Texture lockmap;
     gl::Buffer particle_buffer;
 };
 
@@ -289,9 +290,11 @@ void dispatch_rain(Compute_program& program, const World_data& data, Rain_settin
 }
 
 void dispatch_particle(
-        Compute_program& program 
+        Compute_program& program, const World_data& data
 ) {
-
+    program.use();
+    program.set_uniform("time", data.time);
+    glDispatchCompute(PARTICLE_COUNT, 1, 1);
 }
 
 void dispatch_erosion(
@@ -738,7 +741,7 @@ int main(int argc, char* argv[]) {
                 world_data, 
                 erosion_settings
             ); */
-            // dispatch_particle();
+            dispatch_particle(comput_particle, world_data);
             erosion_d_time = glfwGetTime() - erosion_d_time;
             state.erosion_time += erosion_d_time;
             // calculate average erosion update time

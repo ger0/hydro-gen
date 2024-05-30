@@ -24,6 +24,8 @@
 #define BIND_WRITE_THERMALFLUX_C 11
 #define BIND_WRITE_THERMALFLUX_D 12
 
+#define BIND_LOCKMAP 13
+
 #define BIND_UNIFORM_CONFIG 0
 #define BIND_UNIFORM_EROSION 1
 #define BIND_UNIFORM_MAP_SETTINGS 2
@@ -39,6 +41,7 @@
     #define INT int
     #define UINT uint
     #define VEC2 vec2
+    #define BOOL bool
 #else 
     #define BLOCK struct
     #define FLOAT GLfloat
@@ -46,6 +49,7 @@
     #define UINT GLuint
     #define GL(X) alignas(sizeof(X)) X
     #define VEC2 glm::vec2
+    #define BOOL GLboolean
 #endif
 
 BLOCK Erosion_data {
@@ -82,4 +86,5 @@ struct Particle {
     GL(VEC2)    speed;
     GL(FLOAT)   volume;
     GL(FLOAT)   sediment;
+    GL(BOOL)    alive = false;
 };

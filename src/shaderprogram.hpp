@@ -29,14 +29,10 @@ struct Buffer {
     GLuint  bo;
     GLuint  binding;
     GLint   type = GL_UNIFORM_BUFFER;
+    GLint   mode = GL_STATIC_DRAW;
 
     template <typename T>
-    void push_data(
-        T& data,
-        GLuint binding, 
-        int mode = GL_STATIC_DRAW
-    ) {
-        this->binding = binding;
+    void push_data(T& data) {
         glBindBuffer(type, bo);
         glBindBufferBase(type, binding, bo);
         glBufferData(
@@ -48,6 +44,7 @@ struct Buffer {
     }
 };
 void gen_buffer(Buffer& buff);
+void gen_buffer(Buffer& buff, size_t size);
 void del_buffer(Buffer& buff);
 
 };

@@ -30,6 +30,7 @@
 #define BIND_UNIFORM_RAIN_SETTINGS 3
 
 #define BIND_STORAGE_MASS_COUNT 4
+#define BIND_PARTICLE_BUFFER 5
 
 #if defined(GL_core_profile)
     #define BLOCK layout (std140, binding = BIND_UNIFORM_EROSION) uniform
@@ -37,12 +38,14 @@
     #define FLOAT float
     #define INT int
     #define UINT uint
+    #define VEC2 vec2
 #else 
     #define BLOCK struct
     #define FLOAT GLfloat
     #define INT GLint
     #define UINT GLuint
     #define GL(X) alignas(sizeof(X)) X
+    #define VEC2 glm::vec2
 #endif
 
 BLOCK Erosion_data {
@@ -74,13 +77,9 @@ struct Rain_data {
     GL(FLOAT)   drops;
 };
 
-// countering the loss of sediment mass
-struct Mass_count {
-    GL(FLOAT)   orig_rock;
-    GL(FLOAT)   orig_dirt;
-
-    GL(FLOAT)   curr_rock;
-    GL(FLOAT)   curr_dirt;
-    GL(FLOAT)   sedi_rock;
-    GL(FLOAT)   sedi_dirt;
+struct Particle {
+    GL(VEC2)    position;
+    GL(VEC2)    speed;
+    GL(FLOAT)   volume;
+    GL(FLOAT)   sediment;
 };

@@ -13,11 +13,10 @@
 
 #include "../glsl/bindings.glsl"
 
-// TODO: REMOVE
-bool should_hydro_erode = true;
-
 constexpr u32 WINDOW_W = 1600;
 constexpr u32 WINDOW_H = 900;
+
+constexpr u32 PARTICLE_COUNT = 128;
 
 constexpr float MAX_HEIGHT = 256.f;
 constexpr float WATER_HEIGHT = 96.f;
@@ -40,6 +39,7 @@ constexpr auto erosion_thermal_flux_file        = "thermal_erosion.glsl";
 constexpr auto erosion_thermal_transport_file   = "thermal_transport.glsl";
 constexpr auto erosion_sediment_file            = "sediment_transport.glsl";
 constexpr auto erosion_smooth_file              = "smoothing.glsl";
+constexpr auto erosion_particle_file            = "particle.glsl";
 
 using glm::normalize, glm::cross;
 using glm::vec2, glm::vec3, glm::ivec2, glm::ivec3;
@@ -98,13 +98,14 @@ struct Rain_settings {
         .drops = 0.02f
     };
     void push_data() {
-        buffer.push_data(this->data, BIND_UNIFORM_RAIN_SETTINGS);
+        buffer.push_data(data);
     }
     Rain_settings() {
-        gl::gen_buffer(this->buffer);
+        buffer.binding = BIND_UNIFORM_RAIN_SETTINGS;
+        gl::gen_buffer(buffer);
     }
     ~Rain_settings() {
-        gl::del_buffer(this->buffer);
+        gl::del_buffer(buffer);
     }
 };
 
@@ -127,13 +128,14 @@ struct Map_settings {
         alignas(sizeof(GLuint))  GLuint  mask_slope   = false;
     } data;
     void push_data() {
-        buffer.push_data(this->data, BIND_UNIFORM_MAP_SETTINGS);
+        buffer.push_data(data);
     }
     Map_settings() {
-        gl::gen_buffer(this->buffer);
+        buffer.binding = BIND_UNIFORM_MAP_SETTINGS;
+        gl::gen_buffer(buffer);
     }
     ~Map_settings() {
-        gl::del_buffer(this->buffer);
+        gl::del_buffer(buffer);
     }
 };
 
@@ -151,13 +153,14 @@ struct Erosion_settings {
         .d_t = 0.001,
     };
     void push_data() {
-        buffer.push_data(this->data, BIND_UNIFORM_EROSION);
+        buffer.push_data(data);
     }
     Erosion_settings() {
-        gl::gen_buffer(this->buffer);
+        buffer.binding = BIND_UNIFORM_EROSION;
+        gl::gen_buffer(buffer);
     }
     ~Erosion_settings() {
-        gl::del_buffer(this->buffer);
+        gl::del_buffer(buffer);
     }
 };
 
@@ -235,7 +238,7 @@ struct World_data {
     Tex_pair thermal_c;
     Tex_pair thermal_d;
 
-    gl::Buffer mass_buffer;
+    gl::Buffer particle_buffer;
 };
 
 World_data gen_world_data(const GLuint width, const GLuint height) {
@@ -248,15 +251,11 @@ World_data gen_world_data(const GLuint width, const GLuint height) {
     Tex_pair thermal_c(GL_READ_WRITE, width, height, BIND_THERMALFLUX_C, BIND_WRITE_THERMALFLUX_C);
     // ------------- diagonal flux for thermal erosion -----------
     Tex_pair thermal_d(GL_READ_WRITE, width, height, BIND_THERMALFLUX_D, BIND_WRITE_THERMALFLUX_D);
-    Mass_count mass_struct {
-        // 0.f, 0.f, 0.f, 0.f, 0.f, 0.f
-        0, 0, 0, 0, 0, 0 
-    };
-    gl::Buffer mass_buffer {
+    gl::Buffer particle_buffer {
+        .binding = BIND_PARTICLE_BUFFER,
         .type = GL_SHADER_STORAGE_BUFFER
     };
-    gl::gen_buffer(mass_buffer);
-    mass_buffer.push_data(mass_struct, BIND_STORAGE_MASS_COUNT);
+    gl::gen_buffer(particle_buffer, PARTICLE_COUNT);
 
     return World_data {
         .heightmap = heightmap,
@@ -265,7 +264,7 @@ World_data gen_world_data(const GLuint width, const GLuint height) {
         .sediment = sediment,
         .thermal_c = thermal_c,
         .thermal_d = thermal_d,
-        .mass_buffer = mass_buffer
+        .particle_buffer = particle_buffer
     };
 };
 
@@ -276,7 +275,7 @@ void delete_world_data(World_data& data) {
     data.sediment.delete_textures();
     data.thermal_c.delete_textures();
     data.thermal_d.delete_textures();
-    gl::del_buffer(data.mass_buffer);
+    // gl::del_buffer(data.mass_buffer);
 }
 
 void dispatch_rain(Compute_program& program, const World_data& data, Rain_settings& set) {
@@ -287,6 +286,12 @@ void dispatch_rain(Compute_program& program, const World_data& data, Rain_settin
     glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
     // glMemoryBarrier(GL_ALL_BARRIER_BITS);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+}
+
+void dispatch_particle(
+        Compute_program& program 
+) {
+
 }
 
 void dispatch_erosion(
@@ -304,7 +309,6 @@ void dispatch_erosion(
         if (layer != -1) {
             program.set_uniform("t_layer", layer);
         }
-        // program.set_uniform("should_hydro_erode", should_hydro_erode);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -376,8 +380,9 @@ bool prepare_rendering(
         alignas(sizeof(GLint) * 2) ivec2 dims          = ivec2(NOISE_SIZE, NOISE_SIZE);
     } conf_buff;
 
+    rndr.config_buff.binding = BIND_UNIFORM_CONFIG;
     gl::gen_buffer(rndr.config_buff);
-    rndr.config_buff.push_data(conf_buff, BIND_UNIFORM_CONFIG);
+    rndr.config_buff.push_data(conf_buff);
     program.bind_uniform_block("config", rndr.config_buff);
     gl::bind_texture(rndr.output_texture, BIND_DISPLAY_TEXTURE);
     glBindFramebuffer(GL_FRAMEBUFFER, rndr.framebuffer);
@@ -598,10 +603,6 @@ void draw_ui(
     if (ImGui::Button("Set Erosion Settings")) {
         erosion.push_data();
     }
-    if (ImGui::Button(should_hydro_erode ? "STOP HYDRO EROSION" : "ERODEEEE!!!")) {
-        should_hydro_erode = !should_hydro_erode;
-    }
-
     ImGui::SeparatorText("General");
     ImGui::SliderFloat("Raymarching precision", &render.prec, 0.01f, 1.f);
     ImGui::Checkbox("Display sediment", &render.display_sediment);
@@ -660,14 +661,16 @@ int main(int argc, char* argv[]) {
     Compute_program renderer(render_comput_file);
 
     Compute_program comput_map(noise_comput_file);
-    Compute_program comput_rain(rain_comput_file);
+    /* Compute_program comput_rain(rain_comput_file);
 
     Compute_program comput_hydro_flux(erosion_hydro_flux_file);
     Compute_program comput_hydro_erosion(erosion_hydro_erosion_file);
     Compute_program comput_thermal_flux(erosion_thermal_flux_file);
     Compute_program comput_thermal_trans(erosion_thermal_transport_file);
     Compute_program comput_sediment(erosion_sediment_file);
-    Compute_program comput_smooth(erosion_smooth_file);
+    Compute_program comput_smooth(erosion_smooth_file); */
+
+    Compute_program comput_particle(erosion_particle_file);
 
     World_data world_data = gen_world_data(NOISE_SIZE, NOISE_SIZE);
     defer{delete_world_data(world_data);};
@@ -675,17 +678,17 @@ int main(int argc, char* argv[]) {
     // ------------ noise generation -----------------
     Rain_settings rain_settings;
     rain_settings.push_data();
-    comput_rain.bind_uniform_block("settings", rain_settings.buffer);
+    // comput_rain.bind_uniform_block("settings", rain_settings.buffer);
 
     Erosion_settings erosion_settings;
     erosion_settings.push_data();
 
     // TODO: REFACTOR!!!
-    comput_hydro_flux.bind_uniform_block("Erosion_data", erosion_settings.buffer);
+    /* comput_hydro_flux.bind_uniform_block("Erosion_data", erosion_settings.buffer);
     comput_hydro_erosion.bind_uniform_block("Erosion_data", erosion_settings.buffer);
     comput_sediment.bind_uniform_block("Erosion_data", erosion_settings.buffer);
     comput_thermal_flux.bind_uniform_block("Erosion_data", erosion_settings.buffer);
-    comput_thermal_trans.bind_uniform_block("Erosion_data", erosion_settings.buffer);
+    comput_thermal_trans.bind_uniform_block("Erosion_data", erosion_settings.buffer); */
 
     Map_settings map_settings;
     gen_heightmap(map_settings, comput_map, world_data, state);
@@ -719,13 +722,13 @@ int main(int argc, char* argv[]) {
         // ---------- erosion compute shader ------------
         if (state.should_erode) {
             state.erosion_steps++;
-            if (state.should_rain) {
+            /* if (state.should_rain) {
                 if (!(state.erosion_steps % rain_settings.data.period)) {
                     dispatch_rain(comput_rain, world_data, rain_settings);
                 }
-            } 
+            }  */
             float erosion_d_time = glfwGetTime();
-            dispatch_erosion(
+            /* dispatch_erosion(
                 comput_hydro_flux,
                 comput_hydro_erosion, 
                 comput_thermal_flux, 
@@ -734,7 +737,8 @@ int main(int argc, char* argv[]) {
                 comput_smooth, 
                 world_data, 
                 erosion_settings
-            );
+            ); */
+            // dispatch_particle();
             erosion_d_time = glfwGetTime() - erosion_d_time;
             state.erosion_time += erosion_d_time;
             // calculate average erosion update time

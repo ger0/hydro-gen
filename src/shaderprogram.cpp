@@ -41,6 +41,20 @@ namespace gl {
     }
     void gen_buffer(Buffer& buff) {
         glGenBuffers(1, &buff.bo);
+        glBindBuffer(buff.type, buff.bo);
+        glBindBufferBase(buff.type, buff.binding, buff.bo);
+        glBindBuffer(buff.type, 0);
+    }
+    void gen_buffer(Buffer& buff, size_t size) {
+        glGenBuffers(1, &buff.bo);
+        glBindBuffer(buff.type, buff.bo);
+        glBindBufferBase(buff.type, buff.binding, buff.bo);
+        glBufferData(
+            buff.type, 
+            size, nullptr, 
+            buff.mode
+        );
+        glBindBuffer(buff.type, 0);
     }
     void del_buffer(Buffer& buff) {
         glDeleteBuffers(1, &buff.bo);

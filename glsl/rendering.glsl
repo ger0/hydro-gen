@@ -1,9 +1,8 @@
 #version 460
-#extension GL_ARB_uniform_buffer_object : require
 
 #include "bindings.glsl"
 #include "img_interpolation.glsl"
-#line 7
+#line 6
 
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
@@ -501,6 +500,10 @@ void main() {
                 0
             )
         );
+        for (uint i = 0; i < 8; i++) {
+            ivec2 part_pos = ivec2(particles[i].position / hmap_dims.xy * (gl_NumWorkGroups.xy * gl_WorkGroupSize.xy));
+            imageStore(out_tex, part_pos, vec4(0,0,1,1));
+        }
         return;
     }
     vec2 clip = 2.0 * uv - 1.0;

@@ -247,6 +247,12 @@ World_data gen_world_data(const GLuint width, const GLuint height) {
     Tex_pair flux(GL_READ_WRITE, width, height, BIND_FLUXMAP, BIND_WRITE_FLUXMAP);
     Tex_pair velocity(GL_READ_WRITE, width, height, BIND_VELOCITYMAP, BIND_WRITE_VELOCITYMAP);
     Tex_pair sediment(GL_READ_WRITE, width, height, BIND_SEDIMENTMAP, BIND_WRITE_SEDIMENTMAP);
+    gl::Texture lockmap {
+        .access = GL_READ_WRITE,
+        .format = GL_R16,
+    };
+    gl::gen_texture(lockmap);
+    gl::bind_texture(lockmap, BIND_LOCKMAP);
 
     // ------------- cross    flux for thermal erosion -----------
     Tex_pair thermal_c(GL_READ_WRITE, width, height, BIND_THERMALFLUX_C, BIND_WRITE_THERMALFLUX_C);
@@ -256,7 +262,7 @@ World_data gen_world_data(const GLuint width, const GLuint height) {
         .binding = BIND_PARTICLE_BUFFER,
         .type = GL_SHADER_STORAGE_BUFFER
     };
-    gl::gen_buffer(particle_buffer, PARTICLE_COUNT);
+    gl::gen_buffer(particle_buffer, PARTICLE_COUNT * sizeof(Particle));
 
     return World_data {
         .heightmap = heightmap,
@@ -265,6 +271,7 @@ World_data gen_world_data(const GLuint width, const GLuint height) {
         .sediment = sediment,
         .thermal_c = thermal_c,
         .thermal_d = thermal_d,
+        .lockmap = lockmap,
         .particle_buffer = particle_buffer
     };
 };
@@ -277,6 +284,8 @@ void delete_world_data(World_data& data) {
     data.thermal_c.delete_textures();
     data.thermal_d.delete_textures();
     // gl::del_buffer(data.mass_buffer);
+    gl::del_buffer(data.particle_buffer);
+    gl::delete_texture(data.lockmap);
 }
 
 void dispatch_rain(Compute_program& program, const World_data& data, Rain_settings& set) {
@@ -290,10 +299,12 @@ void dispatch_rain(Compute_program& program, const World_data& data, Rain_settin
 }
 
 void dispatch_particle(
-        Compute_program& program, const World_data& data
+        Compute_program& movement,
+        Compute_program& erosion,
+        const World_data& data
 ) {
-    program.use();
-    program.set_uniform("time", data.time);
+    movement.use();
+    movement.set_uniform("time", data.time);
     glDispatchCompute(PARTICLE_COUNT, 1, 1);
 }
 
@@ -741,7 +752,7 @@ int main(int argc, char* argv[]) {
                 world_data, 
                 erosion_settings
             ); */
-            dispatch_particle(comput_particle, world_data);
+            dispatch_particle(comput_particle, comput_particle, world_data);
             erosion_d_time = glfwGetTime() - erosion_d_time;
             state.erosion_time += erosion_d_time;
             // calculate average erosion update time

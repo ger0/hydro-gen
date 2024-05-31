@@ -86,5 +86,5 @@ struct Particle {
     GL(VEC2)    speed;
     GL(FLOAT)   volume;
     GL(FLOAT)   sediment;
-    GL(BOOL)    alive = false;
+    GL(INT)     iters;
 };

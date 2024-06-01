@@ -6,9 +6,9 @@
 
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
-layout (std140) uniform config {
-    float max_height;
-    ivec2 hmap_dims;
+layout (std140, binding = BIND_UNIFORM_MAP_SETTINGS)
+uniform map_settings {
+    Map_settings_data set;
 };
 
 layout(std430, binding = BIND_PARTICLE_BUFFER) buffer ParticleBuffer {
@@ -218,7 +218,7 @@ vec3 get_sky_color(vec3 direction, float ray_dist, float sundot) {
 vec4 get_shade(Ray ray, vec3 normal, bool is_water) {
     // shadow 
     // difference to the point above which there's no possible surface
-    float shadow_diff = max_height - ray.pos.y;
+    float shadow_diff = set.max_height - ray.pos.y;
     float shadow_scale = shadow_diff / -light_dir.y;
     float shadow_max = length(light_dir * shadow_scale);
     // casting a shadow ray towards the sun
@@ -441,7 +441,7 @@ Ray raymarch(
         }
 
         if (
-            (sample_pos.y > max_height && direction.y >= 0) ||
+            (sample_pos.y > set.max_height && direction.y >= 0) ||
             (sample_pos.y <= 0 && direction.y < 0)
         ) {
             break;
@@ -494,15 +494,17 @@ void main() {
         imageStore(
             out_tex, pixel, vec4(
                 (img_bilinear_r(heightmap, vec2(pixel)) + 
-                img_bilinear_g(heightmap, vec2(pixel))) / max_height,
+                img_bilinear_g(heightmap, vec2(pixel))) / set.max_height,
                 img_bilinear_g(sedimentmap, vec2(pixel)) / sediment_max_cap,
                 img_bilinear_b(heightmap, vec2(pixel)),
                 0
             )
         );
-        for (uint i = 0; i < 8; i++) {
-            ivec2 part_pos = ivec2(particles[i].position / hmap_dims.xy * (gl_NumWorkGroups.xy * gl_WorkGroupSize.xy));
-            imageStore(out_tex, part_pos, vec4(0,0,1,1));
+        for (uint i = 0; i < 128; i++) {
+            // ivec2 part_pos = ivec2(particles[i].position / float(set.hmap_dims.xy) * (gl_NumWorkGroups.xy * gl_WorkGroupSize.xy));
+            ivec2 part_pos = ivec2(particles[i].position);
+            part_pos += ivec2(1,1);
+            imageStore(out_tex, part_pos, vec4(1,1,1,1));
         }
         return;
     }
@@ -518,15 +520,15 @@ void main() {
     color = pow(color, vec3(1.0 / 2.2));
 
 #ifdef LOW_RES_DIV3
-    imageStore(out_tex, pixel * 3, vec4(color, hmap_dims.x));
-    imageStore(out_tex, pixel * 3 + ivec2(1, 0), vec4(color, hmap_dims.x));
-    imageStore(out_tex, pixel * 3 + ivec2(2, 0), vec4(color, hmap_dims.x));
-    imageStore(out_tex, pixel * 3 + ivec2(0, 1), vec4(color, hmap_dims.x));
-    imageStore(out_tex, pixel * 3 + ivec2(0, 2), vec4(color, hmap_dims.x));
-    imageStore(out_tex, pixel * 3 + ivec2(1, 1), vec4(color, hmap_dims.x));
-    imageStore(out_tex, pixel * 3 + ivec2(2, 1), vec4(color, hmap_dims.x));
-    imageStore(out_tex, pixel * 3 + ivec2(1, 2), vec4(color, hmap_dims.x));
-    imageStore(out_tex, pixel * 3 + ivec2(2, 2), vec4(color, hmap_dims.x));
+    imageStore(out_tex, pixel * 3, vec4(color, set.hmap_dims.x));
+    imageStore(out_tex, pixel * 3 + ivec2(1, 0), vec4(color, set.hmap_dims.x));
+    imageStore(out_tex, pixel * 3 + ivec2(2, 0), vec4(color, set.hmap_dims.x));
+    imageStore(out_tex, pixel * 3 + ivec2(0, 1), vec4(color, set.hmap_dims.x));
+    imageStore(out_tex, pixel * 3 + ivec2(0, 2), vec4(color, set.hmap_dims.x));
+    imageStore(out_tex, pixel * 3 + ivec2(1, 1), vec4(color, set.hmap_dims.x));
+    imageStore(out_tex, pixel * 3 + ivec2(2, 1), vec4(color, set.hmap_dims.x));
+    imageStore(out_tex, pixel * 3 + ivec2(1, 2), vec4(color, set.hmap_dims.x));
+    imageStore(out_tex, pixel * 3 + ivec2(2, 2), vec4(color, set.hmap_dims.x));
 #else
     imageStore(out_tex, pixel, vec4(color, 0));
 #endif

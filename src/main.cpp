@@ -86,11 +86,9 @@ static struct Game_state {
     float target_fps = 60.f;
 } state;
 
-
 struct Rain_settings {
     gl::Buffer buffer;
     Rain_data data {
-        .max_height = MAX_HEIGHT,
         .amount = 0.01f,
         .mountain_thresh = 0.55f,
         .mountain_multip = 0.05f,
@@ -111,22 +109,22 @@ struct Rain_settings {
 
 struct Map_settings {
     gl::Buffer buffer;
-    struct Data {
-        alignas(sizeof(GLfloat)) GLfloat height_scale   = MAX_HEIGHT;
-        alignas(sizeof(GLfloat)) GLfloat height_mult    = 1.0;
-        alignas(sizeof(GLfloat)) GLfloat water_lvl      = WATER_HEIGHT;
-        alignas(sizeof(GLfloat)) GLfloat seed           = 10000.f * rand() / (float)RAND_MAX;
-        alignas(sizeof(GLfloat)) GLfloat persistance    = 0.44;
-        alignas(sizeof(GLfloat)) GLfloat lacunarity     = 2.0;
-        alignas(sizeof(GLfloat)) GLfloat scale          = 0.0025;
-        alignas(sizeof(GLfloat)) GLfloat redistribution = 1; // doesn't work
-        alignas(sizeof(GLint))   GLint   octaves        = 8;
-
-        alignas(sizeof(GLuint))  GLuint  mask_round   = false;
-        alignas(sizeof(GLuint))  GLuint  mask_exp     = false;
-        alignas(sizeof(GLuint))  GLuint  mask_power   = false;
-        alignas(sizeof(GLuint))  GLuint  mask_slope   = false;
-    } data;
+    struct Map_settings_data data {
+        .max_height     = MAX_HEIGHT,
+        .hmap_dims      = ivec2(NOISE_SIZE, NOISE_SIZE),
+        .height_mult    = 1.0,
+        .water_lvl      = WATER_HEIGHT,
+        .seed           = 10000.f * rand() / (float)RAND_MAX,
+        .persistance    = 0.44,
+        .lacunarity     = 2.0,
+        .scale          = 0.0025,
+        .redistribution = 1, // doesn't work
+        .octaves        = 8,
+        .mask_round     = false,
+        .mask_exp       = false,
+        .mask_power     = false,
+        .mask_slope     = false
+    };
     void push_data() {
         buffer.push_data(data);
     }
@@ -358,7 +356,6 @@ void dispatch_erosion(
 struct Render_data {
     GLuint framebuffer;
     gl::Texture output_texture;
-    gl::Buffer config_buff;
 
     float   prec = 0.35;
     bool    display_sediment = false;
@@ -368,13 +365,13 @@ struct Render_data {
 void delete_renderer(Render_data& data) {
     glDeleteFramebuffers(1, &data.framebuffer);
     gl::delete_texture(data.output_texture);
-    gl::del_buffer(data.config_buff);
 }
 
 bool prepare_rendering(
         Render_data& rndr, 
         Compute_program& program, 
-        World_data& data
+        World_data& data,
+        Map_settings& map_set
     ) {
     program.use();
 
@@ -394,10 +391,7 @@ bool prepare_rendering(
         alignas(sizeof(GLint) * 2) ivec2 dims          = ivec2(NOISE_SIZE, NOISE_SIZE);
     } conf_buff;
 
-    rndr.config_buff.binding = BIND_UNIFORM_CONFIG;
-    gl::gen_buffer(rndr.config_buff);
-    rndr.config_buff.push_data(conf_buff);
-    program.bind_uniform_block("config", rndr.config_buff);
+    program.bind_uniform_block("map_settings", map_set.buffer);
     gl::bind_texture(rndr.output_texture, BIND_DISPLAY_TEXTURE);
     glBindFramebuffer(GL_FRAMEBUFFER, rndr.framebuffer);
     glFramebufferTexture2D(
@@ -545,7 +539,7 @@ void gen_heightmap(
     ) {
     program.use();
     map.push_data();
-    program.bind_uniform_block("map_cfg", map.buffer);
+    program.bind_uniform_block("map_settings", map.buffer);
     // program.bind_storage_buffer("mass_data", world_data.mass_buffer);
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
     glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
@@ -692,7 +686,6 @@ int main(int argc, char* argv[]) {
     // ------------ noise generation -----------------
     Rain_settings rain_settings;
     rain_settings.push_data();
-    // comput_rain.bind_uniform_block("settings", rain_settings.buffer);
 
     Erosion_settings erosion_settings;
     erosion_settings.push_data();
@@ -706,10 +699,11 @@ int main(int argc, char* argv[]) {
 
     Map_settings map_settings;
     gen_heightmap(map_settings, comput_map, world_data, state);
+    comput_particle.bind_uniform_block("map_settings", map_settings.buffer);
 
     // ---------- prepare textures for rendering  ---------------
     Render_data render_data;
-    prepare_rendering(render_data, renderer, world_data);
+    prepare_rendering(render_data, renderer, world_data, map_settings);
     defer{delete_renderer(render_data);};
 
     while (!glfwWindowShouldClose(window.get()) && (!state.shader_error)) {

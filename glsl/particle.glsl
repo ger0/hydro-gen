@@ -9,8 +9,9 @@ layout (local_size_x = WRKGRP_SIZE_X + WRKGRP_SIZE_Y) in;
 layout (binding = BIND_HEIGHTMAP, rgba32f)
     uniform readonly image2D heightmap;
 
-layout (binding = BIND_LOCKMAP, r16)
-    uniform volatile coherent image2D lockmap;
+layout (std140) uniform map_settings {
+    Map_settings_data set;
+};
 
 layout(std430, binding = BIND_PARTICLE_BUFFER) buffer ParticleBuffer {
     Particle particles[];
@@ -75,13 +76,16 @@ void main() {
     // spawn particle if there's 0 iteraitons 
     if (particle.iters == 0) {
         vec2 pos = vec2(
-            random(uint(id * time * 1000.0)) * 100.0,
-            random(uint((id + 1) * time * 1000.0)) * 100.0
+            random(uint(id * time * 1000.0)) * float(set.hmap_dims.x),
+            random(uint((id + 1) * time * 1000.0)) * float(set.hmap_dims.y)
         );
+        // vec2 pos = vec2(0 + id, 64);
         particle.sediment = 0.0;
-        particle.iters = 1;
+        particle.position = pos;
     }
     vec3 norm = get_terr_normal(particle.position);
+    particle.speed = norm.xz * 0.981;
+    particle.position += 0.1 * particle.speed;
     particle.iters++;
     particles[id] = particle;
 }

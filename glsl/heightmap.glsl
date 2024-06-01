@@ -19,21 +19,9 @@ layout (binding = BIND_FLUXMAP, rgba32f)
 layout (binding = BIND_SEDIMENTMAP, rgba32f)
     uniform writeonly image2D dest_sediment;
 
-layout (std140) uniform map_cfg {
-    float   height_scale;
-    float   height_multiplier;
-    float   water_lvl;
-    float   seed;
-    float   persistance;
-    float   lacunarity;
-    float   scale;
-    float   redistribution;
-    int     octaves;  
-
-    bool    mask_round;
-    bool    mask_exp;
-    bool    mask_power;
-    bool    mask_slope;
+layout (std140, binding = BIND_UNIFORM_MAP_SETTINGS)
+uniform map_settings {
+    Map_settings_data cfg;
 };
 
 // Function to generate a random float in the range [0, 1]
@@ -68,22 +56,22 @@ void main() {
     ivec2 store_pos = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = gl_GlobalInvocationID.xy / vec2(imageSize(dest_tex).xy);
     gln_tFBMOpts opts = gln_tFBMOpts(
-        seed,
-        persistance,
-        lacunarity,
-        scale,
+        cfg.seed,
+        cfg.persistance,
+        cfg.lacunarity,
+        cfg.scale,
         1.0,
-        octaves,
+        cfg.octaves,
         false,
         false
     );
     /* gln_tFBMOpts up_opts = gln_tFBMOpts(
-        seed,
-        persistance,
-        lacunarity,
-        scale,
+        cfg.seed,
+        cfg.persistance,
+        cfg.lacunarity,
+        cfg.scale,
         2.0,
-        octaves,
+        cfg.octaves,
         true,
         true
     ); */
@@ -98,23 +86,23 @@ void main() {
     //float up_val = (gln_sfbm(store_pos, up_opts) + 1.0) / 2.0;
     //up_val = power_mask(up_val);
     //up_val = exp_mask(up_val);
-    /* val += up_val * height_multiplier;
+    /* val += up_val * cfg.height_mult;
     val /= 2.0; */
     
-    if (mask_round) {
+    if (cfg.mask_round != 0) {
         val = round_mask(val, uv);
     }
-    if (mask_exp) {
+    if (cfg.mask_exp != 0) {
         val = exp_mask(val);
     }
-    if (mask_power) {
+    if (cfg.mask_power != 0) {
         val = power_mask(val);
     }
-    if (mask_slope) {
+    if (cfg.mask_slope != 0) {
         val = slope_mask(val, uv);
     }
     
-    float rock_val = min(height_scale, val * height_scale * height_multiplier);
+    float rock_val = min(cfg.max_height, val * cfg.max_height * cfg.height_mult);
     float dirt_val = 10.0;
 
     vec4 terrain = vec4(
@@ -143,5 +131,5 @@ void main() {
     imageStore(dest_vel, store_pos, vec4(0));
     imageStore(dest_flux, store_pos, vec4(0));
     imageStore(dest_sediment, store_pos, vec4(0));
-    //imageStore(dest_tex, store_pos, vec4(seed, lacunarity, persistance, height_scale));
+    //imageStore(dest_tex, store_pos, vec4(cfg.seed, cfg.lacunarity, cfg.persistance, cfg.cfg.max_height));
 }

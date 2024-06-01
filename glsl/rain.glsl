@@ -10,8 +10,14 @@ layout (binding = BIND_HEIGHTMAP, rgba32f)
 	uniform image2D heightmap;
 
 uniform float time;
-layout (std140) uniform settings {
+layout (std140, binding = BIND_UNIFORM_RAIN_SETTINGS) 
+uniform settings {
     Rain_data set;
+};
+
+layout (std140, binding = BIND_UNIFORM_MAP_SETTINGS)
+uniform map_settings {
+    Map_settings_data map_set;
 };
 
 float rand(float n) {
@@ -40,9 +46,9 @@ void main() {
     float r = max(0.0, gln_sfbm(gl_GlobalInvocationID.xy, opts));
 
     float incr = set.amount * r;
-    float mountain = terr.w - set.max_height * set.mountain_thresh;
+    float mountain = terr.w - map_set.max_height * set.mountain_thresh;
     if (mountain > 0) {
-        incr += mountain * set.mountain_multip * r / ((1.0 - set.mountain_thresh) * set.max_height);
+        incr += mountain * set.mountain_multip * r / ((1.0 - set.mountain_thresh) * map_set.max_height);
     }
     terr.b += incr;
     terr.w = terr.r + terr.b;

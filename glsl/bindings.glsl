@@ -26,13 +26,10 @@
 
 #define BIND_LOCKMAP 13
 
-#define BIND_UNIFORM_CONFIG 0
 #define BIND_UNIFORM_EROSION 1
 #define BIND_UNIFORM_MAP_SETTINGS 2
 #define BIND_UNIFORM_RAIN_SETTINGS 3
-
-#define BIND_STORAGE_MASS_COUNT 4
-#define BIND_PARTICLE_BUFFER 5
+#define BIND_PARTICLE_BUFFER 4
 
 #if defined(GL_core_profile)
     #define BLOCK layout (std140, binding = BIND_UNIFORM_EROSION) uniform
@@ -41,6 +38,7 @@
     #define INT int
     #define UINT uint
     #define VEC2 vec2
+    #define IVEC2 ivec2
     #define BOOL bool
 #else 
     #define BLOCK struct
@@ -49,6 +47,7 @@
     #define UINT GLuint
     #define GL(X) alignas(sizeof(X)) X
     #define VEC2 glm::vec2
+    #define IVEC2 glm::ivec2
     #define BOOL GLboolean
 #endif
 
@@ -73,12 +72,29 @@ BLOCK Erosion_data {
 #endif
 
 struct Rain_data {
-    GL(FLOAT)   max_height;
     GL(FLOAT)   amount;
     GL(FLOAT)   mountain_thresh;
     GL(FLOAT)   mountain_multip;
     GL(INT)     period;
     GL(FLOAT)   drops;
+};
+
+struct Map_settings_data {
+    GL(FLOAT) max_height;
+    GL(IVEC2) hmap_dims;
+    GL(FLOAT) height_mult;
+    GL(FLOAT) water_lvl;
+    GL(FLOAT) seed;
+    GL(FLOAT) persistance;
+    GL(FLOAT) lacunarity;
+    GL(FLOAT) scale;
+    GL(FLOAT) redistribution;
+    GL(INT)   octaves;
+
+    GL(UINT)  mask_round;
+    GL(UINT)  mask_exp;
+    GL(UINT)  mask_power;
+    GL(UINT)  mask_slope;
 };
 
 struct Particle {

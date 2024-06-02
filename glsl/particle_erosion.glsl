@@ -17,7 +17,7 @@ layout(std430, binding = BIND_PARTICLE_BUFFER) buffer ParticleBuffer {
 
 
 // spinlock - acquire
-void atomic_erosion(uint id, ivec2 pos, vec2 sh) {
+void atomic_erosion(uint id, ivec2 pos, vec2 offset) {
     Particle part = particles[id];
     uint lock_available;
     do {
@@ -25,10 +25,19 @@ void atomic_erosion(uint id, ivec2 pos, vec2 sh) {
         if (lock_available == 0) {
             vec4 terr = imageLoad(heightmap, pos);
             memoryBarrierImage();
-            part.sediment += d_t * Ks * part.sc;
-            terr.g -= d_t * Ks * part.volume * part.sc;
+            // weighted multiplier for every 4 points inside a quad
+            float multipl = offset.x * offset.y;
+            float sed = multipl * d_t * Ks * part.sc;
+            part.sediment += sed * part.volume;
+            terr.g -= sed * part.volume;
+            if (terr.g < 0) {
+                float diff = abs(terr.g);
+                part.sediment -= diff;
+                terr.g += diff;
+            }
+            terr.w = terr.r + terr.b + terr.g;
             if (part.to_kill = true) {
-                terr.g += part.sediment;
+                terr.g += part.sediment * multipl;
             }
             imageStore(heightmap, pos, terr);
             memoryBarrierImage();
@@ -47,13 +56,18 @@ void main() {
     //  3---2
     //  |   |
     //  0---1
-    pos[0] = ivec2(part.position);
-    pos[1] = ivec2(part.position) + ivec2(1, 0);
-    pos[2] = ivec2(part.position) + ivec2(1, 1);
-    pos[3] = ivec2(part.position) + ivec2(0, 1);
+    pos[0] = ivec2(part.position * WORLD_SCALE);
+    pos[1] = ivec2(part.position * WORLD_SCALE) + ivec2(1, 0);
+    pos[2] = ivec2(part.position * WORLD_SCALE) + ivec2(1, 1);
+    pos[3] = ivec2(part.position * WORLD_SCALE) + ivec2(0, 1);
     // offset between points inside a quad
-    vec2 sh = fract(part.position);
+    vec2 offset[4];
+    vec2 off = fract(part.position * WORLD_SCALE);
+    offset[0] = vec2(1 - off.x, 1 - off.y);
+    offset[1] = vec2(off.x, 1 - off.y);
+    offset[2] = vec2(off.x, off.y);
+    offset[3] = vec2(1 - off.x, off.y);
     for (uint i = 0; i < 4; i++) {
-        atomic_erosion(id, pos[i], sh);
+        atomic_erosion(id, pos[i], offset[i]);
     }
 }

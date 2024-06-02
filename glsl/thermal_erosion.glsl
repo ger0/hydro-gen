@@ -16,7 +16,6 @@ layout (binding = BIND_WRITE_THERMALFLUX_D, rgba32f)
 
 uniform int t_layer;
 
-const float L = 1.0;
 const float a = L;
 
 vec4 get_height(ivec2 pos) {

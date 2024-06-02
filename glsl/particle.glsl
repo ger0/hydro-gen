@@ -24,6 +24,7 @@ float friction      = 0.05;
 float inertia       = 0.2;
 float min_volume    = 0.1;
 float min_velocity  = 0.01;
+uint max_iters  = 300;
 
 uniform float time;
 // uniform erosion_data
@@ -98,6 +99,14 @@ void main() {
 
     particle.position += d_t * particle.velocity;
     particle.velocity *= (1.0 - d_t * friction);
+    if (particle.position.x <= 0
+        || particle.position.y <= 0
+        || particle.position.x * WORLD_SCALE >= set.hmap_dims.x
+        || particle.position.y * WORLD_SCALE >= set.hmap_dims.y
+    ) {
+        particle.velocity = -particle.velocity;
+        particle.position += 2 * d_t * particle.velocity;
+    }
     particle.volume -= particle.volume * d_t * Ke;
 
     // sediment transport capacity calculations
@@ -107,7 +116,9 @@ void main() {
 
     particle.iters++;
 
-    if (particle.volume <= min_volume || length(particle.velocity) < min_velocity) {
+    if (particle.volume <= min_volume 
+        || length(particle.velocity) < min_velocity
+        || particle.iters >= max_iters) {
         particle.to_kill = true;
         particle.iters = 0;
     }

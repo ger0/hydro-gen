@@ -6,7 +6,7 @@
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
 layout (binding = BIND_HEIGHTMAP, rgba32f)   
-	uniform coherent image2D heightmap;
+	uniform readonly image2D heightmap;
 layout (binding = BIND_WRITE_HEIGHTMAP, rgba32f)   
 	uniform writeonly image2D out_heightmap;
 
@@ -66,5 +66,6 @@ void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
     vec4 terrain = imageLoad(heightmap, pos);
     terrain[t_layer] += gather_inflow(pos);
+    terrain.w = terrain.r + terrain.g + terrain.b;
     imageStore(out_heightmap, pos, terrain);
 }

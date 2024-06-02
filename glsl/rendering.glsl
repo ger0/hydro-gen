@@ -398,6 +398,14 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
     // hit - get terrain
     else {
         color = get_terrain_color(ray, direction, sundot);
+        // TODO: draw particles
+        for (uint i = 0; i < PARTICLE_COUNT; i++) {
+            // ivec2 part_pos = ivec2(particles[i].position / float(set.hmap_dims.xy) * (gl_NumWorkGroups.xy * gl_WorkGroupSize.xy));
+            vec2 part_pos = particles[i].position;
+            if (abs(length(ray.pos.xz - part_pos)) <= particles[i].volume) {
+                color = water_color;
+            }
+        }
     }
 
     if (display_sediment) {
@@ -500,12 +508,6 @@ void main() {
                 0
             )
         );
-        for (uint i = 0; i < 128; i++) {
-            // ivec2 part_pos = ivec2(particles[i].position / float(set.hmap_dims.xy) * (gl_NumWorkGroups.xy * gl_WorkGroupSize.xy));
-            ivec2 part_pos = ivec2(particles[i].position);
-            part_pos += ivec2(1,1);
-            imageStore(out_tex, part_pos, vec4(1,1,1,1));
-        }
         return;
     }
     vec2 clip = 2.0 * uv - 1.0;

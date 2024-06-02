@@ -16,8 +16,6 @@
 constexpr u32 WINDOW_W = 1600;
 constexpr u32 WINDOW_H = 900;
 
-constexpr u32 PARTICLE_COUNT = 128;
-
 constexpr float MAX_HEIGHT = 256.f;
 constexpr float WATER_HEIGHT = 96.f;
 
@@ -39,7 +37,8 @@ constexpr auto erosion_thermal_flux_file        = "thermal_erosion.glsl";
 constexpr auto erosion_thermal_transport_file   = "thermal_transport.glsl";
 constexpr auto erosion_sediment_file            = "sediment_transport.glsl";
 constexpr auto erosion_smooth_file              = "smoothing.glsl";
-constexpr auto erosion_particle_file            = "particle.glsl";
+constexpr auto particle_file                    = "particle.glsl";
+constexpr auto erosion_particle_file            = "particle_erosion.glsl";
 
 using glm::normalize, glm::cross;
 using glm::vec2, glm::vec3, glm::ivec2, glm::ivec3;
@@ -148,7 +147,7 @@ struct Erosion_settings {
         .ENERGY_KEPT = 1.0,
         .Kalpha = 1.2f,
         .Kspeed = 8.25f,
-        .d_t = 0.001,
+        .d_t = 0.75,
     };
     void push_data() {
         buffer.push_data(data);
@@ -247,9 +246,9 @@ World_data gen_world_data(const GLuint width, const GLuint height) {
     Tex_pair sediment(GL_READ_WRITE, width, height, BIND_SEDIMENTMAP, BIND_WRITE_SEDIMENTMAP);
     gl::Texture lockmap {
         .access = GL_READ_WRITE,
-        .format = GL_R16,
+        .format = GL_R32UI,
     };
-    gl::gen_texture(lockmap);
+    gl::gen_texture(lockmap, GL_RED_INTEGER, GL_UNSIGNED_INT);
     gl::bind_texture(lockmap, BIND_LOCKMAP);
 
     // ------------- cross    flux for thermal erosion -----------
@@ -304,6 +303,10 @@ void dispatch_particle(
     movement.use();
     movement.set_uniform("time", data.time);
     glDispatchCompute(PARTICLE_COUNT, 1, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    erosion.use();
+    glDispatchCompute(PARTICLE_COUNT, 1, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
 
 void dispatch_erosion(
@@ -678,7 +681,8 @@ int main(int argc, char* argv[]) {
     Compute_program comput_sediment(erosion_sediment_file);
     Compute_program comput_smooth(erosion_smooth_file); */
 
-    Compute_program comput_particle(erosion_particle_file);
+    Compute_program comput_part(particle_file);
+    Compute_program comput_part_eros(erosion_particle_file);
 
     World_data world_data = gen_world_data(NOISE_SIZE, NOISE_SIZE);
     defer{delete_world_data(world_data);};
@@ -699,7 +703,7 @@ int main(int argc, char* argv[]) {
 
     Map_settings map_settings;
     gen_heightmap(map_settings, comput_map, world_data, state);
-    comput_particle.bind_uniform_block("map_settings", map_settings.buffer);
+    comput_part.bind_uniform_block("map_settings", map_settings.buffer);
 
     // ---------- prepare textures for rendering  ---------------
     Render_data render_data;
@@ -746,7 +750,7 @@ int main(int argc, char* argv[]) {
                 world_data, 
                 erosion_settings
             ); */
-            dispatch_particle(comput_particle, comput_particle, world_data);
+            dispatch_particle(comput_part, comput_part_eros, world_data);
             erosion_d_time = glfwGetTime() - erosion_d_time;
             state.erosion_time += erosion_d_time;
             // calculate average erosion update time

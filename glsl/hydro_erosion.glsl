@@ -28,7 +28,6 @@ layout (binding = BIND_WRITE_VELOCITYMAP, rgba32f)
 
 #define PI 3.1415926538
 
-const float L = 1.0;
 float find_sin_alpha(ivec2 pos) {
     float r_b = 0.0;
     float l_b = 0.0;

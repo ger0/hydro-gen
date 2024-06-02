@@ -1,6 +1,8 @@
 #define WORLD_SCALE (0.20)
 #define SED_LAYERS (2)
 
+#define PARTICLE_COUNT (2048)
+
 #define LOW_RES_DIV3
 
 #define WRKGRP_SIZE_X 8
@@ -30,6 +32,10 @@
 #define BIND_UNIFORM_MAP_SETTINGS 2
 #define BIND_UNIFORM_RAIN_SETTINGS 3
 #define BIND_PARTICLE_BUFFER 4
+
+#if defined(GL_core_profile) 
+    const float L = 1.0;
+#endif
 
 #if defined(GL_core_profile)
     #define BLOCK layout (std140, binding = BIND_UNIFORM_EROSION) uniform
@@ -99,8 +105,11 @@ struct Map_settings_data {
 
 struct Particle {
     GL(VEC2)    position;
-    GL(VEC2)    speed;
+    GL(VEC2)    velocity;
     GL(FLOAT)   volume;
     GL(FLOAT)   sediment;
+    // sediment capacity at a point
+    GL(FLOAT)   sc;
     GL(INT)     iters;
+    GL(BOOL)    to_kill;
 };

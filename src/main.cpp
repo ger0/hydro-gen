@@ -140,10 +140,10 @@ struct Erosion_settings {
     gl::Buffer buffer;
     Erosion_data data = {
         .Kc = 0.060,
-        .Ks = 0.036,
-        .Kd = 0.00006,
+        .Ks = 0.026,
+        .Kd = 0.01,
         .Ke = 0.003,
-        .G = 1.0,
+        .G = 9.81,
         .ENERGY_KEPT = 1.0,
         .Kalpha = 1.2f,
         .Kspeed = 0.01f,

@@ -18,13 +18,13 @@ layout(std430, binding = BIND_PARTICLE_BUFFER) buffer ParticleBuffer {
     Particle particles[];
 };
 
-float density       = 1.0;
-float init_volume   = 2.0;
-float friction      = 0.05;
-float inertia       = 0.2;
-float min_volume    = 0.1;
-float min_velocity  = 0.01;
-uint max_iters  = 300;
+const float density       = 1.0;
+const float init_volume   = 2.0;
+const float friction      = 0;
+const float inertia       = 0.50;
+const float min_volume    = 0.1;
+const float min_velocity  = 0.01;
+const uint max_iters  = 300;
 
 uniform float time;
 // uniform erosion_data
@@ -79,49 +79,48 @@ vec3 get_terr_normal(vec2 pos) {
 
 void main() {
     uint id = gl_GlobalInvocationID.x;
-    Particle particle = particles[id];
+    Particle p = particles[id];
     // spawn particle if there's 0 iteraitons 
-    if (particle.iters == 0) {
+    if (p.iters == 0 || p.to_kill == true) {
         vec2 pos = vec2(
             random(uint(id * time * 1000.0)) * float(set.hmap_dims.x) / WORLD_SCALE,
             random(uint((id + 1) * time * 1000.0)) * float(set.hmap_dims.y / WORLD_SCALE)
         );
-        particle.to_kill = false;
-        particle.sediment = 0.0;
-        particle.position = pos;
-        particle.velocity = vec2(0);
-        particle.volume = init_volume;
+        p.to_kill = false;
+        // p.sediment = vec2(0.0);
+        p.position = pos;
+        p.velocity = vec2(0);
+        p.volume = init_volume;
+        p.iters = 0;
     }
-    vec3 norm = get_terr_normal(particle.position);
+    vec3 norm = get_terr_normal(p.position);
 
-    // particle.velocity *= inertia;
-    particle.velocity += -(d_t * norm.xz) / (particle.volume * density);
+    p.velocity = 
+        inertia * p.velocity
+        - (d_t * norm.xz) / (p.volume * density) * G * (1.0 - inertia);
 
-    particle.position += d_t * particle.velocity;
-    particle.velocity *= (1.0 - d_t * friction);
-    if (particle.position.x <= 0
-        || particle.position.y <= 0
-        || particle.position.x * WORLD_SCALE >= set.hmap_dims.x
-        || particle.position.y * WORLD_SCALE >= set.hmap_dims.y
+    p.position += d_t * p.velocity;
+    p.velocity *= (1.0 - d_t * friction);
+    if (p.position.x <= 0
+        || p.position.y <= 0
+        || p.position.x * WORLD_SCALE >= set.hmap_dims.x
+        || p.position.y * WORLD_SCALE >= set.hmap_dims.y
     ) {
-        particle.velocity = -particle.velocity;
-        particle.position += 2 * d_t * particle.velocity;
+        p.velocity = -p.velocity;
+        p.position += 2 * d_t * p.velocity;
     }
-    particle.volume -= particle.volume * d_t * Ke;
+    p.volume -= p.volume * d_t * Ke;
 
     // sediment transport capacity calculations
-    float sin_a = find_sin_alpha(particle.position);
-    particle.sc = max(0.0, particle.volume * length(particle.velocity) * max(0.10, sin_a));
-    particle.sc -= particle.sediment;
+    float sin_a = find_sin_alpha(p.position);
+    p.sc = max(0.0, p.volume * length(p.velocity) * max(0.10, sin_a));
+    p.iters++;
 
-    particle.iters++;
-
-    if (particle.volume <= min_volume 
-        || length(particle.velocity) < min_velocity
-        || particle.iters >= max_iters) {
-        particle.to_kill = true;
-        particle.iters = 0;
+    if (p.volume <= min_volume 
+        || length(p.velocity) < min_velocity
+        || p.iters >= max_iters
+    ) {
+        p.to_kill = true;
     }
-
-    particles[id] = particle;
+    particles[id] = p;
 }

@@ -107,9 +107,10 @@ struct Particle {
     GL(VEC2)    position;
     GL(VEC2)    velocity;
     GL(FLOAT)   volume;
-    GL(FLOAT)   sediment;
     // sediment capacity at a point
     GL(FLOAT)   sc;
     GL(INT)     iters;
     GL(BOOL)    to_kill;
+    // sediment layers
+    GL(VEC2)   sediment;
 };

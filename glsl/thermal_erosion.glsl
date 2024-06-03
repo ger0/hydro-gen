@@ -92,7 +92,8 @@ void store_outflow(ivec2 pos, vec4 terrain, int layer) {
     }
     sharpness *= sharpness * sharpness;
     float Klspeed = Kspeed * float(layer + 1);
-    float S = d_t * Kspeed * sharpness * a * H / 2.0;
+
+    float S = d_t * Klspeed * sharpness * a * H / 2.0;
     // float S = d_t * Kspeed * a * H / 2.0;
 
     for (uint j = 0; j < 2; j++) {

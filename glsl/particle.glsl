@@ -19,17 +19,16 @@ layout(std430, binding = BIND_PARTICLE_BUFFER) buffer ParticleBuffer {
 };
 
 const float density       = 1.0;
-const float init_volume   = 2.0;
-const float friction      = 0;
+const float init_volume   = 1.0;
+const float friction      = 0.1;
 const float inertia       = 0.50;
 const float min_volume    = 0.1;
-const float min_velocity  = 0.01;
-const uint max_iters  = 300;
+const float min_velocity  = 0.10;
 
 uniform float time;
 // uniform erosion_data
 // particle time to live
-const int ttl = 5000;
+const uint ttl = 5000;
 
 uint hash(uint x) {
     x ^= x >> 16;
@@ -99,26 +98,29 @@ void main() {
         inertia * p.velocity
         - (d_t * norm.xz) / (p.volume * density) * G * (1.0 - inertia);
 
+    vec2 old_pos = p.position;
     p.position += d_t * p.velocity;
-    p.velocity *= (1.0 - d_t * friction);
-    if (p.position.x <= 0
-        || p.position.y <= 0
-        || p.position.x * WORLD_SCALE >= set.hmap_dims.x
-        || p.position.y * WORLD_SCALE >= set.hmap_dims.y
+    if (p.position.x <= 1
+        || p.position.y <= 1
+        || p.position.x * WORLD_SCALE >= (set.hmap_dims.x - 1.0)
+        || p.position.y * WORLD_SCALE >= (set.hmap_dims.y - 1.0)
     ) {
-        p.velocity = -p.velocity;
-        p.position += 2 * d_t * p.velocity;
+        /* p.velocity = -p.velocity;
+        p.position += 2 * d_t * p.velocity * (1 - friction); */
+        p.position = old_pos;
+        p.to_kill = true;
     }
-    p.volume -= p.volume * d_t * Ke;
+    p.velocity *= (1.0 - d_t * friction);
+    p.volume -= d_t * Ke;
 
     // sediment transport capacity calculations
-    float sin_a = find_sin_alpha(p.position);
-    p.sc = max(0.0, p.volume * length(p.velocity) * max(0.10, sin_a));
+    float sin_a = abs(find_sin_alpha(p.position));
+    p.sc = max(0.0, Kc * p.volume * length(p.velocity) * max(0.05, sin_a));
     p.iters++;
 
     if (p.volume <= min_volume 
         || length(p.velocity) < min_velocity
-        || p.iters >= max_iters
+        || p.iters >= ttl
     ) {
         p.to_kill = true;
     }

@@ -403,7 +403,12 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
             // ivec2 part_pos = ivec2(particles[i].position / float(set.hmap_dims.xy) * (gl_NumWorkGroups.xy * gl_WorkGroupSize.xy));
             vec2 part_pos = particles[i].position;
             if (abs(length(ray.pos.xz - part_pos)) <= particles[i].volume) {
-                color = water_color;
+                color *= 0.4;
+                color += 0.6 * water_color;
+                if (display_sediment) {
+                    color.r = particles[i].sediment.r / (sediment_max_cap * particles[i].volume);
+                    color.g = particles[i].sediment.g / (sediment_max_cap * particles[i].volume);
+                }
             }
         }
     }

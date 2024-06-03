@@ -139,14 +139,18 @@ struct Map_settings {
 struct Erosion_settings {
     gl::Buffer buffer;
     Erosion_data data = {
-        .Kc = 0.060,
-        .Ks = 0.026,
-        .Kd = 0.01,
+        .Kc = 0.60,
+        .Ks = 0.036,
+        .Kd = 0.02,
         .Ke = 0.003,
         .G = 9.81,
         .ENERGY_KEPT = 1.0,
         .Kalpha = 1.2f,
-        .Kspeed = 0.01f,
+#if defined(PARTICLE_COUNT)
+        .Kspeed = 0.001f,
+#else 
+        .Kspeed = 0.1f,
+#endif
         .d_t = 0.75,
     };
     void push_data() {
@@ -336,12 +340,14 @@ void dispatch_particle(
         run(tflux, i);
         data.thermal_c.swap();
         data.thermal_d.swap();
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
         run(ttrans, i);
         data.heightmap.swap(true);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }
     run(smooth);
-    data.heightmap.swap();
+    data.heightmap.swap(true);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
 
@@ -646,7 +652,13 @@ void draw_ui(
 
     ImGui::SeparatorText("Thermal Erosion");
     ImGui::SliderAngle("Talus angle", &erosion.data.Kalpha, 0.00, 90.f);
-    ImGui::SliderFloat("Erosion speed", &erosion.data.Kspeed, 0.01, 100.f, "%.3f", ImGuiSliderFlags_Logarithmic);
+
+    // TODO: move this somewhere else...
+    #if defined(PARTICLE_COUNT) 
+        ImGui::SliderFloat("Erosion speed", &erosion.data.Kspeed, 0.0001, 1.f, "%.5f", ImGuiSliderFlags_Logarithmic);
+    #else 
+        ImGui::SliderFloat("Erosion speed", &erosion.data.Kspeed, 0.01, 100.f, "%.3f", ImGuiSliderFlags_Logarithmic);
+    #endif
     if (ImGui::Button("Set Erosion Settings")) {
         erosion.push_data();
     }

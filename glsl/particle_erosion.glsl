@@ -38,7 +38,7 @@ void erode_layers(uint id, ivec2 pos, vec2 offset, vec2 old_sediment) {
         float Kld = d_t * Kd * (10.0 * i + 1.0);
 
         // sediment transport capacity
-        float c = part.sc;
+        float c = part.sc - cap;
         float s1 = old_sediment[i];
 
         // dissolve sediment
@@ -60,12 +60,13 @@ void erode_layers(uint id, ivec2 pos, vec2 offset, vec2 old_sediment) {
             if (s1 < 0) {
                 float diff = abs(s1);
                 s1 = 0;
-                terr[i] -= diff;
+                // terr[i] -= diff;
             }
         }
         cap += s1;
         part.sediment[i] = s1;
     }
+    particles[id] = part;
     terr.w = terr.r + terr.b + terr.g;
     imageStore(heightmap, pos, terr);
     memoryBarrierImage();
@@ -105,6 +106,7 @@ void main() {
     offset[2] = vec2(off.x, off.y);
     offset[3] = vec2(1 - off.x, off.y);
     vec2 sediment = part.sediment;
+    barrier();
     for (uint i = 0; i < 4; i++) {
         atomic_erosion(id, pos[i], offset[i], sediment);
     }

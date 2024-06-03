@@ -11,6 +11,7 @@ layout (binding = BIND_WRITE_HEIGHTMAP, rgba32f)
 	uniform writeonly image2D out_heightmap;
 
 void main() {
+    float d_time = d_t;
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
     vec4 terrain = imageLoad(heightmap, pos);
     vec2 terr = terrain.rg;
@@ -54,7 +55,8 @@ void main() {
     ) {
         terr.g = (terr.g + l.g + r.g + t.g + b.g) / 5.0; // Set height to average
     }
-    terrain.rg = terr.rg;
+    float multip = Kspeed * d_time;
+    terrain.rg = multip * terr.rg + (1 - multip) * terrain.rg;
     terrain.w = terrain.r + terrain.g + terrain.b;
     imageStore(out_heightmap, pos, terrain);
 }

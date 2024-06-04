@@ -1,9 +1,9 @@
-#define WORLD_SCALE (0.20)
+#define WORLD_SCALE (0.75)
 #define SED_LAYERS (2)
 
 #define PARTICLE_COUNT (2048)
 
-#define LOW_RES_DIV3
+// #define LOW_RES_DIV3
 
 #define WRKGRP_SIZE_X 8
 #define WRKGRP_SIZE_Y 8
@@ -62,11 +62,19 @@ BLOCK Erosion_data {
     GL(FLOAT) Ks;
     GL(FLOAT) Kd;
     GL(FLOAT) Ke;
-    GL(FLOAT) G;
     GL(FLOAT) ENERGY_KEPT;
     GL(FLOAT) Kalpha;
     GL(FLOAT) Kspeed;
+    GL(FLOAT) G;
     GL(FLOAT) d_t;
+
+    GL(FLOAT) density;
+    GL(FLOAT) init_volume;
+    GL(FLOAT) friction;
+    GL(FLOAT) inertia;
+    GL(FLOAT) min_volume;
+    GL(FLOAT) min_velocity;
+    GL(UINT)  ttl; // time to live
 };
 
 #undef BLOCK

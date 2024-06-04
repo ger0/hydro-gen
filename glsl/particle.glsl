@@ -18,17 +18,7 @@ layout(std430, binding = BIND_PARTICLE_BUFFER) buffer ParticleBuffer {
     Particle particles[];
 };
 
-const float density       = 1.0;
-const float init_volume   = 1.0;
-const float friction      = 0.1;
-const float inertia       = 0.50;
-const float min_volume    = 0.1;
-const float min_velocity  = 0.10;
-
 uniform float time;
-// uniform erosion_data
-// particle time to live
-const uint ttl = 5000;
 
 uint hash(uint x) {
     x ^= x >> 16;
@@ -97,6 +87,11 @@ void main() {
     p.velocity = 
         inertia * p.velocity
         - (d_t * norm.xz) / (p.volume * density) * G * (1.0 - inertia);
+
+    // velocity is capped at length 1.0, otherwise particles can tunnel through terrain
+    if (length(p.velocity) > 1.0) {
+        p.velocity = normalize(p.velocity);
+    }
 
     vec2 old_pos = p.position;
     p.position += d_t * p.velocity;

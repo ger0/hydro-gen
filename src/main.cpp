@@ -24,7 +24,7 @@ constexpr float Z_FAR = 2048.f;
 constexpr float FOV = 90.f;
 constexpr float ASPECT_RATIO = float(WINDOW_W) / WINDOW_H;
 
-constexpr GLuint NOISE_SIZE = 128;
+constexpr GLuint NOISE_SIZE = 256;
 
 // shader filenames
 constexpr auto noise_comput_file                = "heightmap.glsl";
@@ -139,19 +139,28 @@ struct Map_settings {
 struct Erosion_settings {
     gl::Buffer buffer;
     Erosion_data data = {
-        .Kc = 0.60,
-        .Ks = 0.036,
-        .Kd = 0.02,
-        .Ke = 0.003,
-        .G = 9.81,
-        .ENERGY_KEPT = 1.0,
-        .Kalpha = 1.2f,
+        .Kc             = 0.60,
+        .Ks             = 0.036,
+        .Kd             = 0.02,
+        .Ke             = 0.003,
+        .Kalpha         = 1.2f,
 #if defined(PARTICLE_COUNT)
-        .Kspeed = 0.001f,
+        .Kspeed         = 0.001f,
+        .G              = 9.81,
+        .d_t            = 0.75,
+        .density        = 1.0,
+        .init_volume    = 1.0,
+        .friction       = 0.2,
+        .inertia        = 0.40,
+        .min_volume     = 0.1,
+        .min_velocity   = 0.10,
+        .ttl            = 5000,
 #else 
-        .Kspeed = 0.1f,
+        .ENERGY_KEPT    = 1.0,
+        .Kspeed         = 0.1f,
+        .G              = 1.0,
+        .d_t            = 0.003,
 #endif
-        .d_t = 0.75,
     };
     void push_data() {
         buffer.push_data(data);
@@ -592,6 +601,7 @@ void gen_heightmap(
     glUseProgram(0);
 }
 
+// TODO: Refactor and move to another module
 void draw_ui(
         World_data& world,
         Rain_settings& rain,
@@ -635,15 +645,28 @@ void draw_ui(
         state.should_rain = !state.should_rain;
         rain.push_data();
     }
+
+#if defined(PARTICLE_COUNT)
+    ImGui::SeparatorText("Particles");
+    ImGui::SliderFloat("Density", &erosion.data.density, 0.0f, 2.0f, "%.1f");
+    ImGui::SliderFloat("Initial volume", &erosion.data.init_volume, 0.0f, 2.0f, "%.1f");
+    ImGui::SliderFloat("Friction", &erosion.data.friction, 0.0f, 1.0f, "%.3f");
+    ImGui::SliderFloat("Inertia", &erosion.data.inertia, 0.0f, 1.0f, "%.3f");
+    ImGui::SliderFloat("Minimum volume", &erosion.data.min_volume, 0.0f, 1.0f, "%.3f");
+    ImGui::SliderFloat("Minimum velocity", &erosion.data.min_velocity, 0.0f, 1.0f, "%.3f");
+    int ttl = (int)erosion.data.ttl;
+    ImGui::SliderInt("Maximum iterations", &ttl, 1, 5000);
+    erosion.data.ttl = (GLuint)ttl;
+#else
     ImGui::SeparatorText("Rain");
     ImGui::SliderFloat("Amount", &rain.data.amount, 0.0f, 1.0f, "%.5f");
     ImGui::SliderFloat("Bonus (%)", &rain.data.mountain_thresh, 0.0f, 1.0f);
     ImGui::SliderFloat("Bonus Amount", &rain.data.mountain_multip, 0.0f, 2.5f, "%.5f");
     ImGui::SliderInt("Tick period", &rain.data.period, 2, 10000);
     ImGui::SliderFloat("Drops", &rain.data.drops, 0.001, 0.1);
+#endif 
 
     ImGui::SeparatorText("Hydraulic Erosion");
-    ImGui::SliderFloat("Energy Kept (%)", &erosion.data.ENERGY_KEPT, 0.998, 1.0, "%.5f");
     ImGui::SliderFloat("Capacity", &erosion.data.Kc, 0.0001f, 0.10f, "%.4f");
     ImGui::SliderFloat("Solubility", &erosion.data.Ks, 0.0001f, 0.10f, "%.4f");
     ImGui::SliderFloat("Deposition", &erosion.data.Kd, 0.0001f, 0.10f, "%.4f");
@@ -658,6 +681,7 @@ void draw_ui(
         ImGui::SliderFloat("Erosion speed", &erosion.data.Kspeed, 0.0001, 1.f, "%.5f", ImGuiSliderFlags_Logarithmic);
     #else 
         ImGui::SliderFloat("Erosion speed", &erosion.data.Kspeed, 0.01, 100.f, "%.3f", ImGuiSliderFlags_Logarithmic);
+        ImGui::SliderFloat("Energy Kept (%)", &erosion.data.ENERGY_KEPT, 0.998, 1.0, "%.5f");
     #endif
     if (ImGui::Button("Set Erosion Settings")) {
         erosion.push_data();

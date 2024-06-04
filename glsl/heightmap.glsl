@@ -103,7 +103,7 @@ void main() {
     }
     
     float rock_val = min(cfg.max_height, val * cfg.max_height * cfg.height_mult);
-    float dirt_val = 10.0;
+    float dirt_val = 2.0;
 
     vec4 terrain = vec4(
         rock_val,

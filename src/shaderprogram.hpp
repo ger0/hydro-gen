@@ -4,6 +4,7 @@
 #include <GL/glew.h>
 #include <string>
 #include <unordered_map>
+#include "utils.hpp"
 
 namespace gl {
 struct Texture {
@@ -17,11 +18,13 @@ struct Texture {
     GLuint      width;
     GLuint      height;
 };
+
 void gen_texture(Texture& tex,
     GLenum format = GL_RGBA,
     GLenum type = GL_FLOAT,
     const void* pixels = nullptr
 );
+
 void delete_texture(Texture& tex);
 void bind_texture(Texture& tex, GLuint bind);
 
@@ -46,6 +49,21 @@ struct Buffer {
 void gen_buffer(Buffer& buff);
 void gen_buffer(Buffer& buff, size_t size);
 void del_buffer(Buffer& buff);
+
+// TODO: Refactor
+// texture pairs for swapping
+struct Tex_pair {
+    gl::Texture t1; 
+    gl::Texture t2; 
+
+    GLuint r_bind;
+    GLuint w_bind;
+
+    u32 cntr = 0;
+    void swap(bool read_write = false);
+    Tex_pair(GLenum access, GLuint width, GLuint height, GLuint bind_r, GLuint bind_w);
+    void delete_textures();
+};
 
 };
 

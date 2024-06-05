@@ -26,8 +26,6 @@ layout (binding = BIND_WRITE_VELOCITYMAP, rgba32f)
 
 // cross-section area of a pipe
 const float A = 1.0;
-// length of the pipe
-const float L = 1.0;
 
 float get_wheight(ivec2 pos) {
     if (pos.x < 0 || pos.x > (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||

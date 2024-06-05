@@ -1,9 +1,12 @@
+#ifndef HYDR_GL_BINDINGS_HPP
+#define HYDR_GL_BINDINGS_HPP
+
 #define WORLD_SCALE (0.75)
 #define SED_LAYERS (2)
 
 #define PARTICLE_COUNT (2048)
 
-// #define LOW_RES_DIV3
+#define LOW_RES_DIV3
 
 #define WRKGRP_SIZE_X 8
 #define WRKGRP_SIZE_Y 8
@@ -122,3 +125,4 @@ struct Particle {
     // sediment layers
     GL(VEC2)   sediment;
 };
+#endif // HYDR_GL_BINDINGS_HPP``

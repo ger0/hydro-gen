@@ -59,6 +59,68 @@ namespace gl {
     void del_buffer(Buffer& buff) {
         glDeleteBuffers(1, &buff.bo);
     }
+
+    void Tex_pair::swap(bool read_write) {
+        cntr++;
+        if (cntr % 2) {
+            if (read_write) {
+                t1.access = GL_READ_WRITE;
+                t2.access = GL_READ_WRITE;
+            } else {
+                t1.access = GL_WRITE_ONLY;
+                t2.access = GL_READ_ONLY;
+            }
+            gl::bind_texture(t1, w_bind);
+            gl::bind_texture(t2, r_bind);
+        } else {
+            if (read_write) {
+                t1.access = GL_READ_WRITE;
+                t2.access = GL_READ_WRITE;
+            } else {
+                t1.access = GL_READ_ONLY;
+                t2.access = GL_WRITE_ONLY;
+            }
+            gl::bind_texture(t1, r_bind);
+            gl::bind_texture(t2, w_bind);
+        }
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
+    Tex_pair::Tex_pair(GLenum access, GLuint width, GLuint height, GLuint bind_r, GLuint bind_w) {
+        this->t1 = gl::Texture {
+            .access = access,
+            .width = width,
+            .height = height
+        };
+        this->t2 = gl::Texture {
+            .access = access,
+            .width = width,
+            .height = height
+        };
+        this->r_bind = bind_r;
+        this->w_bind = bind_w;
+
+        gl::gen_texture(t1);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        gl::gen_texture(t2);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        gl::bind_texture(t1, r_bind);
+        gl::bind_texture(t2, w_bind);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
+    void Tex_pair::delete_textures() {
+        gl::delete_texture(t1);
+        gl::delete_texture(t2);
+    }
 }
 
 enum Log_type {
@@ -186,9 +248,7 @@ Shader_program::~Shader_program() {
 
 Compute_program::~Compute_program() {
     glDetachShader(program, compute);
-
     glDeleteShader(compute);
-
     glDeleteProgram(program);
     LOG_DBG("Compute shader program deleted");
 }

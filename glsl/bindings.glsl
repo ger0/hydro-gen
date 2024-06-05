@@ -6,7 +6,7 @@
 
 #define PARTICLE_COUNT (2048)
 
-#define LOW_RES_DIV3
+// #define LOW_RES_DIV3
 
 #define WRKGRP_SIZE_X 8
 #define WRKGRP_SIZE_Y 8

@@ -1,7 +1,7 @@
 #include "erosion.hpp"
 using namespace Erosion;
 
-Programs Erosion::setup_shaders() {
+Programs Erosion::setup_shaders(State::Settings& set) {
     // compile compute shaders
     Programs prog = {
         .particle = {
@@ -21,8 +21,6 @@ Programs Erosion::setup_shaders() {
         },
     };
 
-    constexpr auto& set = State::settings;
-
     prog.thermal.flux.bind_uniform_block("Erosion_data", set.erosion.buffer);
     prog.thermal.transport.bind_uniform_block("Erosion_data", set.erosion.buffer);
 
@@ -40,7 +38,11 @@ void Erosion::dispatch_grid_rain(Programs& prog, const State::World::Textures& d
     prog.grid.rain.use();
     prog.grid.rain.set_uniform("time", data.time);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-    glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
+    glDispatchCompute(
+        State::NOISE_SIZE / WRKGRP_SIZE_X,
+        State::NOISE_SIZE / WRKGRP_SIZE_Y, 
+        1
+    );
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
 
@@ -51,7 +53,11 @@ void run(Compute_program& program, GLint layer = -1) {
         program.set_uniform("t_layer", layer);
     }
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-    glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
+    glDispatchCompute(
+        State::NOISE_SIZE / WRKGRP_SIZE_X,
+        State::NOISE_SIZE / WRKGRP_SIZE_Y,
+        1
+    );
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 };
 

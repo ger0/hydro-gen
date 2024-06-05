@@ -29,20 +29,26 @@ struct Data {
 
     Compute_program shader;
     Data(
-        GLuint window_w,
-        GLuint window_h,
+        GLuint window_width,
+        GLuint window_height,
         GLuint noise_size,
-        State::World::Textures& data
+        State::Settings& settings,
+        State::Program_state& program_state,
+        State::World::Textures& textures_data
     );
     ~Data();
 
     void blit();
     bool dispatch(
-        State::World::Textures& data
+        State::World::Textures& world_data,
+        State::Settings& settings,
+        State::Program_state::Camera& camera
     );
     void handle_ui(
-        State::World::Textures& world_data, 
-        Compute_program& comput_map
+        State::Settings& settings,
+        State::Program_state& state,
+        State::World::Textures& world,
+        Compute_program& map_generator
     );
 };
 

@@ -46,33 +46,35 @@ void State::World::delete_textures(State::World::Textures& data) {
     gl::delete_texture(data.lockmap);
 }
 
-void State::setup_settings() {
+State::Settings State::setup_settings() {
     LOG_DBG("Generating settings buffers...");
-    settings.rain.buffer.binding     = BIND_UNIFORM_RAIN_SETTINGS;
-    settings.erosion.buffer.binding  = BIND_UNIFORM_EROSION;
-    settings.map.buffer.binding      = BIND_UNIFORM_MAP_SETTINGS;
+    Settings set;
+    set.rain.buffer.binding     = BIND_UNIFORM_RAIN_SETTINGS;
+    set.erosion.buffer.binding  = BIND_UNIFORM_EROSION;
+    set.map.buffer.binding      = BIND_UNIFORM_MAP_SETTINGS;
 
-    gl::gen_buffer(settings.rain.buffer);
-    gl::gen_buffer(settings.erosion.buffer);
-    gl::gen_buffer(settings.map.buffer);
+    gl::gen_buffer(set.rain.buffer);
+    gl::gen_buffer(set.erosion.buffer);
+    gl::gen_buffer(set.map.buffer);
 
-    settings.rain.push_data();
-    settings.erosion.push_data();
-    settings.map.push_data();
+    set.rain.push_data();
+    set.erosion.push_data();
+    set.map.push_data();
+    return set;
 }
 
-void State::delete_settings() {
+void State::delete_settings(State::Settings& set) {
     LOG_DBG("Deleting settings buffers...");
-    gl::del_buffer(settings.rain.buffer);
-    gl::del_buffer(settings.erosion.buffer);
-    gl::del_buffer(settings.map.buffer);
+    gl::del_buffer(set.rain.buffer);
+    gl::del_buffer(set.erosion.buffer);
+    gl::del_buffer(set.map.buffer);
 }
 
 
-void State::World::gen_heightmap(Compute_program& program) {
+void State::World::gen_heightmap(Settings& settings, Compute_program& program) {
     program.use();
-    State::settings.map.push_data();
-    program.bind_uniform_block("map_settings", State::settings.map.buffer);
+    settings.map.push_data();
+    program.bind_uniform_block("map_settings", settings.map.buffer);
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
     glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
     glMemoryBarrier(GL_ALL_BARRIER_BITS);

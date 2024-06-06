@@ -5,7 +5,7 @@
 #include "simplex_noise.glsl"
 #line 7
 
-layout (local_size_x = WRKGRP_SIZE_X + WRKGRP_SIZE_Y) in;
+layout (local_size_x = WRKGRP_SIZE_X * WRKGRP_SIZE_Y) in;
 
 layout (binding = BIND_HEIGHTMAP, rgba32f)
     uniform readonly image2D heightmap;

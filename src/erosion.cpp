@@ -68,7 +68,7 @@ void run_particles(Compute_program& program, GLint layer = -1) {
     }
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-    glDispatchCompute(PARTICLE_COUNT, 1, 1);
+    glDispatchCompute(PARTICLE_COUNT / (WRKGRP_SIZE_X * WRKGRP_SIZE_Y), 1, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 };
@@ -84,7 +84,7 @@ void run_thermal_erosion(Programs& prog, State::World::Textures& data) {
     }
 }
 
-void dispatch_grid(Programs& prog, State::World::Textures& data) {
+void Erosion::dispatch_grid(Programs& prog, State::World::Textures& data) {
     run(prog.grid.flux);
     data.heightmap.swap();
     data.flux.swap();

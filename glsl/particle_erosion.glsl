@@ -4,7 +4,7 @@
 #include "simplex_noise.glsl"
 #line 6
 
-layout (local_size_x = WRKGRP_SIZE_X + WRKGRP_SIZE_Y) in;
+layout (local_size_x = WRKGRP_SIZE_X * WRKGRP_SIZE_Y) in;
 layout (binding = BIND_LOCKMAP, r32ui)   
 	uniform volatile coherent uimage2D lockmap;
 

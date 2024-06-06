@@ -72,12 +72,13 @@ void main() {
     // spawn particle if there's 0 iteraitons 
     if (p.iters == 0 || p.to_kill == true) {
         vec2 pos = vec2(
-            random(uint(id * time * 1000.0)) * float(set.hmap_dims.x) / WORLD_SCALE,
-            random(uint((id + 1) * time * 1000.0)) * float(set.hmap_dims.y / WORLD_SCALE)
+            random(uint(id * time * 1000.0)) * float(set.hmap_dims.x - 2.0) / WORLD_SCALE + 1.0,
+            random(uint((id + 1) * time * 1000.0)) * float(set.hmap_dims.y - 2.0) / WORLD_SCALE + 1.0
         );
         p.to_kill = false;
         // p.sediment = vec2(0.0);
         p.position = pos;
+        p.sediment = vec2(0);
         p.velocity = vec2(0);
         p.volume = init_volume;
         p.iters = 0;

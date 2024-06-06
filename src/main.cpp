@@ -20,9 +20,6 @@ constexpr auto noise_comput_file  = "heightmap.glsl";
 
 // mouse position
 static glm::vec2 mouse_last;
-
-void setup(GLFWwindow* window);
-
 State::Program_state state;
 
 namespace Input_handling {
@@ -187,7 +184,7 @@ int main(int argc, char* argv[]) {
             state.erosion_steps++;
             /* if (state.should_rain) {
                 if (!(state.erosion_steps % rain_settings.data.period)) {
-                    dispatch_rain(comput_rain, world_data, rain_settings);
+                    Erosion::dispatch_grid_rain(comput_rain, world_data, rain_settings);
                     Erosion::dispatch_grid_rain(erosion_progs, world_data, rain_settings);
                 }
             }  */

@@ -71,10 +71,15 @@ void State::delete_settings(State::Settings& set) {
 }
 
 
-void State::World::gen_heightmap(Settings& settings, Compute_program& program) {
+void State::World::gen_heightmap(
+    Settings& settings,
+    State::World::Textures& world,
+    Compute_program& program
+) {
     program.use();
     settings.map.push_data();
     program.bind_uniform_block("map_settings", settings.map.buffer);
+    program.bind_storage_buffer("ParticleBuffer", world.particle_buffer);
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
     glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
     glMemoryBarrier(GL_ALL_BARRIER_BITS);

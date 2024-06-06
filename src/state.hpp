@@ -76,7 +76,11 @@ struct Textures {
 Textures gen_textures(const GLuint width, const GLuint height);
 void delete_textures(Textures& data);
 
-void gen_heightmap(Settings& settings, Compute_program& program);
+void gen_heightmap(
+    Settings& settings,
+    State::World::Textures& world_data,
+    Compute_program& program
+);
 
 };
 };

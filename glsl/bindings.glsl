@@ -115,14 +115,14 @@ struct Map_settings_data {
 };
 
 struct Particle {
+    GL(FLOAT)   sc;
+    GL(INT)     iters;
     GL(VEC2)    position;
     GL(VEC2)    velocity;
     GL(FLOAT)   volume;
+    GL(VEC2)    sediment;
     // sediment capacity at a point
-    GL(FLOAT)   sc;
-    GL(INT)     iters;
-    GL(BOOL)    to_kill;
     // sediment layers
-    GL(VEC2)   sediment;
+    GL(BOOL)    to_kill;
 };
 #endif // HYDR_GL_BINDINGS_HPP``

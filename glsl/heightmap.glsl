@@ -19,6 +19,10 @@ layout (binding = BIND_FLUXMAP, rgba32f)
 layout (binding = BIND_SEDIMENTMAP, rgba32f)
     uniform writeonly image2D dest_sediment;
 
+layout(std430, binding = BIND_PARTICLE_BUFFER) buffer ParticleBuffer {
+    Particle particles[];
+};
+
 layout (std140, binding = BIND_UNIFORM_MAP_SETTINGS)
 uniform map_settings {
     Map_settings_data cfg;
@@ -127,6 +131,9 @@ void main() {
     // terrain.b += 84.4;
     // terrain.b = max(0.0, 84.0 - terrain.r);
     terrain.w = terrain.r + terrain.g + terrain.b;
+    for (uint i = 0; i < PARTICLE_COUNT; i++) {
+        particles[i].iters = 0;
+    }
     imageStore(dest_tex, store_pos, terrain);
     imageStore(dest_vel, store_pos, vec4(0));
     imageStore(dest_flux, store_pos, vec4(0));

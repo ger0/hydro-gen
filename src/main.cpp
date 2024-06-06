@@ -147,8 +147,8 @@ int main(int argc, char* argv[]) {
         State::World::gen_textures(State::NOISE_SIZE, State::NOISE_SIZE);
     defer{delete_textures(world_data);};
 
-    State::World::gen_heightmap(settings, comput_map);
-    auto erosion_progs = Erosion::setup_shaders(settings);
+    State::World::gen_heightmap(settings, world_data, comput_map);
+    auto erosion_progs = Erosion::setup_shaders(settings, world_data);
 
     // ---------- prepare textures and framebuffer for rendering  ---------------
     auto renderer = Render::Data(

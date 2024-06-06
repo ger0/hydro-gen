@@ -35,12 +35,15 @@ struct Buffer {
     GLint   mode = GL_STATIC_DRAW;
 
     template <typename T>
-    void push_data(T& data) {
+    void push_data(T& data, size_t size = 0) {
         glBindBuffer(type, bo);
         glBindBufferBase(type, binding, bo);
+        if (size == 0) {
+            size = sizeof(data);
+        }
         glBufferData(
             type, 
-            sizeof(data), &data, 
+            size, &data, 
             mode
         );
         glBindBuffer(type, 0);

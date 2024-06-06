@@ -70,18 +70,21 @@ void main() {
     uint id = gl_GlobalInvocationID.x;
     Particle p = particles[id];
     // spawn particle if there's 0 iteraitons 
+    for (uint i = 0; i < SED_LAYERS; i++) {
+        if (p.sediment[i] < 0.0 || p.iters == 0) {
+            p.sediment[i] = 0;
+        }
+    }
     if (p.iters == 0 || p.to_kill == true) {
         vec2 pos = vec2(
-            random(uint(id * time * 1000.0)) * float(set.hmap_dims.x - 2.0) / WORLD_SCALE + 1.0,
-            random(uint((id + 1) * time * 1000.0)) * float(set.hmap_dims.y - 2.0) / WORLD_SCALE + 1.0
+            random(uint(id * time * 1000.0)) * float(set.hmap_dims.x - 3.0) / WORLD_SCALE + 1.0,
+            random(uint((id + 1) * time * 1000.0)) * float(set.hmap_dims.y - 3.0) / WORLD_SCALE + 1.0
         );
         p.to_kill = false;
-        // p.sediment = vec2(0.0);
         p.position = pos;
-        p.sediment = vec2(0);
         p.velocity = vec2(0);
         p.volume = init_volume;
-        p.iters = 0;
+        p.iters = 1;
     }
     vec3 norm = get_terr_normal(p.position);
 
@@ -98,8 +101,8 @@ void main() {
     p.position += d_t * p.velocity;
     if (p.position.x <= 1
         || p.position.y <= 1
-        || p.position.x * WORLD_SCALE >= (set.hmap_dims.x - 1.0)
-        || p.position.y * WORLD_SCALE >= (set.hmap_dims.y - 1.0)
+        || p.position.x * WORLD_SCALE >= (set.hmap_dims.x - 2.0)
+        || p.position.y * WORLD_SCALE >= (set.hmap_dims.y - 2.0)
     ) {
         /* p.velocity = -p.velocity;
         p.position += 2 * d_t * p.velocity * (1 - friction); */

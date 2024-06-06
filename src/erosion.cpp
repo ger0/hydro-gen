@@ -1,7 +1,7 @@
 #include "erosion.hpp"
 using namespace Erosion;
 
-Programs Erosion::setup_shaders(State::Settings& set) {
+Programs Erosion::setup_shaders(State::Settings& set, State::World::Textures& data) {
     // compile compute shaders
     Programs prog = {
         .particle = {
@@ -30,6 +30,9 @@ Programs Erosion::setup_shaders(State::Settings& set) {
 
     prog.particle.movement.bind_uniform_block("map_settings", set.map.buffer);
     prog.particle.erosion.bind_uniform_block("Erosion_data", set.erosion.buffer);
+
+    prog.particle.movement.bind_storage_buffer("ParticleBuffer", data.particle_buffer);
+    prog.particle.erosion.bind_storage_buffer("ParticleBuffer", data.particle_buffer);
 
     return prog;
 }

@@ -47,7 +47,7 @@ struct Programs {
     Thermal     thermal;
 };
 
-Programs setup_shaders(State::Settings& settings);
+Programs setup_shaders(State::Settings& set, State::World::Textures& data);
 
 void dispatch_grid_rain(Programs& prog, const State::World::Textures& data);
 void dispatch_grid(Programs& prog, State::World::Textures& data);

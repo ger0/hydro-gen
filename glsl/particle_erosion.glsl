@@ -57,11 +57,11 @@ void erode_layers(uint id, ivec2 pos, vec2 offset, vec2 old_sediment) {
             float deposit = multipl * Kld * (s1 - c);
             s1 -= deposit;
             terr[i] += deposit;
-            if (s1 < 0) {
-                float diff = abs(s1);
-                s1 = 0;
-                // terr[i] -= diff;
-            }
+        }
+        if (s1 < 0) {
+            float diff = abs(s1);
+            s1 = 0;
+            terr[i] -= diff;
         }
         cap += s1;
         part.sediment[i] = s1;
@@ -101,10 +101,10 @@ void main() {
     // offset between points inside a quad
     vec2 offset[4];
     vec2 off = fract(part.position * WORLD_SCALE);
-    offset[0] = vec2(1 - off.x, 1 - off.y);
-    offset[1] = vec2(off.x, 1 - off.y);
+    offset[0] = vec2(1.0 - off.x, 1.0 - off.y);
+    offset[1] = vec2(off.x, 1.0 - off.y);
     offset[2] = vec2(off.x, off.y);
-    offset[3] = vec2(1 - off.x, off.y);
+    offset[3] = vec2(1.0 - off.x, off.y);
     vec2 sediment = part.sediment;
     barrier();
     for (uint i = 0; i < 4; i++) {

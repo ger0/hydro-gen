@@ -227,7 +227,7 @@ void Render::Data::handle_ui(
         state.should_erode = false;
         delete_textures(world);
         world = State::World::gen_textures(State::NOISE_SIZE, State::NOISE_SIZE);
-        State::World::gen_heightmap(set, map_generator);
+        State::World::gen_heightmap(set, world, map_generator);
         erosion.push_data();
         state.should_erode = old_erod;
     }

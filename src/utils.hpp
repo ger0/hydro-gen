@@ -6,6 +6,7 @@
 #include <fmt/format.h>
 #include <array>
 #include <glm/fwd.hpp>
+#include <optional>
 #include <vector>
 
 using u64 = uint_fast64_t;
@@ -22,6 +23,9 @@ using byte = uint_least8_t;
 
 template <typename... T>
 using Uq_ptr = std::unique_ptr<T...>;
+
+template <typename... T>
+using Opt = std::optional<T...>;
 
 template <typename T, size_t n>
 using Arr = std::array<T, n>;

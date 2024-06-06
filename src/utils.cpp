@@ -82,6 +82,7 @@ GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title, bool* 
     // glfwSetInputMode(win, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwSwapInterval(0);
     glViewport(0, 0, window_size.x, window_size.y);
+    glEnable(GL_ARB_uniform_buffer_object);
 
     if (glewInit() != GLEW_OK) {
         LOG_ERR("Failed to initialise GLEW!");

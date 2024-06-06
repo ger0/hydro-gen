@@ -24,17 +24,8 @@ layout (binding = BIND_VELOCITYMAP, rgba32f)
 layout (binding = BIND_WRITE_VELOCITYMAP, rgba32f)   
 	uniform writeonly image2D out_velocitymap;
 
-uniform float max_height;
-uniform float ENERGY_LOSS;
-
 // cross-section area of a pipe
 const float A = 1.0;
-// length of the pipe
-const float L = 1.0;
-// gravity acceleration
-uniform float G;
-// time step
-uniform float d_t;
 
 float get_wheight(ivec2 pos) {
     if (pos.x < 0 || pos.x > (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
@@ -76,13 +67,13 @@ void main() {
     in_flux.w = get_flux(pos + ivec2( 0,-1)).z; // from bottom 
 
     out_flux.x = 
-        max(0, ENERGY_LOSS * out_flux.x + d_t * A * (G * d_height.x) / L);
+        max(0, ENERGY_KEPT * out_flux.x + d_t * A * (G * d_height.x) / L);
     out_flux.y =  
-        max(0, ENERGY_LOSS * out_flux.y + d_t * A * (G * d_height.y) / L);
+        max(0, ENERGY_KEPT * out_flux.y + d_t * A * (G * d_height.y) / L);
     out_flux.z =  
-        max(0, ENERGY_LOSS * out_flux.z + d_t * A * (G * d_height.z) / L);
+        max(0, ENERGY_KEPT * out_flux.z + d_t * A * (G * d_height.z) / L);
     out_flux.w =
-        max(0, ENERGY_LOSS * out_flux.w + d_t * A * (G * d_height.w) / L);
+        max(0, ENERGY_KEPT * out_flux.w + d_t * A * (G * d_height.w) / L);
 
     // boundary checking */
     if (pos.x <= 0) {
@@ -112,10 +103,10 @@ void main() {
     float d2 = max(0, d1 + (d_volume / (L * L)));
 
     terrain.b = d2;
-    terrain.w = terrain.r + d2;
+    terrain.w = terrain.r + d2 + terrain.g;
 
     // average water height
-    vel.z = max(1e-2, d1 + d2); 
+    vel.z = (d1 + d2); 
     imageStore(out_fluxmap, pos, out_flux);
     imageStore(out_velocitymap, pos, vel);
     imageStore(out_heightmap, pos, terrain);

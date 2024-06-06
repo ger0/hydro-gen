@@ -1,4 +1,12 @@
-#define WORLD_SCALE (0.66)
+#ifndef HYDR_GL_BINDINGS_HPP
+#define HYDR_GL_BINDINGS_HPP
+
+#define WORLD_SCALE (0.75)
+#define SED_LAYERS (2)
+
+#define PARTICLE_COUNT (2048)
+
+// #define LOW_RES_DIV3
 
 #define WRKGRP_SIZE_X 8
 #define WRKGRP_SIZE_Y 8
@@ -8,13 +16,113 @@
 #define BIND_HEIGHTMAP 1
 #define BIND_FLUXMAP 2
 #define BIND_VELOCITYMAP 3 
+#define BIND_SEDIMENTMAP 4 
 
-#define BIND_THERMALFLUX_C 4 
-#define BIND_THERMALFLUX_D 5 
+#define BIND_THERMALFLUX_C 5 
+#define BIND_THERMALFLUX_D 6 
 
-#define BIND_WRITE_HEIGHTMAP 6 
-#define BIND_WRITE_FLUXMAP 7 
-#define BIND_WRITE_VELOCITYMAP 8
+#define BIND_WRITE_HEIGHTMAP 7 
+#define BIND_WRITE_FLUXMAP 8 
+#define BIND_WRITE_VELOCITYMAP 9
+#define BIND_WRITE_SEDIMENTMAP 10
 
-#define BIND_WRITE_THERMALFLUX_C 9
-#define BIND_WRITE_THERMALFLUX_D 10
+#define BIND_WRITE_THERMALFLUX_C 11
+#define BIND_WRITE_THERMALFLUX_D 12
+
+#define BIND_LOCKMAP 13
+
+#define BIND_UNIFORM_EROSION 1
+#define BIND_UNIFORM_MAP_SETTINGS 2
+#define BIND_UNIFORM_RAIN_SETTINGS 3
+#define BIND_PARTICLE_BUFFER 4
+
+#if defined(GL_core_profile) 
+    const float L = 1.0;
+#endif
+
+#if defined(GL_core_profile)
+    #define BLOCK layout (std140, binding = BIND_UNIFORM_EROSION) uniform
+    #define GL(X) X
+    #define FLOAT float
+    #define INT int
+    #define UINT uint
+    #define VEC2 vec2
+    #define IVEC2 ivec2
+    #define BOOL bool
+#else 
+    #define BLOCK struct
+    #define FLOAT GLfloat
+    #define INT GLint
+    #define UINT GLuint
+    #define GL(X) alignas(sizeof(X)) X
+    #define VEC2 glm::vec2
+    #define IVEC2 glm::ivec2
+    #define BOOL GLboolean
+#endif
+
+BLOCK Erosion_data {
+    GL(FLOAT) Kc;
+    GL(FLOAT) Ks;
+    GL(FLOAT) Kd;
+    GL(FLOAT) Ke;
+    GL(FLOAT) ENERGY_KEPT;
+    GL(FLOAT) Kalpha;
+    GL(FLOAT) Kspeed;
+    GL(FLOAT) G;
+    GL(FLOAT) d_t;
+
+    GL(FLOAT) density;
+    GL(FLOAT) init_volume;
+    GL(FLOAT) friction;
+    GL(FLOAT) inertia;
+    GL(FLOAT) min_volume;
+    GL(FLOAT) min_velocity;
+    GL(UINT)  ttl; // time to live
+};
+
+#undef BLOCK
+
+#if defined(GL_core_profile)
+    #define BLOCK layout (std140, binding = BIND_UNIFORM_RAIN_SETTINGS) uniform
+#else 
+    #define BLOCK struct
+#endif
+
+struct Rain_data {
+    GL(FLOAT)   amount;
+    GL(FLOAT)   mountain_thresh;
+    GL(FLOAT)   mountain_multip;
+    GL(INT)     period;
+    GL(FLOAT)   drops;
+};
+
+struct Map_settings_data {
+    GL(FLOAT) max_height;
+    GL(IVEC2) hmap_dims;
+    GL(FLOAT) height_mult;
+    GL(FLOAT) water_lvl;
+    GL(FLOAT) seed;
+    GL(FLOAT) persistance;
+    GL(FLOAT) lacunarity;
+    GL(FLOAT) scale;
+    GL(FLOAT) redistribution;
+    GL(INT)   octaves;
+
+    GL(UINT)  mask_round;
+    GL(UINT)  mask_exp;
+    GL(UINT)  mask_power;
+    GL(UINT)  mask_slope;
+};
+
+struct Particle {
+    GL(VEC2)    position;
+    GL(VEC2)    velocity;
+    GL(FLOAT)   volume;
+    // sediment capacity at a point
+    GL(FLOAT)   sc;
+    GL(INT)     iters;
+    GL(BOOL)    to_kill;
+    // sediment layers
+    GL(VEC2)   sediment;
+};
+#endif // HYDR_GL_BINDINGS_HPP``

@@ -10,11 +10,15 @@ layout (binding = BIND_HEIGHTMAP, rgba32f)
 	uniform image2D heightmap;
 
 uniform float time;
-uniform float max_height;
-uniform float rain_amount;
-uniform float MOUNT_HGH; // 0.0-1.0
-uniform float mount_mtp;
-uniform float drops;
+layout (std140, binding = BIND_UNIFORM_RAIN_SETTINGS) 
+uniform settings {
+    Rain_data set;
+};
+
+layout (std140, binding = BIND_UNIFORM_MAP_SETTINGS)
+uniform map_settings {
+    Map_settings_data map_set;
+};
 
 float rand(float n) {
     return fract(sin(n) * 1e4);
@@ -33,7 +37,7 @@ void main() {
         fract(time * 1.372914227e3) * 1000.f,
         0.5,
         2.0,
-        drops,
+        set.drops,
         1,
         3,
         false,
@@ -41,10 +45,10 @@ void main() {
     );
     float r = max(0.0, gln_sfbm(gl_GlobalInvocationID.xy, opts));
 
-    float incr = rain_amount * r;
-    float mountain = terr.w - max_height * MOUNT_HGH;
+    float incr = set.amount * r;
+    float mountain = terr.w - map_set.max_height * set.mountain_thresh;
     if (mountain > 0) {
-        incr += mountain * mount_mtp * r / ((1.0 - MOUNT_HGH) * max_height);
+        incr += mountain * set.mountain_multip * r / ((1.0 - set.mountain_thresh) * map_set.max_height);
     }
     terr.b += incr;
     terr.w = terr.r + terr.b;

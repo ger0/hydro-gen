@@ -17,7 +17,7 @@ Settings setup_settings();
 void delete_settings(Settings& settings);
 
 struct Program_state {
-    bool should_rain = false;
+    bool should_rain = true;
     bool should_erode = true;
     bool should_render = true;
 

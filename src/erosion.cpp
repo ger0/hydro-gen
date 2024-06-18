@@ -64,6 +64,18 @@ void run(Compute_program& program, GLint layer = -1) {
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 };
 
+void run_thermal_erosion(Programs& prog, State::World::Textures& data) {
+    for (int i = 0; i < SED_LAYERS; i++) {
+        run(prog.thermal.flux, i);
+        data.thermal_c.swap();
+        data.thermal_d.swap();
+
+        run(prog.thermal.transport, i);
+        data.heightmap.swap();
+    }
+}
+
+#if defined(PARTICLE_COUNT)
 void run_particles(Compute_program& program, GLint layer = -1) {
     program.use();
     if (layer != -1) {
@@ -76,16 +88,19 @@ void run_particles(Compute_program& program, GLint layer = -1) {
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 };
 
-void run_thermal_erosion(Programs& prog, State::World::Textures& data) {
-    for (int i = 0; i < SED_LAYERS; i++) {
-        run(prog.thermal.flux, i);
-        data.thermal_c.swap();
-        data.thermal_d.swap();
+void Erosion::dispatch_particle(Programs& prog, State::World::Textures& data) {
+    prog.particle.movement.use();
+    prog.particle.movement.set_uniform("time", data.time);
+    run_particles(prog.particle.movement);
+    run_particles(prog.particle.erosion);
+    run_thermal_erosion(prog, data);
 
-        run(prog.thermal.transport, i);
-        data.heightmap.swap();
-    }
+    // thermal erosion - ravine smoothing
+    run(prog.thermal.smooth);
+    data.heightmap.swap(true);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
+#endif
 
 void Erosion::dispatch_grid(Programs& prog, State::World::Textures& data) {
     run(prog.grid.flux);
@@ -107,17 +122,3 @@ void Erosion::dispatch_grid(Programs& prog, State::World::Textures& data) {
     run(prog.thermal.smooth);
     data.heightmap.swap();
 }
-
-void Erosion::dispatch_particle(Programs& prog, State::World::Textures& data) {
-    prog.particle.movement.use();
-    prog.particle.movement.set_uniform("time", data.time);
-    run_particles(prog.particle.movement);
-    run_particles(prog.particle.erosion);
-    run_thermal_erosion(prog, data);
-
-    // thermal erosion - ravine smoothing
-    run(prog.thermal.smooth);
-    data.heightmap.swap(true);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-}
-

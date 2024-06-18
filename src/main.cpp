@@ -182,15 +182,18 @@ int main(int argc, char* argv[]) {
         // ---------- erosion compute shader ------------
         if (state.should_erode) {
             state.erosion_steps++;
-            /* if (state.should_rain) {
-                if (!(state.erosion_steps % rain_settings.data.period)) {
-                    Erosion::dispatch_grid_rain(comput_rain, world_data, rain_settings);
-                    Erosion::dispatch_grid_rain(erosion_progs, world_data, rain_settings);
-                }
-            }  */
+
             float erosion_d_time = glfwGetTime();
-            // Erosion::dispatch_grid(erosion_progs, world_data);
+#if not defined(PARTICLE_COUNT) 
+            if (state.should_rain) {
+                if (!(state.erosion_steps % settings.rain.data.period)) {
+                    Erosion::dispatch_grid_rain(erosion_progs, world_data);
+                }
+            }
+            Erosion::dispatch_grid(erosion_progs, world_data);
+#else
             Erosion::dispatch_particle(erosion_progs, world_data);
+#endif
 
             erosion_d_time = glfwGetTime() - erosion_d_time;
             state.erosion_time += erosion_d_time;

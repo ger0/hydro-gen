@@ -1,10 +1,10 @@
 #ifndef HYDR_GL_BINDINGS_HPP
 #define HYDR_GL_BINDINGS_HPP
 
-#define WORLD_SCALE (0.75)
+#define WORLD_SCALE (0.50)
 #define SED_LAYERS (2)
 
-#define PARTICLE_COUNT (2048)
+#define PARTICLE_COUNT (262144)
 
 // #define LOW_RES_DIV3
 
@@ -65,8 +65,8 @@ BLOCK Erosion_data {
     GL(FLOAT) Ks;
     GL(FLOAT) Kd;
     GL(FLOAT) Ke;
-    GL(FLOAT) ENERGY_KEPT;
     GL(FLOAT) Kalpha;
+    GL(FLOAT) ENERGY_KEPT;
     GL(FLOAT) Kspeed;
     GL(FLOAT) G;
     GL(FLOAT) d_t;

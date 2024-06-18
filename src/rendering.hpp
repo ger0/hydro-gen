@@ -19,6 +19,7 @@ struct Data {
 
     float   prec = 0.35;
     bool    display_sediment = false;
+    bool    display_particles = false;
     bool    debug_preview = false;
 
     struct Dims {

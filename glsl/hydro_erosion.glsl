@@ -94,7 +94,7 @@ void main() {
         float c = max(0.0, Klc * max(0.10, sin_a) * length(vel.xy) - cap);
         // float c = max(0.0, Klc * sin_a * length(vel.xy) - cap);
 
-        float bt;
+        float bt = 0;
         float s1;
         float st = sediment[i];
 
@@ -121,9 +121,6 @@ void main() {
         sediment[i] = s1;
         terrain[i] = bt;
         cap += s1;
-        if (bt > 0.0) {
-            break;
-        }
     }
 
     terrain.w = terrain.r + terrain.g + terrain.b;

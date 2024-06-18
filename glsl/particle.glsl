@@ -77,8 +77,8 @@ void main() {
     }
     if (p.iters == 0 || p.to_kill == true) {
         vec2 pos = vec2(
-            random(uint(id * time * 1000.0)) * float(set.hmap_dims.x - 3.0) / WORLD_SCALE + 1.0,
-            random(uint((id + 1) * time * 1000.0)) * float(set.hmap_dims.y - 3.0) / WORLD_SCALE + 1.0
+            random(uint(id * time * 1000.0)) * float(set.hmap_dims.x - 4.0) / WORLD_SCALE + 2.0,
+            random(uint((id + 1) * time * 1000.0)) * float(set.hmap_dims.y - 4.0) / WORLD_SCALE + 2.0
         );
         p.to_kill = false;
         p.position = pos;
@@ -101,12 +101,13 @@ void main() {
     p.position += d_t * p.velocity;
     if (p.position.x <= 1
         || p.position.y <= 1
-        || p.position.x * WORLD_SCALE >= (set.hmap_dims.x - 2.0)
-        || p.position.y * WORLD_SCALE >= (set.hmap_dims.y - 2.0)
+        || p.position.x * WORLD_SCALE >= (set.hmap_dims.x - 2)
+        || p.position.y * WORLD_SCALE >= (set.hmap_dims.y - 2)
     ) {
         /* p.velocity = -p.velocity;
         p.position += 2 * d_t * p.velocity * (1 - friction); */
         p.position = old_pos;
+        p.velocity = vec2(0);
         p.to_kill = true;
     }
     p.velocity *= (1.0 - d_t * friction);

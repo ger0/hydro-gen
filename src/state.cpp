@@ -16,11 +16,13 @@ State::World::Textures State::World::gen_textures(const GLuint width, const GLui
     gl::Tex_pair thermal_c(GL_READ_WRITE, width, height, BIND_THERMALFLUX_C, BIND_WRITE_THERMALFLUX_C);
     // ------------- diagonal flux for thermal erosion -----------
     gl::Tex_pair thermal_d(GL_READ_WRITE, width, height, BIND_THERMALFLUX_D, BIND_WRITE_THERMALFLUX_D);
+#if defined(PARTICLE_COUNT)
     gl::Buffer particle_buffer {
         .binding = BIND_PARTICLE_BUFFER,
         .type = GL_SHADER_STORAGE_BUFFER
     };
     gl::gen_buffer(particle_buffer, PARTICLE_COUNT * sizeof(Particle));
+#endif
 
     return State::World::Textures {
         .heightmap = heightmap,
@@ -30,7 +32,9 @@ State::World::Textures State::World::gen_textures(const GLuint width, const GLui
         .thermal_c = thermal_c,
         .thermal_d = thermal_d,
         .lockmap = lockmap,
+#if defined(PARTICLE_COUNT)
         .particle_buffer = particle_buffer
+#endif
     };
 };
 

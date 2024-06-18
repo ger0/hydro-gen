@@ -51,10 +51,10 @@ struct Map_settings {
 struct Erosion_settings {
     gl::Buffer buffer;
     Erosion_data data = {
-        .Kc             = 0.60,
-        .Ks             = 0.036,
-        .Kd             = 0.02,
-        .Ke             = 0.003,
+        .Kc             = 0.060,
+        .Ks             = 0.0020,
+        .Kd             = 0.0012,
+        .Ke             = 0.0003,
         .Kalpha         = 1.2f,
 #if defined(PARTICLE_COUNT)
         .Kspeed         = 0.001f,
@@ -69,9 +69,9 @@ struct Erosion_settings {
         .ttl            = 5000,
 #else 
         .ENERGY_KEPT    = 1.0,
-        .Kspeed         = 0.1f,
+        .Kspeed         = 1.0f,
         .G              = 1.0,
-        .d_t            = 0.003,
+        .d_t            = 0.001,
 #endif
     };
     void push_data() {

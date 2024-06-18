@@ -38,7 +38,7 @@ void erode_layers(uint id, ivec2 pos, vec2 offset, vec2 old_sediment) {
         float Kld = d_t * Kd * (10.0 * i + 1.0);
 
         // sediment transport capacity
-        float c = part.sc - cap;
+        float c = max(0.0, part.sc - cap);
         float s1 = old_sediment[i];
 
         // dissolve sediment

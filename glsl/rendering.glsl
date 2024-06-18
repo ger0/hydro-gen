@@ -21,7 +21,7 @@ uniform mat4 view;
 uniform vec3 dir;
 uniform vec3 pos;
 uniform float time;
-uniform bool should_draw_water;
+uniform bool should_draw_particles;
 uniform bool DEBUG_PREVIEW;
 
 uniform float prec = 0.35;
@@ -399,18 +399,22 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
     else {
         color = get_terrain_color(ray, direction, sundot);
         // TODO: draw particles
-        for (uint i = 0; i < PARTICLE_COUNT; i++) {
-            // ivec2 part_pos = ivec2(particles[i].position / float(set.hmap_dims.xy) * (gl_NumWorkGroups.xy * gl_WorkGroupSize.xy));
-            vec2 part_pos = particles[i].position;
-            if (abs(length(ray.pos.xz - part_pos)) <= particles[i].volume) {
-                color *= 0.4;
-                color += 0.6 * water_color;
-                if (display_sediment) {
-                    color.r = particles[i].sediment.r / (sediment_max_cap * particles[i].volume);
-                    color.g = particles[i].sediment.g / (sediment_max_cap * particles[i].volume);
+#if defined(PARTICLE_COUNT)
+        if (should_draw_particles) {
+            for (uint i = 0; i < PARTICLE_COUNT; i++) {
+                // ivec2 part_pos = ivec2(particles[i].position / float(set.hmap_dims.xy) * (gl_NumWorkGroups.xy * gl_WorkGroupSize.xy));
+                vec2 part_pos = particles[i].position;
+                if (abs(length(ray.pos.xz - part_pos)) <= particles[i].volume) {
+                    color *= 0.4;
+                    color += 0.6 * water_color;
+                    if (display_sediment) {
+                        color.r = particles[i].sediment.r / (sediment_max_cap * particles[i].volume * WORLD_SCALE);
+                        color.g = particles[i].sediment.g / (sediment_max_cap * particles[i].volume * WORLD_SCALE);
+                    }
                 }
             }
         }
+#endif
     }
 
     if (display_sediment) {

@@ -131,12 +131,15 @@ void main() {
     // terrain.b += 84.4;
     // terrain.b = max(0.0, 84.0 - terrain.r);
     terrain.w = terrain.r + terrain.g + terrain.b;
-    for (uint i = 0; i < PARTICLE_COUNT; i++) {
-        particles[i].iters = 0;
+#if defined(PARTICLE_COUNT)
+    if (gl_GlobalInvocationID.xy == vec2(0, 0)) {
+        for (uint i = 0; i < PARTICLE_COUNT; i++) {
+            particles[i].iters = 0;
+        }
     }
+#endif
     imageStore(dest_tex, store_pos, terrain);
     imageStore(dest_vel, store_pos, vec4(0));
     imageStore(dest_flux, store_pos, vec4(0));
     imageStore(dest_sediment, store_pos, vec4(0));
-    //imageStore(dest_tex, store_pos, vec4(cfg.seed, cfg.lacunarity, cfg.persistance, cfg.cfg.max_height));
 }

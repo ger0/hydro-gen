@@ -94,6 +94,7 @@ bool Render::Data::dispatch(
     shader.set_uniform("display_sediment", display_sediment);
     shader.set_uniform("sediment_max_cap", set.erosion.data.Kc);
     shader.set_uniform("DEBUG_PREVIEW", debug_preview);
+    shader.set_uniform("should_draw_particles", display_particles);
 
 #ifdef LOW_RES_DIV3
     glDispatchCompute(
@@ -146,7 +147,7 @@ void Render::Data::handle_ui(
     ImGui::Text("Total Time: {%f}", world.time);
     ImGui::End();
 
-    ImGui::Begin("set");
+    ImGui::Begin("Erosion Settings");
     if (ImGui::Button(state.should_render ? "Disable Rendering" : "Start Rendering")) {
         state.should_render = !state.should_render;
     }
@@ -203,6 +204,7 @@ void Render::Data::handle_ui(
     ImGui::SliderFloat("Raymarching precision", &prec, 0.01f, 1.f);
     ImGui::Checkbox("Display sediment", &display_sediment);
     ImGui::Checkbox("Heightmap view", &debug_preview);
+    ImGui::Checkbox("Display particles", &display_particles);
     ImGui::SliderFloat("Target_fps", &state.target_fps, 2.f, 120.f);
     ImGui::SliderFloat("Time step", &erosion.data.d_t, 0.0005f, 0.05f);
     ImGui::End();

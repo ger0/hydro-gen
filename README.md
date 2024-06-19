@@ -1,5 +1,15 @@
-# Procedural generation with hydraulic erosion
-There are two modes of erosion available:
+# Procedural generation with hydraulic erosion and thermal erosion
+
+
+Erosion parameters include:
+- Total transport capacity of a particle / unit of water
+- Speed of dissolution
+- Speed of deposition
+- Water evaporation speed
+- Talus angle of the material
+
+
+There are two modes of hydraulic erosion available:
 
 
 - Grid based erosion (shallow water model with virtual pipes)
@@ -33,7 +43,11 @@ make
 ```
 
 In order to change map size replace NOISE_SIZE in settings.hpp with a different value.
+
+
 Dimensions of the window can be changed by changing WINDOW_W and WINDOW_H variables in main.cpp.
+
+
 (These settings along with the ability to change erosion method will be changed later).
 ## Screenshots
 

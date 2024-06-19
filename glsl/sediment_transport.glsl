@@ -69,17 +69,23 @@ void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
 
     vec4 vel = imageLoad(velocitymap, pos);
-    vec2 back_coords = vec2(pos.x - vel.x * d_t, pos.y - vel.y * d_t);
-    // vec2 back_coords = mac_cormack_backward(gl_GlobalInvocationID.xy, velocitymap, d_t);
+    // vec2 back_coords = vec2(pos.x - vel.x * d_t, pos.y - vel.y * d_t);
+    vec2 back_coords = mac_cormack_backward(gl_GlobalInvocationID.xy, velocitymap, d_t);
     vec4 st = get_lerp_sed(back_coords);
 
-    // vec4 st = imageLoad(sedimap, pos);
-    // vec4 pre_st = imageLoad(sedimap, pos);
+    vec4 pre_st = imageLoad(sedimap, pos);
     // trying to counter mass loss?
-    // st = (100.0 * st + pre_st) / 101.0;
+    st = (100.0 * st + pre_st) / 101.0;
 
     vec4 terrain = imageLoad(heightmap, pos);
     terrain.b *= (1 - Ke * d_t);
+    // deposit all sediment when there's no water (NEW)
+    if (terrain.b == 0) {
+        terrain.r += st.r;
+        terrain.g += st.g;
+        st.r = 0;
+        st.g = 0;
+    }
     terrain.w = terrain.r + terrain.g + terrain.b;
     imageStore(out_sedimap, pos, st);
     imageStore(out_heightmap, pos, terrain);

@@ -40,7 +40,7 @@ struct Map_settings {
         .octaves        = 8,
         .mask_round     = false,
         .mask_exp       = false,
-        .mask_power     = false,
+        .mask_power     = true,
         .mask_slope     = false
     };
     void push_data() {
@@ -51,9 +51,14 @@ struct Map_settings {
 struct Erosion_settings {
     gl::Buffer buffer;
     Erosion_data data = {
-        .Kc             = 0.060,
+        .Kc             = 0.020,
+#if defined(PARTICLE_COUNT)
         .Ks             = 0.0020,
-        .Kd             = 0.0012,
+        .Kd             = 0.0020,
+#else
+        .Ks             = 0.020,
+        .Kd             = 0.020,
+#endif
         .Ke             = 0.0003,
         .Kalpha         = 1.2f,
 #if defined(PARTICLE_COUNT)

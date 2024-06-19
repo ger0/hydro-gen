@@ -55,8 +55,21 @@ void main() {
     ) {
         terr.g = (terr.g + l.g + r.g + t.g + b.g) / 5.0; // Set height to average
     }
-    float multip = Kspeed * d_time;
+
+    float multip = clamp(Kspeed * d_time * 100, 0, 1);
+    // water display on particles
+#if defined(PARTICLE_COUNT)
+    terrain.b *= clamp(1 - max(d_time * Ke, 1e-2), 0, 1);
+    if (pos.x == 0 || pos.y == 0 || 
+        pos.x == (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
+        pos.y == (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1)
+    ) {
+        terrain.b = 0;
+    }
+    multip = clamp(Kspeed * d_time, 0, 1);
+#endif
     terrain.rg = multip * terr.rg + (1 - multip) * terrain.rg;
+
     terrain.w = terrain.r + terrain.g + terrain.b;
     imageStore(out_heightmap, pos, terrain);
 }

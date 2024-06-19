@@ -67,6 +67,7 @@ void erode_layers(uint id, ivec2 pos, vec2 offset, vec2 old_sediment) {
         part.sediment[i] = s1;
     }
     particles[id] = part;
+    terr.b = part.volume * multipl;
     terr.w = terr.r + terr.b + terr.g;
     imageStore(heightmap, pos, terr);
     memoryBarrierImage();

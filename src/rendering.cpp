@@ -94,7 +94,7 @@ bool Render::Data::dispatch(
     shader.set_uniform("display_sediment", display_sediment);
     shader.set_uniform("sediment_max_cap", set.erosion.data.Kc);
     shader.set_uniform("DEBUG_PREVIEW", debug_preview);
-    shader.set_uniform("should_draw_particles", display_particles);
+    shader.set_uniform("should_draw_water", display_water);
 
 #ifdef LOW_RES_DIV3
     glDispatchCompute(
@@ -130,12 +130,12 @@ void Render::Data::handle_ui(
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     ImGui::Begin("Debug", nullptr, ImGuiWindowFlags_NoDecoration);
-    ImGui::Text("state.cam pos: {%.2f %.2f %.2f}", 
+    ImGui::Text("Camera pos: {%.2f %.2f %.2f}", 
         state.camera.pos.x, 
         state.camera.pos.y, 
         state.camera.pos.z
     );
-    ImGui::Text("state.camera.dir: {%.2f %.2f %.2f}", 
+    ImGui::Text("Camera dir: {%.2f %.2f %.2f}", 
         state.camera.dir.x, 
         state.camera.dir.y, 
         state.camera.dir.z
@@ -184,10 +184,10 @@ void Render::Data::handle_ui(
     ImGui::SliderFloat("Capacity", &erosion.data.Kc, 0.0001f, 0.10f, "%.4f");
     ImGui::SliderFloat("Solubility", &erosion.data.Ks, 0.0001f, 0.10f, "%.4f");
     ImGui::SliderFloat("Deposition", &erosion.data.Kd, 0.0001f, 0.10f, "%.4f");
-    ImGui::SliderFloat("Evaporation", &erosion.data.Ke, 0.0f, 1.00f);
+    ImGui::SliderFloat("Evaporation", &erosion.data.Ke, 0.0f, 1.00f, "%.4f");
     ImGui::SliderFloat("Gravitation", &erosion.data.G, 0.1f, 10.f);
 
-    ImGui::SeparatorText("Thermal Erosion");
+    ImGui::SeparatorText("Mass wasting");
     ImGui::SliderAngle("Talus angle", &erosion.data.Kalpha, 0.00, 90.f);
 
     // TODO: move this somewhere else...
@@ -197,14 +197,14 @@ void Render::Data::handle_ui(
         ImGui::SliderFloat("Erosion speed", &erosion.data.Kspeed, 0.01, 100.f, "%.3f", ImGuiSliderFlags_Logarithmic);
         ImGui::SliderFloat("Energy Kept (%)", &erosion.data.ENERGY_KEPT, 0.998, 1.0, "%.5f");
     #endif
-    if (ImGui::Button("Set Erosion set")) {
+    if (ImGui::Button("Set Erosion settings")) {
         erosion.push_data();
     }
     ImGui::SeparatorText("General");
     ImGui::SliderFloat("Raymarching precision", &prec, 0.01f, 1.f);
     ImGui::Checkbox("Display sediment", &display_sediment);
     ImGui::Checkbox("Heightmap view", &debug_preview);
-    ImGui::Checkbox("Display particles", &display_particles);
+    ImGui::Checkbox("Display water", &display_water);
     ImGui::SliderFloat("Target_fps", &state.target_fps, 2.f, 120.f);
     ImGui::SliderFloat("Time step", &erosion.data.d_t, 0.0005f, 0.05f);
     ImGui::End();

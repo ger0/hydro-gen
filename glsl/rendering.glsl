@@ -22,6 +22,7 @@ uniform vec3 dir;
 uniform vec3 pos;
 uniform float time;
 uniform bool should_draw_particles;
+uniform bool should_draw_water;
 uniform bool DEBUG_PREVIEW;
 
 uniform float prec = 0.35;
@@ -384,7 +385,7 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
         color = get_sky_color(direction, ray.dist, sundot);
     }
     // ray hitting the surface of water
-    else if (water_h > 1e-12) {
+    else if (water_h > 1e-12 && should_draw_water) {
         // water buildup
         vec3 water_col = get_water_color(ray, direction, sundot);
         water_col = get_fog_color(water_col, ray.dist, sundot);
@@ -399,7 +400,7 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
     else {
         color = get_terrain_color(ray, direction, sundot);
         // TODO: draw particles
-#if defined(PARTICLE_COUNT)
+/* #if defined(PARTICLE_COUNT)
         if (should_draw_particles) {
             for (uint i = 0; i < PARTICLE_COUNT; i++) {
                 // ivec2 part_pos = ivec2(particles[i].position / float(set.hmap_dims.xy) * (gl_NumWorkGroups.xy * gl_WorkGroupSize.xy));
@@ -414,7 +415,7 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
                 }
             }
         }
-#endif
+#endif */
     }
 
     if (display_sediment) {

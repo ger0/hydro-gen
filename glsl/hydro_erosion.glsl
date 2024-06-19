@@ -64,7 +64,7 @@ void main() {
     // water velocity
     // float dd = clamp(smoothstep(0.01, 6, vel.z - 0.01), 0.01, 6.0);
     float dd = vel.z;
-    if (dd < 1e-04) {
+    if (dd < 1e-03) {
         vel.xy = vec2(0, 0);
     } else {
         vel.x = (

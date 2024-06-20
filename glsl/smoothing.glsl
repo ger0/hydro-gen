@@ -59,7 +59,7 @@ void main() {
     float multip = clamp(Kspeed * d_time * 100, 0, 1);
     // water display on particles
 #if defined(PARTICLE_COUNT)
-    terrain.b *= clamp(1 - max(d_time * Ke, 1e-2), 0, 1);
+    terrain.b *= clamp(1 - max(Ke, 1e-1), 0, 1);
     if (pos.x == 0 || pos.y == 0 || 
         pos.x == (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
         pos.y == (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1)

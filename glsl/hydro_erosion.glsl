@@ -91,8 +91,7 @@ void main() {
         float Kls = d_t * Ks * (10.0 * i + 1.0);
         float Kld = d_t * Kd * (10.0 * i + 1.0);
         // sediment transport capacity
-        float c = max(0.0, Klc * max(0.10, sin_a) * length(vel.xy) - cap);
-        // float c = max(0.0, Klc * sin_a * length(vel.xy) - cap);
+        float c = max(0.0, Klc * max(0.05, sin_a) * length(vel.xy) - cap);
 
         float bt = 0;
         float s1;
@@ -105,7 +104,7 @@ void main() {
             if (bt < 0.0) {
                 float dbt = abs(bt);
                 bt = 0;
-                s1 -= dbt;
+                s1 = abs(s1 - dbt);
             }
         } 
         // deposit sediment
@@ -115,7 +114,7 @@ void main() {
             if (s1 < 0.0) {
                 float ds1 = abs(s1);
                 s1 = 0;
-                bt -= ds1;
+                bt = abs(bt - ds1);
             }
         }
         sediment[i] = s1;

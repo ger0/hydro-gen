@@ -35,7 +35,7 @@ struct Map_settings {
         .seed           = 10000.f * rand() / (float)RAND_MAX,
         .persistance    = 0.44,
         .lacunarity     = 2.0,
-        .scale          = 0.0025,
+        .scale          = 0.0015,
         .redistribution = 1, // doesn't work
         .octaves        = 8,
         .mask_round     = false,

@@ -91,7 +91,9 @@ bool Render::Data::dispatch(
     shader.set_uniform("pos", cam.pos);
     shader.set_uniform("time", data.time);
     shader.set_uniform("prec", prec);
+#if not defined(PARTICLE_COUNT)
     shader.set_uniform("display_sediment", display_sediment);
+#endif
     shader.set_uniform("sediment_max_cap", set.erosion.data.Kc);
     shader.set_uniform("DEBUG_PREVIEW", debug_preview);
     shader.set_uniform("should_draw_water", display_water);
@@ -147,18 +149,23 @@ void Render::Data::handle_ui(
     ImGui::Text("Total Time: {%f}", world.time);
     ImGui::End();
 
-    ImGui::Begin("Erosion Settings");
+    ImGui::Begin("Settings");
     if (ImGui::Button(state.should_render ? "Disable Rendering" : "Start Rendering")) {
         state.should_render = !state.should_render;
     }
     ImGui::SameLine();
-    if (ImGui::Button(state.should_erode ? "Stop Erosion" : "Erode")) {
-        state.should_erode = !state.should_erode;
+    if (ImGui::Button("Set Erosion settings")) {
+        erosion.push_data();
     }
-    ImGui::SameLine();
+#if not defined(PARTICLE_COUNT)
     if (ImGui::Button(state.should_rain ? "Stop Raining" : "Rain")) {
         state.should_rain = !state.should_rain;
         rain.push_data();
+    }
+#endif
+    ImGui::SameLine();
+    if (ImGui::Button(state.should_erode ? "Stop Erosion" : "Erode")) {
+        state.should_erode = !state.should_erode;
     }
 
 #if defined(PARTICLE_COUNT)
@@ -187,7 +194,7 @@ void Render::Data::handle_ui(
     ImGui::SliderFloat("Evaporation", &erosion.data.Ke, 0.0f, 1.00f, "%.4f");
     ImGui::SliderFloat("Gravitation", &erosion.data.G, 0.1f, 10.f);
 
-    ImGui::SeparatorText("Mass wasting");
+    ImGui::SeparatorText("Thermal erosion");
     ImGui::SliderAngle("Talus angle", &erosion.data.Kalpha, 0.00, 90.f);
 
     // TODO: move this somewhere else...
@@ -197,12 +204,11 @@ void Render::Data::handle_ui(
         ImGui::SliderFloat("Erosion speed", &erosion.data.Kspeed, 0.01, 100.f, "%.3f", ImGuiSliderFlags_Logarithmic);
         ImGui::SliderFloat("Energy Kept (%)", &erosion.data.ENERGY_KEPT, 0.998, 1.0, "%.5f");
     #endif
-    if (ImGui::Button("Set Erosion settings")) {
-        erosion.push_data();
-    }
     ImGui::SeparatorText("General");
     ImGui::SliderFloat("Raymarching precision", &prec, 0.01f, 1.f);
+#if not defined(PARTICLE_COUNT)
     ImGui::Checkbox("Display sediment", &display_sediment);
+#endif
     ImGui::Checkbox("Heightmap view", &debug_preview);
     ImGui::Checkbox("Display water", &display_water);
     ImGui::SliderFloat("Target_fps", &state.target_fps, 2.f, 120.f);

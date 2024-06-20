@@ -50,37 +50,52 @@ vec4 get_img(readonly image2D img, ivec2 pos) {
     return imageLoad(img, pos);
 }
 
+vec2 advect_coords(vec2 coords, vec2 vel, float d_t) {
+    vec2 adv = coords - vel * d_t;
+    vec2 max_dims = vec2(
+        gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1,
+        gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1
+    );
+    if (adv.x < 0) {
+        adv.x = 0;
+    } else if (adv.x > max_dims.x) {
+        adv.x = max_dims.x;
+    }
+
+    if (adv.y < 0) {
+        adv.y = 0;
+    } else if (adv.y > max_dims.y) {
+        adv.y = max_dims.y;
+    }
+
+    return adv;
+}
+
 // Semi-Lagrangian MacCormack method for backward advection
 vec2 mac_cormack_backward(vec2 currentCoords, readonly image2D velocityField, float dt) {
     // Forward advection
     vec2 velocity = img_bilinear(velocityField, currentCoords).xy;
-    vec2 advectedCoords = currentCoords - velocity * dt;
+    vec2 advectedCoords = advect_coords(currentCoords, velocity, dt);
 
     // Backward advection
     vec2 advectedVelocity = img_bilinear(velocityField, advectedCoords).xy;
-    vec2 backCoords = currentCoords + advectedVelocity * dt;
+    vec2 correctorCoords = advect_coords(advectedCoords, -advectedVelocity, dt);
 
-    // MacCormack correction
-    vec2 correctedVelocity = img_bilinear(velocityField, backCoords).xy;
-    return 0.5 * (backCoords + (currentCoords - correctedVelocity * dt));
+    return advectedCoords + (currentCoords - correctorCoords) / 2.0;
 }
 
 void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
 
-    vec4 vel = imageLoad(velocitymap, pos);
+    // vec4 vel = imageLoad(velocitymap, pos);
     // vec2 back_coords = vec2(pos.x - vel.x * d_t, pos.y - vel.y * d_t);
     vec2 back_coords = mac_cormack_backward(gl_GlobalInvocationID.xy, velocitymap, d_t);
     vec4 st = get_lerp_sed(back_coords);
 
-    vec4 pre_st = imageLoad(sedimap, pos);
-    // trying to counter mass loss?
-    st = (100.0 * st + pre_st) / 101.0;
-
     vec4 terrain = imageLoad(heightmap, pos);
     terrain.b *= (1 - Ke * d_t);
     // deposit all sediment when there's no water (NEW)
-    if (terrain.b == 0) {
+    if (terrain.b < 1e-09) {
         terrain.r += st.r;
         terrain.g += st.g;
         st.r = 0;

@@ -113,11 +113,11 @@ void Erosion::dispatch_grid(Programs& prog, State::World::Textures& data) {
     data.velocity.swap();
     data.sediment.swap();
 
-    run_thermal_erosion(prog, data);
-
     run(prog.grid.sediment);
     data.heightmap.swap();
     data.sediment.swap();
+
+    run_thermal_erosion(prog, data);
 
     run(prog.thermal.smooth);
     data.heightmap.swap();

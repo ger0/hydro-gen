@@ -1,7 +1,7 @@
 #ifndef HYDR_GL_BINDINGS_HPP
 #define HYDR_GL_BINDINGS_HPP
 
-#define WORLD_SCALE (0.80)
+#define WORLD_SCALE (1.00)
 #define SED_LAYERS (2)
 
 // #define PARTICLE_COUNT (262144)

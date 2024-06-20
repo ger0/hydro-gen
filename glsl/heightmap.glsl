@@ -86,6 +86,7 @@ void main() {
     );
 
     float val = (gln_sfbm(vec2(store_pos) + dist, opts) + 1) / 2.0;
+    // float g_val = (gln_sfbm(vec2(store_pos), opts) + 1) / 2.0;
     // float val = (gln_sfbm(vec2(store_pos), opts) + 1) / 2.0;
     //float up_val = (gln_sfbm(store_pos, up_opts) + 1.0) / 2.0;
     //up_val = power_mask(up_val);

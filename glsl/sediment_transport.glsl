@@ -94,13 +94,15 @@ void main() {
 
     vec4 terrain = imageLoad(heightmap, pos);
     terrain.b *= (1 - Ke * d_t);
-    // deposit all sediment when there's no water (NEW)
-    if (terrain.b < 1e-09) {
-        terrain.r += st.r;
-        terrain.g += st.g;
-        st.r = 0;
-        st.g = 0;
-    }
+
+    // NEW, some sediment gets deposited on water evaporation
+    vec2 d_st = st.rg * vec2(Ke * d_t);
+    terrain.r += d_st.r;
+    terrain.g += d_st.g;
+
+    st.r -= d_st.r;
+    st.g -= d_st.g;
+
     terrain.w = terrain.r + terrain.g + terrain.b;
     imageStore(out_sedimap, pos, st);
     imageStore(out_heightmap, pos, terrain);

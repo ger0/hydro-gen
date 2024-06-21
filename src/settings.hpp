@@ -29,6 +29,9 @@ struct Map_settings {
     gl::Buffer buffer;
     struct Map_settings_data data {
         .max_height     = MAX_HEIGHT,
+            
+        .max_dirt       = 2.0,
+
         .hmap_dims      = glm::ivec2(NOISE_SIZE, NOISE_SIZE),
         .height_mult    = 1.0,
         .water_lvl      = WATER_HEIGHT,
@@ -41,7 +44,15 @@ struct Map_settings {
         .mask_round     = false,
         .mask_exp       = false,
         .mask_power     = true,
-        .mask_slope     = false
+        .mask_slope     = false,
+
+        .uplift         = 0,
+        .uplift_scale   = 1,
+
+        .domain_warp    = 1,
+        .domain_warp_scale = 100.f,
+        .terrace        = 0,
+        .terrace_scale  = 0.5
     };
     void push_data() {
         buffer.push_data(data);

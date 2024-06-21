@@ -69,31 +69,37 @@ void main() {
         false,
         false
     );
-    /* gln_tFBMOpts up_opts = gln_tFBMOpts(
-        cfg.seed,
-        cfg.persistance,
-        cfg.lacunarity,
-        cfg.scale,
-        2.0,
-        cfg.octaves,
-        true,
-        true
-    ); */
+    float val = 0.0;
+    if (cfg.domain_warp != 0) {
+        vec2 dist = vec2(
+            gln_sfbm(vec2(store_pos.x + 2.3, store_pos.y + 2.9), opts),
+            gln_sfbm(vec2(store_pos.x - 3.1, store_pos.y - 4.3), opts)
+        );
+        if (cfg.domain_warp == 2) {
+            dist = vec2(
+                gln_sfbm(vec2(store_pos.x + cfg.domain_warp_scale* dist.x - 5.7, store_pos.y + cfg.domain_warp_scale*dist.y + 27.9), opts),
+                gln_sfbm(vec2(store_pos.x + cfg.domain_warp_scale* dist.x + 11.5, store_pos.y + cfg.domain_warp_scale*dist.y - 23.7), opts)
+            );
+        }
+        val = (gln_sfbm(vec2(store_pos) + cfg.domain_warp_scale * dist, opts) + 1) / 2.0;
+    } else {
+        val = (gln_sfbm(vec2(store_pos), opts) + 1) / 2.0;
+    }
 
-    vec2 dist = vec2(
-        distort(store_pos.x / 1e7 + 2.3, store_pos.y / 1e7 + 2.9),
-        distort(store_pos.x / 1e7 - 3.1, store_pos.y / 1e7 - 4.3)
-    );
-
-    float val = (gln_sfbm(vec2(store_pos) + dist, opts) + 1) / 2.0;
-    // float g_val = (gln_sfbm(vec2(store_pos), opts) + 1) / 2.0;
-    // float val = (gln_sfbm(vec2(store_pos), opts) + 1) / 2.0;
-    //float up_val = (gln_sfbm(store_pos, up_opts) + 1.0) / 2.0;
-    //up_val = power_mask(up_val);
-    //up_val = exp_mask(up_val);
-    /* val += up_val * cfg.height_mult;
-    val /= 2.0; */
-    
+    if (cfg.uplift != 0) {
+        gln_tFBMOpts up_opts = gln_tFBMOpts(
+            cfg.seed,
+            cfg.persistance,
+            cfg.lacunarity,
+            cfg.scale / cfg.uplift_scale,
+            1.0,
+            cfg.octaves,
+            true,
+            true
+        );
+        float up = gln_sfbm(vec2(store_pos.x - 7.3, store_pos.y + 19.9), up_opts);
+        val *= up;
+    }
     if (cfg.mask_round != 0) {
         val = round_mask(val, uv);
     }
@@ -106,9 +112,18 @@ void main() {
     if (cfg.mask_slope != 0) {
         val = slope_mask(val, uv);
     }
-    
+
+    if (cfg.terrace > 0) {
+        int levels = cfg.terrace;
+        float lol = floor(val / (1.0 / levels));
+        float t_scl = cfg.terrace_scale;
+        val = (t_scl * lol * (1.0 / levels)) + val * (1 - t_scl);
+    }
+
     float rock_val = min(cfg.max_height, val * cfg.max_height * cfg.height_mult);
     float dirt_val = 2.0;
+    dirt_val = gln_sfbm(store_pos + vec2(13.7, 27.1), opts) + 1.0;
+    dirt_val *= cfg.max_dirt;
 
     vec4 terrain = vec4(
         rock_val,
@@ -116,18 +131,6 @@ void main() {
         0.0, 
         0.0
     );
-    /* terrain = vec4(
-        store_pos.x * 2.0,
-        0,
-        0,
-        0
-    ); */
-    /* terrain = vec4(
-        10.0,
-        20.0, 
-        0.0, 
-        0.0
-    ); */
     // water height
     // terrain.b += 84.4;
     // terrain.b = max(0.0, 84.0 - terrain.r);

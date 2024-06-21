@@ -98,6 +98,9 @@ struct Rain_data {
 
 struct Map_settings_data {
     GL(FLOAT) max_height;
+
+    GL(FLOAT) max_dirt;
+
     GL(IVEC2) hmap_dims;
     GL(FLOAT) height_mult;
     GL(FLOAT) water_lvl;
@@ -112,6 +115,14 @@ struct Map_settings_data {
     GL(UINT)  mask_exp;
     GL(UINT)  mask_power;
     GL(UINT)  mask_slope;
+
+    GL(UINT)  uplift;
+    GL(FLOAT) uplift_scale;
+
+    GL(INT)   domain_warp;
+    GL(FLOAT) domain_warp_scale;
+    GL(INT)   terrace;
+    GL(FLOAT) terrace_scale;
 };
 
 struct Particle {

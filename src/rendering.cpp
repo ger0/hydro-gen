@@ -218,17 +218,32 @@ void Render::Data::handle_ui(
     ImGui::Begin("Heightmap");
     ImGui::SliderFloat("Seed", &map.data.seed, 0.0f, 1e4);
     ImGui::SliderFloat("Height multiplier", &map.data.height_mult, 0.1f, 2.f);
+
+    ImGui::SliderFloat("Dirt max height", &map.data.max_dirt, 0.0f, 10.f);
+
     ImGui::SliderFloat("Persistence", &map.data.persistance, 0.0f, 1.f);
     ImGui::SliderFloat("Lacunarity", &map.data.lacunarity, 0.0f, 4.f);
     ImGui::SliderFloat("Scale", &map.data.scale, 0.0f, 0.01f, "%.5f");
     // ImGui::SliderFloat("Redistribution", &map.data.redistribution, 0.0f, 100.f);
     ImGui::SliderInt("Octaves", &map.data.octaves, 1, 10);
 
+
+    ImGui::SeparatorText("Domain warping");
+    ImGui::SliderInt("Layers", &map.data.domain_warp, 0, 2);
+    ImGui::SliderFloat("Domain Scale", &map.data.domain_warp_scale, 20.f, 1000.f);
+
     ImGui::SeparatorText("Masking");
     ImGui::Checkbox("Circular", (bool*)&map.data.mask_round);
     ImGui::Checkbox("Exp", (bool*)&map.data.mask_exp);
     ImGui::Checkbox("Power3", (bool*)&map.data.mask_power);
     ImGui::Checkbox("Slope", (bool*)&map.data.mask_slope);
+
+    ImGui::Checkbox("Uplift", (bool*)&map.data.uplift);
+    ImGui::SliderFloat("Uplift scale", &map.data.uplift_scale, 0.5f, 10.f, "%.2f", ImGuiSliderFlags_Logarithmic );
+
+    ImGui::SeparatorText("Terracing");
+    ImGui::SliderInt("Terrace levels", &map.data.terrace, 0, 30);
+    ImGui::SliderFloat("Terrace scale", &map.data.terrace_scale, 0.f, 1.f);
     
     if (ImGui::Button("Generate")) {
         bool old_erod = state.should_erode;

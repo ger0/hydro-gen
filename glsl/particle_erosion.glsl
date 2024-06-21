@@ -18,13 +18,13 @@ layout(std430, binding = BIND_PARTICLE_BUFFER) buffer ParticleBuffer {
 // erode all layers on 1 point of a quad
 void erode_layers(uint id, ivec2 pos, vec2 offset, vec2 old_sediment) {
     Particle part = particles[id];
-    float cap = 0.0;
     vec4 terr = imageLoad(heightmap, pos);
     memoryBarrierImage();
     // weighted multiplier for a point on a quad on which the particle is located
     float multipl = offset.x * offset.y;
 
     // iterate over all layers
+    float cap = 0.0;
     for (int i = (SED_LAYERS - 1); i >= 0; i--) {
         // deposit sediment if the particle is supposed to die
         if (part.to_kill) {
@@ -39,7 +39,9 @@ void erode_layers(uint id, ivec2 pos, vec2 offset, vec2 old_sediment) {
 
         // sediment transport capacity
         float c = max(0.0, part.sc - cap);
+
         float s1 = old_sediment[i];
+        float old_terr = terr[i];
 
         // dissolve sediment
         if (c > s1) {
@@ -47,9 +49,12 @@ void erode_layers(uint id, ivec2 pos, vec2 offset, vec2 old_sediment) {
             s1 += eroded;
             terr[i] -= eroded;
             if (terr[i] < 0) {
-                float diff = abs(terr[i]);
-                s1 -= diff;
-                terr[i] += diff;
+                s1 += terr[i];
+                terr[i] = 0;
+                cap += old_terr;
+            } else {
+                part.sediment[i] = s1;
+                break;
             }
         }
         // deposit sediment
@@ -58,16 +63,10 @@ void erode_layers(uint id, ivec2 pos, vec2 offset, vec2 old_sediment) {
             s1 -= deposit;
             terr[i] += deposit;
         }
-        if (s1 < 0) {
-            float diff = abs(s1);
-            s1 = 0;
-            terr[i] -= diff;
-        }
-        cap += s1;
         part.sediment[i] = s1;
     }
     particles[id] = part;
-    terr.b = part.volume * multipl;
+    terr.b += 1e-7 * part.volume * multipl;
     terr.w = terr.r + terr.b + terr.g;
     imageStore(heightmap, pos, terr);
     memoryBarrierImage();

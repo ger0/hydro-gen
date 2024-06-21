@@ -56,10 +56,10 @@ struct Erosion_settings {
         .Ks             = 0.0020,
         .Kd             = 0.0020,
 #else
-        .Ks             = 0.020,
-        .Kd             = 0.020,
+        .Ks             = 0.010,
+        .Kd             = 0.010,
 #endif
-        .Ke             = 0.0003,
+        .Ke             = 0.003,
         .Kalpha         = 1.2f,
 #if defined(PARTICLE_COUNT)
         .Kspeed         = 0.001f,

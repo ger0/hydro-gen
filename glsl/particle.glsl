@@ -33,25 +33,6 @@ float random(uint x) {
     return float(hash(x)) / float(0xFFFFFFFFu);
 }
 
-float find_sin_alpha(vec2 pos) {
-    float r_b = 0.0;
-    float l_b = 0.0;
-    float d_b = 0.0;
-    float u_b = 0.0;
-
-    for (int i = 0; i < SED_LAYERS; i++) {
-	    r_b += img_bilinear(heightmap, pos + vec2(1, 0))[i];
-	    l_b += img_bilinear(heightmap, pos - vec2(1, 0))[i];
-	    d_b += img_bilinear(heightmap, pos - vec2(0, 1))[i];
-	    u_b += img_bilinear(heightmap, pos + vec2(0, 1))[i];
-	}
-
-	float dbdx = (r_b-l_b) / (2.0 * L);
-	float dbdy = (u_b-d_b) / (2.0 * L);
-
-	return sqrt(dbdx*dbdx+dbdy*dbdy)/sqrt(1+dbdx*dbdx+dbdy*dbdy);
-}
-
 vec3 get_terr_normal(vec2 pos) {
     vec2 r = img_bilinear(heightmap, pos + vec2( 1.0, 0)).rg;
     vec2 l = img_bilinear(heightmap, pos + vec2(-1.0, 0)).rg;
@@ -114,8 +95,8 @@ void main() {
     p.volume -= d_t * Ke;
 
     // sediment transport capacity calculations
-    float sin_a = abs(find_sin_alpha(p.position));
-    p.sc = max(0.0, Kc * p.volume * length(p.velocity) * max(0.05, sin_a));
+    float n_a = length(norm.xz);
+    p.sc = max(0.0, Kc * p.volume * length(p.velocity) * max(0.1, n_a));
     p.iters++;
 
     if (p.volume <= min_volume 

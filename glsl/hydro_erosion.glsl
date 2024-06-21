@@ -28,23 +28,18 @@ layout (binding = BIND_WRITE_VELOCITYMAP, rgba32f)
 
 #define PI 3.1415926538
 
-float find_sin_alpha(ivec2 pos) {
-    float r_b = 0.0;
-    float l_b = 0.0;
-    float d_b = 0.0;
-    float u_b = 0.0;
-
-    for (int i = 0; i < SED_LAYERS; i++) {
-	    r_b += imageLoad(heightmap, pos + ivec2(1, 0))[i];
-	    l_b += imageLoad(heightmap, pos - ivec2(1, 0))[i];
-	    d_b += imageLoad(heightmap, pos - ivec2(0, 1))[i];
-	    u_b += imageLoad(heightmap, pos + ivec2(0, 1))[i];
-	}
-
-	float dbdx = (r_b-l_b) / (2.0 * L);
-	float dbdy = (u_b-d_b) / (2.0 * L);
-
-	return sqrt(dbdx*dbdx+dbdy*dbdy)/sqrt(1+dbdx*dbdx+dbdy*dbdy);
+vec3 get_terr_normal(ivec2 pos) {
+    vec2 r = imageLoad(heightmap, pos + ivec2( 1, 0)).rg;
+    vec2 l = imageLoad(heightmap, pos + ivec2(-1, 0)).rg;
+    vec2 b = imageLoad(heightmap, pos + ivec2( 0,-1)).rg;
+    vec2 t = imageLoad(heightmap, pos + ivec2( 0, 1)).rg;
+    float dx = (
+        r.r + r.g - l.r - l.g
+    );
+    float dz = (
+        t.r + t.g - b.r - b.g
+    );
+    return normalize(cross(vec3(2.0 * L, dx, 0), vec3(0, dz, 2.0 * L)));
 }
 
 vec4 get_flux(ivec2 pos) {
@@ -64,7 +59,7 @@ void main() {
     // water velocity
     // float dd = clamp(smoothstep(0.01, 6, vel.z - 0.01), 0.01, 6.0);
     float dd = vel.z;
-    if (dd < 1e-03) {
+    if (dd < 5e-4) {
         vel.xy = vec2(0, 0);
     } else {
         vel.x = (
@@ -83,45 +78,34 @@ void main() {
 
     // how much sediment from other layers is already in the water
     float cap = 0.0;
-    float sin_a = find_sin_alpha(pos);
+    float n_len = length(get_terr_normal(pos).xz);
     for (int i = (SED_LAYERS - 1); i >= 0; i--) {
         // sediment capacity constant for a layer
         // float Klc = Kc * (10 * i + 1);
-        float Klc = Kc;
         float Kls = d_t * Ks * (10.0 * i + 1.0);
         float Kld = d_t * Kd * (10.0 * i + 1.0);
         // sediment transport capacity
-        float c = max(0.0, Klc * max(0.05, sin_a) * length(vel.xy) - cap);
-
-        float bt = 0;
-        float s1;
-        float st = sediment[i];
+        float c = max(0, Kc * max(0.1, n_len) * length(vel.xy) - cap);
 
         // dissolve sediment
-        if (c > st) {
-            bt = terrain[i] - Kls * (c - st);
-            s1 = st + Kls * (c - st);
-            if (bt < 0.0) {
-                float dbt = abs(bt);
-                bt = 0;
-                s1 = abs(s1 - dbt);
+        if (c > sediment[i]) {
+            float old_terr = terrain[i];
+            terrain[i] -= Kls * (c - sediment[i]);
+            sediment[i] += Kls * (c - sediment[i]);
+            if (terrain[i] < 0) {
+                sediment[i] += terrain[i];
+                terrain[i] = 0;
+                cap += old_terr;
+            } else {
+                break;
             }
         } 
         // deposit sediment
         else {
-            bt = terrain[i] + Kld * (st - c);
-            s1 = st - Kld * (st - c);
-            if (s1 < 0.0) {
-                float ds1 = abs(s1);
-                s1 = 0;
-                bt = abs(bt - ds1);
-            }
+            terrain[i] += Kld * (sediment[i] - c);
+            sediment[i] -= Kld * (sediment[i] - c);
         }
-        sediment[i] = s1;
-        terrain[i] = bt;
-        cap += s1;
     }
-
     terrain.w = terrain.r + terrain.g + terrain.b;
     imageStore(out_velocitymap, pos, vel);
     imageStore(out_sedimap, pos, sediment);

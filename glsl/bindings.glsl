@@ -111,6 +111,8 @@ struct Map_settings_data {
     GL(FLOAT) redistribution;
     GL(INT)   octaves;
 
+    GL(UINT)  fake_erosion;
+
     GL(UINT)  mask_round;
     GL(UINT)  mask_exp;
     GL(UINT)  mask_power;

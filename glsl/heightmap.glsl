@@ -69,9 +69,9 @@ void main() {
         false,
         false
     );
-    float val = 0.0;
+    vec2 dist = vec2(1, 1);
     if (cfg.domain_warp != 0) {
-        vec2 dist = vec2(
+        dist = vec2(
             gln_sfbm(vec2(store_pos.x + 2.3, store_pos.y + 2.9), opts),
             gln_sfbm(vec2(store_pos.x - 3.1, store_pos.y - 4.3), opts)
         );
@@ -81,9 +81,12 @@ void main() {
                 gln_sfbm(vec2(store_pos.x + cfg.domain_warp_scale* dist.x + 11.5, store_pos.y + cfg.domain_warp_scale*dist.y - 23.7), opts)
             );
         }
-        val = (gln_sfbm(vec2(store_pos) + cfg.domain_warp_scale * dist, opts) + 1) / 2.0;
+    }
+    float val = 0.0;
+    if (cfg.fake_erosion != 0) {
+        val = perlfbm(vec2(store_pos) + cfg.domain_warp_scale * dist, opts);
     } else {
-        val = (gln_sfbm(vec2(store_pos), opts) + 1) / 2.0;
+        val = (gln_sfbm(vec2(store_pos) + cfg.domain_warp_scale * dist, opts) + 1.0) / 2.0;
     }
 
     if (cfg.uplift != 0) {

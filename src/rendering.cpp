@@ -227,18 +227,18 @@ void Render::Data::handle_ui(
     // ImGui::SliderFloat("Redistribution", &map.data.redistribution, 0.0f, 100.f);
     ImGui::SliderInt("Octaves", &map.data.octaves, 1, 10);
 
-
     ImGui::SeparatorText("Domain warping");
     ImGui::SliderInt("Layers", &map.data.domain_warp, 0, 2);
     ImGui::SliderFloat("Domain Scale", &map.data.domain_warp_scale, 20.f, 1000.f);
 
-    ImGui::SeparatorText("Masking");
-    ImGui::Checkbox("Circular", (bool*)&map.data.mask_round);
-    ImGui::Checkbox("Exp", (bool*)&map.data.mask_exp);
-    ImGui::Checkbox("Power3", (bool*)&map.data.mask_power);
-    ImGui::Checkbox("Slope", (bool*)&map.data.mask_slope);
-
+    ImGui::SeparatorText("Options");
+    ImGui::Checkbox("Fake erosion", (bool*)&map.data.fake_erosion);
+    ImGui::Checkbox("Mask Circular", (bool*)&map.data.mask_round);
+    ImGui::Checkbox("Mask Exp", (bool*)&map.data.mask_exp);
+    ImGui::Checkbox("Mask Power3", (bool*)&map.data.mask_power);
+    ImGui::Checkbox("Mask Slope", (bool*)&map.data.mask_slope);
     ImGui::Checkbox("Uplift", (bool*)&map.data.uplift);
+
     ImGui::SliderFloat("Uplift scale", &map.data.uplift_scale, 0.5f, 10.f, "%.2f", ImGuiSliderFlags_Logarithmic );
 
     ImGui::SeparatorText("Terracing");

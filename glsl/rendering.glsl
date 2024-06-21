@@ -507,19 +507,6 @@ void main() {
     ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
     vec2 uv = vec2(pixel) / 
         vec2(gl_NumWorkGroups.xy * gl_WorkGroupSize.xy);
-
-    if (DEBUG_PREVIEW) {
-        imageStore(
-            out_tex, pixel, vec4(
-                (img_bilinear_r(heightmap, vec2(pixel)) + 
-                img_bilinear_g(heightmap, vec2(pixel))) / set.max_height,
-                img_bilinear_g(sedimentmap, vec2(pixel)) / sediment_max_cap,
-                img_bilinear_b(heightmap, vec2(pixel)),
-                0
-            )
-        );
-        return;
-    }
     vec2 clip = 2.0 * uv - 1.0;
 
     vec4 ray_start  = to_world(vec4(0.0, 0.0, -1.0, 1.0));
@@ -544,4 +531,13 @@ void main() {
 #else
     imageStore(out_tex, pixel, vec4(color, 0));
 #endif
+    if (DEBUG_PREVIEW && pixel.x < set.hmap_dims.x && pixel.y < set.hmap_dims.y) {
+        imageStore(
+            out_tex, pixel, vec4(
+                (img_bilinear_r(heightmap, vec2(set.hmap_dims.x - pixel.x, pixel.y)) + 
+                img_bilinear_g(heightmap, vec2(set.hmap_dims.x - pixel.x, pixel.y))) / set.max_height
+            )
+        );
+    }
+
 }

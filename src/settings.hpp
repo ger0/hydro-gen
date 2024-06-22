@@ -9,7 +9,7 @@ namespace State {
 
 constexpr float MAX_HEIGHT = 256.f;
 constexpr float WATER_HEIGHT = 96.f;
-constexpr GLuint NOISE_SIZE = 512;
+constexpr GLuint NOISE_SIZE = 1024;
 
 struct Rain_settings {
     gl::Buffer buffer;
@@ -62,30 +62,25 @@ struct Map_settings {
 struct Erosion_settings {
     gl::Buffer buffer;
     Erosion_data data = {
-        .Kc             = 0.020,
-#if defined(PARTICLE_COUNT)
-        .Ks             = 0.0020,
-        .Kd             = 0.0020,
-#else
-        .Ks             = 0.010,
-        .Kd             = 0.010,
-#endif
+        .Kc             = 0.200,
+        .Ks             = VEC2(0.02, 0.04),
+        .Kd             = VEC2(0.02, 0.04),
         .Ke             = 0.003,
-        .Kalpha         = 1.2f,
+        .Kalpha         = VEC2(1.2f, 0.6f),
 #if defined(PARTICLE_COUNT)
-        .Kspeed         = 0.001f,
+        .Kspeed         = VEC2(0.00335f, 0.067f),
         .G              = 9.81,
         .d_t            = 0.75,
         .density        = 1.0,
         .init_volume    = 1.0,
-        .friction       = 0.2,
-        .inertia        = 0.40,
-        .min_volume     = 0.1,
-        .min_velocity   = 0.10,
+        .friction       = 0.05,
+        .inertia        = 0.20,
+        .min_volume     = 0.01,
+        .min_velocity   = 0.01,
         .ttl            = 5000,
 #else 
         .ENERGY_KEPT    = 1.0,
-        .Kspeed         = 1.0f,
+        .Kspeed         = VEC2(2.5f, 50.0f),
         .G              = 1.0,
         .d_t            = 0.001,
 #endif

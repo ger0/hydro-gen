@@ -74,7 +74,7 @@ void store_outflow(ivec2 pos, vec4 terrain, int layer) {
                 d *= sqrt(2.0);
             }
             float alph = atan(b / (d / WORLD_SCALE));
-            float Kl_alph = Kalpha / float(layer + 1);
+            float Kl_alph = Kalpha[layer];
             // float Kl_alph = Kalpha;
             if (alph > Kl_alph) {
                 // speed up when the angle is too big
@@ -91,7 +91,7 @@ void store_outflow(ivec2 pos, vec4 terrain, int layer) {
         }
     }
     sharpness *= sharpness * sharpness;
-    float Klspeed = Kspeed * float(layer + 1);
+    float Klspeed = Kspeed[layer];
 
     float S = d_t * Klspeed * sharpness * a * H / 2.0;
     // float S = d_t * Kspeed * a * H / 2.0;

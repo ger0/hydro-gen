@@ -95,10 +95,8 @@ void Erosion::dispatch_particle(Programs& prog, State::World::Textures& data) {
     run_particles(prog.particle.erosion);
     run_thermal_erosion(prog, data);
 
-    // thermal erosion - ravine smoothing
     run(prog.thermal.smooth);
     data.heightmap.swap(true);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
 #endif
 

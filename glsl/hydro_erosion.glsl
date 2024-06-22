@@ -81,9 +81,8 @@ void main() {
     float n_len = length(get_terr_normal(pos).xz);
     for (int i = (SED_LAYERS - 1); i >= 0; i--) {
         // sediment capacity constant for a layer
-        // float Klc = Kc * (10 * i + 1);
-        float Kls = d_t * Ks * (10.0 * i + 1.0);
-        float Kld = d_t * Kd * (10.0 * i + 1.0);
+        float Kls = d_t * Ks[i];
+        float Kld = d_t * Kd[i];
         // sediment transport capacity
         float c = max(0, Kc * max(0.1, n_len) * length(vel.xy) - cap);
 

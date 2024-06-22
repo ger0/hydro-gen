@@ -22,7 +22,7 @@ void main() {
         imageStore(out_heightmap, pos, terrain);
         return;
     }
-    float m_hdiff = tan(Kalpha);
+    float m_hdiff = tan(Kalpha[1]);
 
     vec2 l = imageLoad(heightmap, pos + ivec2(-1, 0)).rg;
     vec2 r = imageLoad(heightmap, pos + ivec2( 1, 0)).rg;
@@ -56,17 +56,17 @@ void main() {
         terr.g = (terr.g + l.g + r.g + t.g + b.g) / 5.0; // Set height to average
     }
 
-    float multip = clamp(Kspeed * d_time * 100, 0, 1);
+    float multip = clamp(Kspeed[1] * d_time * 100, 0, 1);
     // water display on particles
 #if defined(PARTICLE_COUNT)
-    terrain.b *= clamp(1 - max(d_time * Ke, 1e-6), 0, 1);
+    terrain.b *= clamp(1 - 1e-6, 0, 1);
     if (pos.x == 0 || pos.y == 0 || 
         pos.x == (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
         pos.y == (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1)
     ) {
         terrain.b = 0;
     }
-    multip = clamp(Kspeed * d_time, 0, 1);
+    multip = clamp(Kspeed[1] * d_time, 0, 1);
 #endif
     terrain.rg = multip * terr.rg + (1 - multip) * terrain.rg;
 

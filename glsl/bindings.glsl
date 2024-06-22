@@ -5,6 +5,7 @@
 #define SED_LAYERS (2)
 
 // #define PARTICLE_COUNT (262144)
+// #define PARTICLE_COUNT (1048576)
 
 // #define LOW_RES_DIV3
 
@@ -62,12 +63,12 @@
 
 BLOCK Erosion_data {
     GL(FLOAT) Kc;
-    GL(FLOAT) Ks;
-    GL(FLOAT) Kd;
+    GL(VEC2) Ks;
+    GL(VEC2) Kd;
     GL(FLOAT) Ke;
-    GL(FLOAT) Kalpha;
+    GL(VEC2) Kalpha;
     GL(FLOAT) ENERGY_KEPT;
-    GL(FLOAT) Kspeed;
+    GL(VEC2) Kspeed;
     GL(FLOAT) G;
     GL(FLOAT) d_t;
 

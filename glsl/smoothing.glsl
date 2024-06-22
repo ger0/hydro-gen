@@ -22,8 +22,6 @@ void main() {
         imageStore(out_heightmap, pos, terrain);
         return;
     }
-    float m_hdiff = tan(Kalpha[1]);
-
     vec2 l = imageLoad(heightmap, pos + ivec2(-1, 0)).rg;
     vec2 r = imageLoad(heightmap, pos + ivec2( 1, 0)).rg;
     vec2 t = imageLoad(heightmap, pos + ivec2( 0, 1)).rg;
@@ -39,24 +37,30 @@ void main() {
 	vec2 d_b = terr - b;
 	d_b.g += d_b.r;
 
+    float g_hdiff = (d_l.g + d_r.g + d_t.g + d_b.g) / (4.0 * 2.0);
+    float r_hdiff = (d_l.r + d_r.r + d_t.r + d_b.r) / (4.0 * 2.0);
+
+    g_hdiff = abs(g_hdiff);
+    r_hdiff = abs(r_hdiff);
+
     // Only do this at a minimum/maximum -- we can tell we're at a min/max if the sign of the derivative suddenly changes
     // In this case, it happens when they're the same, since the vectors are pointing in different directions
     vec2 x_crv = d_l * d_r;
     vec2 y_crv = d_t * d_b;
 
-    if (((abs(d_l.r) > m_hdiff || abs(d_r.r) > m_hdiff) && x_crv.r > 0)
-        || ((abs(d_t.r) > m_hdiff || abs(d_b.r) > m_hdiff) && y_crv.r > 0)
+    if (((abs(d_l.r) > r_hdiff || abs(d_r.r) > r_hdiff) && x_crv.r > 0)
+        || ((abs(d_t.r) > r_hdiff || abs(d_b.r) > r_hdiff) && y_crv.r > 0)
     ) {
         terr.r = (terr.r + l.r + r.r + t.r + b.r) / 5.0; // Set height to average
     }
 
-    if (((abs(d_l.g) > m_hdiff || abs(d_r.g) > m_hdiff) && x_crv.g > 0)
-        || ((abs(d_t.g) > m_hdiff || abs(d_b.g) > m_hdiff) && y_crv.g > 0)
+    if (((abs(d_l.g) > g_hdiff || abs(d_r.g) > g_hdiff) && x_crv.g > 0)
+        || ((abs(d_t.g) > g_hdiff || abs(d_b.g) > g_hdiff) && y_crv.g > 0)
     ) {
         terr.g = (terr.g + l.g + r.g + t.g + b.g) / 5.0; // Set height to average
     }
 
-    float multip = clamp(Kspeed[1] * d_time * 100, 0, 1);
+    float multip = clamp(Kspeed[1] * d_time * 10, 0, 1);
     // water display on particles
 #if defined(PARTICLE_COUNT)
     terrain.b *= clamp(1 - 1e-6, 0, 1);
@@ -68,6 +72,9 @@ void main() {
     }
     multip = clamp(Kspeed[1] * d_time, 0, 1);
 #endif
+
+    // multip = 1.0;
+
     terrain.rg = multip * terr.rg + (1 - multip) * terrain.rg;
 
     terrain.w = terrain.r + terrain.g + terrain.b;

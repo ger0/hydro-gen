@@ -59,9 +59,8 @@ void main() {
     // water velocity
     // float dd = clamp(smoothstep(0.01, 6, vel.z - 0.01), 0.01, 6.0);
     float dd = vel.z;
-    if (dd < 5e-4) {
-        vel.xy = vec2(0, 0);
-    } else {
+
+    if (dd > 0) {
         vel.x = (
             get_flux(pos + ivec2(-1, 0)).y -
             get_flux(pos).x + 
@@ -74,17 +73,27 @@ void main() {
             get_flux(pos).z -
             get_flux(pos + ivec2(0, 1)).w
         ) / (L * dd);
+    } else {
+        vel.xy = vec2(0, 0);
+    }
+
+    float ero_vel;
+    if (dd < 5e-4) {
+        ero_vel = 0;
+    } else {
+        ero_vel = length(vel.xy);
     }
 
     // how much sediment from other layers is already in the water
     float cap = 0.0;
-    float n_len = length(get_terr_normal(pos).xz);
+    vec3 norm = get_terr_normal(pos);
+    float sin_a = length(abs(sqrt(1.0 - norm.y * norm.y)));
     for (int i = (SED_LAYERS - 1); i >= 0; i--) {
         // sediment capacity constant for a layer
         float Kls = d_t * Ks[i];
         float Kld = d_t * Kd[i];
         // sediment transport capacity
-        float c = max(0, Kc * max(0.1, n_len) * length(vel.xy) - cap);
+        float c = max(0, Kc * sin_a * ero_vel - cap);
 
         // dissolve sediment
         if (c > sediment[i]) {

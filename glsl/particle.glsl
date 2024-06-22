@@ -95,8 +95,9 @@ void main() {
     p.volume -= d_t * Ke;
 
     // sediment transport capacity calculations
-    float n_a = length(norm.xz);
-    p.sc = max(0.0, Kc * p.volume * length(p.velocity) * max(0.1, n_a));
+    float sin_a = length(abs(sqrt(1.0 - norm.y * norm.y)));
+
+    p.sc = max(0.0, Kc * p.volume * length(p.velocity) * sin_a);
     p.iters++;
 
     if (p.volume <= min_volume 

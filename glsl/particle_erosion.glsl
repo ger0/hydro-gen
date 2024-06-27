@@ -89,6 +89,9 @@ void atomic_erosion(uint id, ivec2 pos, vec2 offset, vec2 old_sediment) {
 void main() {
     uint id = gl_GlobalInvocationID.x;
     Particle part = particles[id];
+    if (part.iters == 0) {
+        return;
+    }
     // get a quad
     ivec2 pos[4];
     //  3---2

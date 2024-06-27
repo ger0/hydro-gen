@@ -35,7 +35,7 @@ float rand(vec2 co) {
 
 float round_mask(float val, vec2 uv) {
     float v = 1.0 - (pow(uv.x - 0.5, 2.0) + pow(uv.y - 0.5, 2.0) + 0.75);
-    v = pow(v, 1.0 / 2.0);
+    // v = pow(v, 1.0 / 2.0);
     return val * max(0.0, v * 1.0);
 }
 
@@ -116,16 +116,17 @@ void main() {
         val = slope_mask(val, uv);
     }
 
+    val = val + 4 * cfg.mask_round * val;
     if (cfg.terrace > 0) {
         int levels = cfg.terrace;
-        float lol = floor(val / (1.0 / levels));
+        float lol = floor(val / (1.0 / (levels * cfg.height_mult)));
         float t_scl = cfg.terrace_scale;
-        val = (t_scl * lol * (1.0 / levels)) + val * (1 - t_scl);
+        val = (t_scl * lol * (1.0 / (levels * cfg.height_mult))) + val * (1 - t_scl);
     }
 
     float rock_val = min(cfg.max_height, val * cfg.max_height * cfg.height_mult);
     float dirt_val = 2.0;
-    dirt_val = gln_sfbm(store_pos + vec2(13.7, 27.1), opts) + 1.0;
+    dirt_val = gln_sfbm(store_pos + vec2(13.7, 27.1), opts) + 1.5;
     dirt_val *= cfg.max_dirt;
 
     vec4 terrain = vec4(

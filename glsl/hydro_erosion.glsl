@@ -78,8 +78,9 @@ void main() {
     }
 
     float ero_vel;
-    if (dd < 5e-4) {
-        ero_vel = 0;
+    if (dd < 1e-3) {
+        dd = max(5e-4, dd);
+        ero_vel = mix(length(vel.xy), 0, smoothstep(1e-3, 5e-4, dd));
     } else {
         ero_vel = length(vel.xy);
     }

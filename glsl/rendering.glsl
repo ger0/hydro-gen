@@ -2,6 +2,7 @@
 
 #include "bindings.glsl"
 #include "img_interpolation.glsl"
+#include "simplex_noise.glsl"
 #line 6
 
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
@@ -79,7 +80,7 @@ const Material_colors ambient_cols = Material_colors(
 const Material_colors diffuse_cols = Material_colors(
     vec3(0.2068, 0.279, 0.01) * 1.3 / 5,
     vec3(0.40,  0.39,  0.37) * 1.3 / 6,
-    vec3(0.2068, 0.179, 0.00) * 1.3 / 6,
+    vec3(0.1968, 0.169, 0.03) * 1.3 / 6,
     vec3(0.25,  0.25,  0.081) / 2,
     vec3(0.5, 0.48, 0.49) * 2 / 3
 );
@@ -216,6 +217,11 @@ vec3 get_sky_color(vec3 direction, float ray_dist, float sundot) {
     );
 }
 
+float rand(vec2 p) {
+    return fract(1e4 * sin(17.0 * p.x + p.y * 0.1) *
+                 (0.1 + abs(sin(p.y * 13.0 + p.x))));
+}
+
 vec4 get_shade(Ray ray, vec3 normal, bool is_water) {
     // shadow 
     // difference to the point above which there's no possible surface
@@ -225,8 +231,23 @@ vec4 get_shade(Ray ray, vec3 normal, bool is_water) {
     // casting a shadow ray towards the sun
     Ray shadow = raymarch(ray.pos.xyz, -light_dir, shadow_max, max_steps / 2, TERRAIN);
 
+    /* gln_tFBMOpts opts = gln_tFBMOpts(
+        ray.pos.y / 1000,
+        0.5,
+        2.0,
+        2,
+        1.0,
+        3,
+        false,
+        false
+    );
+    vec3 nn = (derivperlfbm(ray.pos.xz, opts) + 1.0) / 2.0;
+    normal.xz += nn.yz * 0.2;
+    normalize(normal); */
+
+
     vec3 ambient;
-    float amb_factor = clamp(0.5 + 0.5 * normal.y, 0.0, 1.0);
+    float amb_factor = clamp(0.5 + 0.5 * -normal.y, 0.0, 1.0);
     // background
     vec3 diffuse;
     if (is_water) {
@@ -235,22 +256,23 @@ vec4 get_shade(Ray ray, vec3 normal, bool is_water) {
         //diffuse = sky_color * 0.1;
         diffuse = vec3(0.108, 0.187, 0.288) * 0.1;
     } else {
-        ambient = get_material_color(ray, normal, ambient_cols);
+        ambient = get_material_color(ray, -normal, ambient_cols);
         diffuse = get_material_color(
             ray, 
             normal, 
             diffuse_cols
         );
     }
-    ambient += amb_factor * (diffuse / 16); // bonus
+    ambient += amb_factor * 0.20 * (diffuse + 0.01 * sky_color); // bonus
     vec4 outp = vec4(ambient, 0.04);
     // no shadow
     if (shadow.dist >= shadow_max) {
         vec3 light_diff = light_dir;
 	    float lambrt = max(dot(light_diff, normal), 0.0);
-        outp.rgb += lambrt / 2 * diffuse * shadow.pos.w; 
+        outp.rgb += lambrt * diffuse * shadow.pos.w; 
         outp.w = shadow.pos.w;
     }
+/*     return outp * 0.9 + outp * nn.x * 0.1; */
     return outp;
 }
 

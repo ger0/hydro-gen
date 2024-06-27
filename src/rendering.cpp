@@ -215,6 +215,9 @@ void rain_particle_ui(State::Settings& set, State::Program_state& state) {
     int ttl = (int)erosion.data.ttl;
     ImGui::SliderInt("Maximum iterations", &ttl, 1, 5000);
     erosion.data.ttl = (GLuint)ttl;
+    if (ImGui::Button(state.should_rain ? "Stop Raining" : "Rain")) {
+        state.should_rain = !state.should_rain;
+    }
 #else
     ImGui::SeparatorText("Rain");
     if (ImGui::Button(state.should_rain ? "Stop Raining" : "Rain")) {

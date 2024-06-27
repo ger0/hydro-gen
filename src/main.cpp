@@ -192,7 +192,7 @@ int main(int argc, char* argv[]) {
             }
             Erosion::dispatch_grid(erosion_progs, world_data);
 #else
-            Erosion::dispatch_particle(erosion_progs, world_data);
+            Erosion::dispatch_particle(erosion_progs, world_data, state.should_rain);
 #endif
 
             erosion_d_time = glfwGetTime() - erosion_d_time;
@@ -200,6 +200,7 @@ int main(int argc, char* argv[]) {
             // calculate average erosion update time
             if (!(state.erosion_steps % 100)) {
                 state.erosion_mean_t = state.erosion_time / 100.f;
+                LOG_DBG("{}", state.erosion_mean_t);
                 state.erosion_time = 0;
             }
         }

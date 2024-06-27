@@ -45,7 +45,6 @@ void State::World::delete_textures(State::World::Textures& data) {
     data.sediment.delete_textures();
     data.thermal_c.delete_textures();
     data.thermal_d.delete_textures();
-    // gl::del_buffer(data.mass_buffer);
     gl::del_buffer(data.particle_buffer);
     gl::delete_texture(data.lockmap);
 }

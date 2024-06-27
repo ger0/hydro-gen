@@ -43,6 +43,8 @@ vec4 img_bilinear(readonly image2D img, vec2 sample_pos) {
 }
 
 vec4 get_lerp_sed(vec2 back_coords) {
+    back_coords.x = clamp(back_coords.x, 0, gl_NumWorkGroups.x * WRKGRP_SIZE_X - 1);
+    back_coords.y = clamp(back_coords.y, 0, gl_NumWorkGroups.y * WRKGRP_SIZE_Y - 1);
     return img_bilinear(sedimap, back_coords);
 }
 
@@ -81,7 +83,7 @@ vec2 mac_cormack_backward(vec2 currentCoords, readonly image2D velocityField, fl
     vec2 advectedVelocity = img_bilinear(velocityField, advectedCoords).xy;
     vec2 correctorCoords = advect_coords(advectedCoords, -advectedVelocity, dt);
 
-    return advectedCoords + (currentCoords - correctorCoords) / 2.0;
+    return (advectedCoords) + (currentCoords - correctorCoords) / 2.0;
 }
 
 void main() {

@@ -19,8 +19,9 @@ layout(std430, binding = BIND_PARTICLE_BUFFER) buffer ParticleBuffer {
 };
 
 uniform float time;
+uniform bool should_rain;
 
-uint hash(uint x) {
+/* uint hash(uint x) {
     x ^= x >> 16;
     x *= 0x7feb352d;
     x ^= x >> 15;
@@ -31,6 +32,11 @@ uint hash(uint x) {
 
 float random(uint x) {
     return float(hash(x)) / float(0xFFFFFFFFu);
+}
+*/
+float rand(vec2 p) {
+    return fract(1e4 * sin(17.0 * p.x + p.y * 0.1) *
+                 (0.1 + abs(sin(p.y * 13.0 + p.x))));
 }
 
 vec3 get_terr_normal(vec2 pos) {
@@ -51,6 +57,9 @@ void main() {
     uint id = gl_GlobalInvocationID.x;
     Particle p = particles[id];
     // spawn particle if there's 0 iteraitons 
+    if (p.iters == 0 && should_rain == false) {
+        return;
+    }
     for (uint i = 0; i < SED_LAYERS; i++) {
         if (p.sediment[i] < 0.0 || p.iters == 0) {
             p.sediment[i] = 0;
@@ -58,14 +67,19 @@ void main() {
     }
     if (p.iters == 0 || p.to_kill == true) {
         vec2 pos = vec2(
-            random(uint(id * time * 1000.0)) * float(set.hmap_dims.x - 4.0) / WORLD_SCALE + 2.0,
-            random(uint((id + 1) * time * 1000.0)) * float(set.hmap_dims.y - 4.0) / WORLD_SCALE + 2.0
+            rand(vec2(fract(time * 1.37) * 1000.0, float(id))) * float(set.hmap_dims.x - 4.0) / WORLD_SCALE + 2.0,
+            rand(vec2(fract(time * 7.21) * 1000.0, float(id) + 3.14)) * float(set.hmap_dims.y - 4.0) / WORLD_SCALE + 2.0
         );
         p.to_kill = false;
         p.position = pos;
         p.velocity = vec2(0);
         p.volume = init_volume;
-        p.iters = 1;
+        if (should_rain) {
+            p.iters = 1;
+        } else {
+            p.iters = 0;
+            return;
+        }
     }
     vec3 norm = get_terr_normal(p.position);
 

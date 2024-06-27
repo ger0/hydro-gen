@@ -36,8 +36,8 @@ struct Grid {
 };
 
 struct Thermal {
-    Compute_program flux;
-    Compute_program transport;
+    Compute_program flux[SED_LAYERS];
+    Compute_program transport[SED_LAYERS];
     Compute_program smooth;
 };
 
@@ -51,7 +51,7 @@ Programs setup_shaders(State::Settings& set, State::World::Textures& data);
 
 void dispatch_grid_rain(Programs& prog, const State::World::Textures& data);
 void dispatch_grid(Programs& prog, State::World::Textures& data);
-void dispatch_particle(Programs& prog, State::World::Textures& data);
+void dispatch_particle(Programs& prog, State::World::Textures& data, bool should_rain);
 
 };
 #endif // HYDR_EROSION_HPP

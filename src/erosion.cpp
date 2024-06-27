@@ -15,14 +15,27 @@ Programs Erosion::setup_shaders(State::Settings& set, State::World::Textures& da
             .rain       = Compute_program(grid_rain_comput_file)
         },
         .thermal = {
-            .flux       = Compute_program(thermal_flux_file),
-            .transport  = Compute_program(thermal_transport_file),
+            .flux       = {
+                Compute_program(thermal_flux_file),
+                Compute_program(thermal_flux_file)
+            },
+            .transport  = {
+                Compute_program(thermal_transport_file),
+                Compute_program(thermal_transport_file)
+            },
             .smooth     = Compute_program(smooth_file)
         },
     };
 
-    prog.thermal.flux.bind_uniform_block("Erosion_data", set.erosion.buffer);
-    prog.thermal.transport.bind_uniform_block("Erosion_data", set.erosion.buffer);
+    for (int i = 0; i < SED_LAYERS; i++) {
+        prog.thermal.flux[i].use();
+        prog.thermal.flux[i].bind_uniform_block("Erosion_data", set.erosion.buffer);
+        prog.thermal.flux[i].set_uniform("t_layer", i);
+        prog.thermal.transport[i].use();
+        prog.thermal.transport[i].bind_uniform_block("Erosion_data", set.erosion.buffer);
+        prog.thermal.transport[i].set_uniform("t_layer", i);
+        glUseProgram(0);
+    }
 
     prog.grid.flux.bind_uniform_block("Erosion_data", set.erosion.buffer);
     prog.grid.erosion.bind_uniform_block("Erosion_data", set.erosion.buffer);
@@ -50,11 +63,8 @@ void Erosion::dispatch_grid_rain(Programs& prog, const State::World::Textures& d
 }
 
 // helper functions
-void run(Compute_program& program, GLint layer = -1) {
+void run(Compute_program& program) {
     program.use();
-    if (layer != -1) {
-        program.set_uniform("t_layer", layer);
-    }
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glDispatchCompute(
         State::NOISE_SIZE / WRKGRP_SIZE_X,
@@ -66,21 +76,18 @@ void run(Compute_program& program, GLint layer = -1) {
 
 void run_thermal_erosion(Programs& prog, State::World::Textures& data) {
     for (int i = 0; i < SED_LAYERS; i++) {
-        run(prog.thermal.flux, i);
+        run(prog.thermal.flux[i]);
         data.thermal_c.swap();
         data.thermal_d.swap();
 
-        run(prog.thermal.transport, i);
+        run(prog.thermal.transport[i]);
         data.heightmap.swap();
     }
 }
 
 #if defined(PARTICLE_COUNT)
-void run_particles(Compute_program& program, GLint layer = -1) {
+void run_particles(Compute_program& program) {
     program.use();
-    if (layer != -1) {
-        program.set_uniform("t_layer", layer);
-    }
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     glDispatchCompute(PARTICLE_COUNT / (WRKGRP_SIZE_X * WRKGRP_SIZE_Y), 1, 1);
@@ -88,9 +95,10 @@ void run_particles(Compute_program& program, GLint layer = -1) {
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 };
 
-void Erosion::dispatch_particle(Programs& prog, State::World::Textures& data) {
+void Erosion::dispatch_particle(Programs& prog, State::World::Textures& data, bool should_rain) {
     prog.particle.movement.use();
     prog.particle.movement.set_uniform("time", data.time);
+    prog.particle.movement.set_uniform("should_rain", should_rain);
     run_particles(prog.particle.movement);
     run_particles(prog.particle.erosion);
     run_thermal_erosion(prog, data);

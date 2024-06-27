@@ -37,11 +37,13 @@ void main() {
 	vec2 d_b = terr - b;
 	d_b.g += d_b.r;
 
-    float g_hdiff = (d_l.g + d_r.g + d_t.g + d_b.g) / (4.0 * 2.0);
-    float r_hdiff = (d_l.r + d_r.r + d_t.r + d_b.r) / (4.0 * 2.0);
+    float g_hdiff = (d_l.g + d_r.g + d_t.g + d_b.g) / (4.0);
+    float r_hdiff = (d_l.r + d_r.r + d_t.r + d_b.r) / (4.0);
 
     g_hdiff = abs(g_hdiff);
+    // g_hdiff = Kalpha.g / 2.0;
     r_hdiff = abs(r_hdiff);
+    // r_hdiff = Kalpha.r / 2.0;
 
     // Only do this at a minimum/maximum -- we can tell we're at a min/max if the sign of the derivative suddenly changes
     // In this case, it happens when they're the same, since the vectors are pointing in different directions
@@ -60,13 +62,15 @@ void main() {
         terr.g = (terr.g + l.g + r.g + t.g + b.g) / 5.0; // Set height to average
     }
 
-    float multip = clamp(Kspeed[1] * d_time * 10, 0, 1);
+    float multip = clamp(Kspeed[1] * d_time, 0, 1);
     // water display on particles
 #if defined(PARTICLE_COUNT)
-    terrain.b *= clamp(1 - 1e-6, 0, 1);
+    terrain.b *= clamp(1 - (1e-10 * PARTICLE_COUNT), 0, 1);
+    terrain.b += (1e-10 * PARTICLE_COUNT) * terrain.b;
     if (pos.x == 0 || pos.y == 0 || 
         pos.x == (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
-        pos.y == (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1)
+        pos.y == (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1) || 
+        terrain.b < 1e-6
     ) {
         terrain.b = 0;
     }

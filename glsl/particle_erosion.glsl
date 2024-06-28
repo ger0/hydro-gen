@@ -11,6 +11,9 @@ layout (binding = BIND_LOCKMAP, r32ui)
 layout (binding = BIND_HEIGHTMAP, rgba32f)   
 	uniform volatile coherent image2D heightmap;
 
+layout (binding = BIND_VELOCITYMAP, rgba32f)
+    uniform volatile coherent image2D momentmap;
+
 layout(std430, binding = BIND_PARTICLE_BUFFER) buffer ParticleBuffer {
     Particle particles[];
 };
@@ -19,6 +22,7 @@ layout(std430, binding = BIND_PARTICLE_BUFFER) buffer ParticleBuffer {
 void erode_layers(uint id, ivec2 pos, vec2 offset, vec2 old_sediment) {
     Particle part = particles[id];
     vec4 terr = imageLoad(heightmap, pos);
+    vec4 momentm = imageLoad(momentmap, pos);
     memoryBarrierImage();
     // weighted multiplier for a point on a quad on which the particle is located
     float multipl = offset.x * offset.y;
@@ -65,10 +69,18 @@ void erode_layers(uint id, ivec2 pos, vec2 offset, vec2 old_sediment) {
         }
         part.sediment[i] = s1;
     }
+    for (uint i = 0; i < (SED_LAYERS - 1); i++) {
+        float conv = part.sediment[i] * Kconv * d_t;
+        part.sediment[i + 1] += conv;
+        part.sediment[i] -= conv;
+    }
     particles[id] = part;
-    terr.b += 1e-7 * part.volume * multipl;
+    // terr.b += 1e-7 * part.volume * multipl;
+    terr.b += 1e-5 * part.volume * multipl;
     terr.w = terr.r + terr.b + terr.g;
+    momentm.zw += part.volume * part.velocity * multipl;
     imageStore(heightmap, pos, terr);
+    imageStore(momentmap, pos, momentm);
     memoryBarrierImage();
 }
 

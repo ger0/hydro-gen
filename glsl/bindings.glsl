@@ -67,6 +67,7 @@ BLOCK Erosion_data {
     GL(VEC2) Kd;
     GL(FLOAT) Ke;
     GL(VEC2) Kalpha;
+    GL(FLOAT) Kconv;
     GL(FLOAT) ENERGY_KEPT;
     GL(VEC2) Kspeed;
     GL(FLOAT) G;

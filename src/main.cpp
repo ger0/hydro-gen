@@ -200,7 +200,6 @@ int main(int argc, char* argv[]) {
             // calculate average erosion update time
             if (!(state.erosion_steps % 100)) {
                 state.erosion_mean_t = state.erosion_time / 100.f;
-                LOG_DBG("{}", state.erosion_mean_t);
                 state.erosion_time = 0;
             }
         }

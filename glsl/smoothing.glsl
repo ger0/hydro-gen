@@ -10,6 +10,11 @@ layout (binding = BIND_HEIGHTMAP, rgba32f)
 layout (binding = BIND_WRITE_HEIGHTMAP, rgba32f)   
 	uniform writeonly image2D out_heightmap;
 
+#if defined(PARTICLE_COUNT)
+layout (binding = BIND_VELOCITYMAP, rgba32f)   
+	uniform image2D momentmap;
+#endif
+
 void main() {
     float d_time = d_t;
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
@@ -65,15 +70,23 @@ void main() {
     float multip = clamp(Kspeed[1] * d_time, 0, 1);
     // water display on particles
 #if defined(PARTICLE_COUNT)
-    terrain.b *= clamp(1 - (1e-10 * PARTICLE_COUNT), 0, 1);
-    terrain.b += (1e-10 * PARTICLE_COUNT) * terrain.b;
+    vec4 momentum = imageLoad(momentmap, pos);
+    momentum.xy *= clamp(1 - (3e-8 * PARTICLE_COUNT), 0, 1);
+    momentum.xy += (3e-8 * PARTICLE_COUNT) * momentum.zw;
+    momentum.zw = vec2(0);
+
+    terrain.b *= clamp(1 - (3e-8 * PARTICLE_COUNT), 0, 1);
     if (pos.x == 0 || pos.y == 0 || 
         pos.x == (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
-        pos.y == (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1) || 
-        terrain.b < 1e-6
+        pos.y == (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1) ||
+        terrain.b < 1e-8
     ) {
         terrain.b = 0;
     }
+    if (length(momentum.xy) < 1e-12) {
+        momentum.xy = vec2(0);
+    }
+    imageStore(momentmap, pos, momentum);
     multip = clamp(Kspeed[1] * d_time, 0, 1);
 #endif
 

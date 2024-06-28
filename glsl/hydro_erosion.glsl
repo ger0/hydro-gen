@@ -94,7 +94,7 @@ void main() {
         float Kls = d_t * Ks[i];
         float Kld = d_t * Kd[i];
         // sediment transport capacity
-        float c = max(0, Kc * sin_a * ero_vel - cap);
+        float c = max(0, Kc * max(0.02, sin_a) * ero_vel - cap);
 
         // dissolve sediment
         if (c > sediment[i]) {
@@ -114,6 +114,11 @@ void main() {
             terrain[i] += Kld * (sediment[i] - c);
             sediment[i] -= Kld * (sediment[i] - c);
         }
+    }
+    for (uint i = 0; i < (SED_LAYERS - 1); i++) {
+        float conv = sediment[i] * Kconv * d_t;
+        sediment[i + 1] += conv;
+        sediment[i] -= conv;
     }
     terrain.w = terrain.r + terrain.g + terrain.b;
     imageStore(out_velocitymap, pos, vel);

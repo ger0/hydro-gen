@@ -181,6 +181,7 @@ void erosion_ui(State::Settings& set) {
     ImGui::SliderFloat("Capacity", &erosion.data.Kc, 0.001f, 1.00f, "%.3f");
     ImGui::SliderFloat("Evaporation", &erosion.data.Ke, 0.0f, 1.00f, "%.4f");
     ImGui::SliderFloat("Gravitation", &erosion.data.G, 0.1f, 10.f);
+    ImGui::SliderFloat("Conversion rate", &erosion.data.Kconv, 1, 1e-4, "%.4f");
     if (ImGui::BeginTabBar("Erosion Settings")) {
         for (u32 i = 0; i < 2; i++) {
             auto name = i == 0 ? "Rock Layer" : "Dirt Layer";

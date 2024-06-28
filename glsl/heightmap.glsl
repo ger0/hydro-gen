@@ -136,8 +136,7 @@ void main() {
         0.0
     );
     // water height
-    // terrain.b += 84.4;
-    // terrain.b = max(0.0, 84.0 - terrain.r);
+    //terrain.b = max(0.0, 10.0 - (terrain.r + terrain.g));
     terrain.w = terrain.r + terrain.g + terrain.b;
 #if defined(PARTICLE_COUNT)
     if (gl_GlobalInvocationID.xy == vec2(0, 0)) {

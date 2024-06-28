@@ -10,6 +10,9 @@ layout (local_size_x = WRKGRP_SIZE_X * WRKGRP_SIZE_Y) in;
 layout (binding = BIND_HEIGHTMAP, rgba32f)
     uniform readonly image2D heightmap;
 
+layout (binding = BIND_VELOCITYMAP, rgba32f)
+    uniform image2D momentmap;
+
 layout (std140) uniform map_settings {
     Map_settings_data set;
 };
@@ -37,6 +40,10 @@ float random(uint x) {
 float rand(vec2 p) {
     return fract(1e4 * sin(17.0 * p.x + p.y * 0.1) *
                  (0.1 + abs(sin(p.y * 13.0 + p.x))));
+}
+
+vec2 get_momentum(vec2 pos) {
+    return img_bilinear(momentmap, pos).xy;
 }
 
 vec3 get_terr_normal(vec2 pos) {
@@ -82,10 +89,14 @@ void main() {
         }
     }
     vec3 norm = get_terr_normal(p.position);
+    vec2 momentum = get_momentum(p.position);
+    float water = img_bilinear_b(heightmap, p.position);
 
-    p.velocity = 
-        inertia * p.velocity
-        - (d_t * norm.xz) / (p.volume * density) * G * (1.0 - inertia);
+    p.velocity -= (d_t * norm.xz) / (p.volume) * G;
+
+    if(length(momentum) > 0 && length(p.velocity) > 0) {
+        p.velocity += inertia * dot(normalize(momentum), normalize(p.velocity)) / (p.volume + 1e5 * water) * momentum;
+    }
 
     // velocity is capped at length 1.0, otherwise particles can tunnel through terrain
     if (length(p.velocity) > 1.0) {
@@ -105,13 +116,13 @@ void main() {
         p.velocity = vec2(0);
         p.to_kill = true;
     }
-    p.velocity *= (1.0 - d_t * friction);
+    p.velocity *= (1.0 - d_t * friction * norm.y);
     p.volume -= d_t * Ke;
 
     // sediment transport capacity calculations
     float sin_a = length(abs(sqrt(1.0 - norm.y * norm.y)));
 
-    p.sc = max(0.0, Kc * p.volume * length(p.velocity) * sin_a);
+    p.sc = max(0.0, Kc * p.volume * length(p.velocity) * max(0.02, sin_a));
     p.iters++;
 
     if (p.volume <= min_volume 

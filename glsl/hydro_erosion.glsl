@@ -23,10 +23,6 @@ layout (binding = BIND_WRITE_SEDIMENTMAP, rgba32f)
 // vec3((u, v), suspended)
 layout (binding = BIND_VELOCITYMAP, rgba32f)   
 	uniform readonly image2D velocitymap;
-layout (binding = BIND_WRITE_VELOCITYMAP, rgba32f)   
-	uniform writeonly image2D out_velocitymap;
-
-#define PI 3.1415926538
 
 vec3 get_terr_normal(ivec2 pos) {
     vec2 r = imageLoad(heightmap, pos + ivec2( 1, 0)).rg;
@@ -59,25 +55,7 @@ void main() {
     // water velocity
     // float dd = clamp(smoothstep(0.01, 6, vel.z - 0.01), 0.01, 6.0);
     float dd = vel.z;
-
-    if (dd > 0) {
-        vel.x = (
-            get_flux(pos + ivec2(-1, 0)).y -
-            get_flux(pos).x + 
-            get_flux(pos).y -
-            get_flux(pos + ivec2(1, 0)).x
-        ) / (L * dd);
-        vel.y = (
-            get_flux(pos + ivec2(0, -1)).z -
-            get_flux(pos).w + 
-            get_flux(pos).z -
-            get_flux(pos + ivec2(0, 1)).w
-        ) / (L * dd);
-    } else {
-        vel.xy = vec2(0, 0);
-    }
-
-    float ero_vel;
+    float ero_vel = length(vel.xy);
     if (dd < 1e-3) {
         dd = max(5e-4, dd);
         ero_vel = mix(length(vel.xy), 0, smoothstep(1e-3, 5e-4, dd));
@@ -116,12 +94,11 @@ void main() {
         }
     }
     for (uint i = 0; i < (SED_LAYERS - 1); i++) {
-        float conv = sediment[i] * Kconv * d_t;
+        float conv = sediment[i] * Kconv;
         sediment[i + 1] += conv;
         sediment[i] -= conv;
     }
     terrain.w = terrain.r + terrain.g + terrain.b;
-    imageStore(out_velocitymap, pos, vel);
     imageStore(out_sedimap, pos, sediment);
     imageStore(out_heightmap, pos, terrain);
 }

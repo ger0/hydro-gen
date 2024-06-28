@@ -43,7 +43,7 @@ void main() {
         false,
         false
     );
-    float r = max(0.0, gln_sfbm(gl_GlobalInvocationID.xy, opts) - 0.34) * 4 / 3;
+    float r = max(0.0, gln_sfbm(gl_GlobalInvocationID.xy, opts));
 
     float incr = set.amount * r;
     float mountain = terr.w - map_set.max_height * set.mountain_thresh;

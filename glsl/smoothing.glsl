@@ -71,19 +71,19 @@ void main() {
     // water display on particles
 #if defined(PARTICLE_COUNT)
     vec4 momentum = imageLoad(momentmap, pos);
-    momentum.xy *= clamp(1 - (3e-8 * PARTICLE_COUNT), 0, 1);
-    momentum.xy += (3e-8 * PARTICLE_COUNT) * momentum.zw;
+    momentum.xy *= clamp(1 - (1e-7 * PARTICLE_COUNT), 0, 1);
+    momentum.xy += (1e-7 * PARTICLE_COUNT) * momentum.zw;
     momentum.zw = vec2(0);
 
-    terrain.b *= clamp(1 - (3e-8 * PARTICLE_COUNT), 0, 1);
+    terrain.b *= clamp(1 - (1e-7 * PARTICLE_COUNT), 0, 1);
     if (pos.x == 0 || pos.y == 0 || 
         pos.x == (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
         pos.y == (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1) ||
-        terrain.b < 1e-8
+        terrain.b < 1e-6
     ) {
         terrain.b = 0;
     }
-    if (length(momentum.xy) < 1e-12) {
+    if (length(momentum.xy) < 1e-8) {
         momentum.xy = vec2(0);
     }
     imageStore(momentmap, pos, momentum);

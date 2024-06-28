@@ -89,13 +89,18 @@ vec2 mac_cormack_backward(vec2 currentCoords, readonly image2D velocityField, fl
 void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
 
-    // vec4 vel = imageLoad(velocitymap, pos);
-    // vec2 back_coords = vec2(pos.x - vel.x * d_t, pos.y - vel.y * d_t);
-    vec2 back_coords = mac_cormack_backward(gl_GlobalInvocationID.xy, velocitymap, d_t);
+    vec4 vel = imageLoad(velocitymap, pos);
+    vec2 back_coords = vec2(pos.x - vel.x * d_t, pos.y - vel.y * d_t);
+    // vec2 back_coords = mac_cormack_backward(gl_GlobalInvocationID.xy, velocitymap, d_t);
     vec4 st = get_lerp_sed(back_coords);
 
     vec4 terrain = imageLoad(heightmap, pos);
     terrain.b *= (1 - Ke * d_t);
+
+    if (vel.z == 0) {
+        terrain.rg += st.rg;
+        st.rg = vec2(0);
+    }
 
     /* // NEW, some sediment gets deposited on water evaporation
     vec2 d_st = st.rg * vec2(Ke * d_t);

@@ -131,9 +131,9 @@ vec3 get_material_color(Ray ray, vec3 norm, Material_colors material) {
 	float rock = smoothstep(0.0, 1.0, min(1.0, ray.terr.r));
 	float dirt = smoothstep(0.0, 1.0, min(1.0, ray.terr.g));
 
-	vec4 sediment = img_bilinear(sedimentmap, ray.pos.xz);
+	/* vec4 sediment = img_bilinear(sedimentmap, ray.pos.xz);
 	float sed_rock = clamp(sediment.r / sediment_max_cap, 0.0, 1.0);
-	float sed_dirt = clamp(sediment.g / sediment_max_cap, 0.0, 1.0);
+	float sed_dirt = clamp(sediment.g / sediment_max_cap, 0.0, 1.0); */
     
     vec3 col;
 	col = material.rock;
@@ -153,8 +153,8 @@ vec3 get_material_color(Ray ray, vec3 norm, Material_colors material) {
         float steep_rock = 1 - smoothstep(0.00, 0.65, cos_a);
         col = mix(material.rock, material.rock * 0.5, steep_rock);
     }
-    col = mix(col, material.sand, sed_rock);
-    col = mix(col, material.dirt * 0.4, sed_dirt);
+    /* col = mix(col, material.sand, sed_rock);
+    col = mix(col, material.dirt * 0.4, sed_dirt); */
 	return col;
 }
 

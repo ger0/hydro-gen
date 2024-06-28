@@ -43,6 +43,55 @@ vec4 get_flux(ivec2 pos) {
     return imageLoad(fluxmap, pos);
 }
 
+vec4 img_bilinear(readonly image2D img, vec2 sample_pos) {
+    ivec2 pos = ivec2(sample_pos);
+    vec2 s_pos = fract(sample_pos);
+    vec4 v1 = mix(
+        imageLoad(img, ivec2(pos)), 
+        imageLoad(img, ivec2(pos) + ivec2(1, 0)),
+        s_pos.x
+    );
+    vec4 v2 = mix(
+        imageLoad(img, ivec2(pos) + ivec2(0, 1)), 
+        imageLoad(img, ivec2(pos) + ivec2(1, 1)),
+        s_pos.x
+    );
+    vec4 value = mix(
+        v1, 
+        v2, 
+        s_pos.y
+    );
+    return value;
+}
+
+vec2 advect_coords(vec2 coords, vec2 vel, float d_t) {
+    vec2 adv = coords - vel * d_t;
+    vec2 max_dims = vec2(
+        gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1,
+        gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1
+    );
+    if (adv.x < 0) {
+        adv.x = 0;
+    } else if (adv.x > max_dims.x) {
+        adv.x = max_dims.x;
+    }
+
+    if (adv.y < 0) {
+        adv.y = 0;
+    } else if (adv.y > max_dims.y) {
+        adv.y = max_dims.y;
+    }
+
+    return adv;
+}
+
+vec2 get_lerp_vel(vec2 back_coords) {
+    back_coords.x = clamp(back_coords.x, 0, gl_NumWorkGroups.x * WRKGRP_SIZE_X - 1);
+    back_coords.y = clamp(back_coords.y, 0, gl_NumWorkGroups.y * WRKGRP_SIZE_Y - 1);
+    return img_bilinear(velocitymap, back_coords).xy;
+}
+
+
 void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
     
@@ -105,8 +154,30 @@ void main() {
     terrain.b = d2;
     terrain.w = terrain.r + d2 + terrain.g;
 
+    /* // velocity advection
+    vec2 adv_pos = advect_coords(pos, vel.xy / 2.0, d_t); 
+    vec2 adv_vel = get_lerp_vel(adv_pos); */
+
     // average water height
     vel.z = (d1 + d2); 
+
+    if (vel.z > 0) {
+        vel.x = (
+            get_flux(pos + ivec2(-1, 0)).y -
+            get_flux(pos).x + 
+            get_flux(pos).y -
+            get_flux(pos + ivec2(1, 0)).x
+        ) / (L * vel.z);
+        vel.y = (
+            get_flux(pos + ivec2(0, -1)).z -
+            get_flux(pos).w + 
+            get_flux(pos).z -
+            get_flux(pos + ivec2(0, 1)).w
+        ) / (L * vel.z);
+    } else {
+        vel.xy = vec2(0, 0);
+    }
+
     imageStore(out_fluxmap, pos, out_flux);
     imageStore(out_velocitymap, pos, vel);
     imageStore(out_heightmap, pos, terrain);

@@ -94,7 +94,7 @@ void main() {
         }
     }
     for (uint i = 0; i < (SED_LAYERS - 1); i++) {
-        float conv = sediment[i] * Kconv;
+        float conv = sediment[i] * Kconv * d_t;
         sediment[i + 1] += conv;
         sediment[i] -= conv;
     }

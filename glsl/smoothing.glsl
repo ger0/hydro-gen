@@ -55,14 +55,14 @@ void main() {
     vec2 x_crv = d_l * d_r;
     vec2 y_crv = d_t * d_b;
 
-    if (((abs(d_l.r) > r_hdiff || abs(d_r.r) > r_hdiff) && x_crv.r > 0)
-        || ((abs(d_t.r) > r_hdiff || abs(d_b.r) > r_hdiff) && y_crv.r > 0)
+    if ((((-d_l.r) > r_hdiff || (-d_r.r) > r_hdiff) && x_crv.r > 0)
+        || (((-d_t.r) > r_hdiff || (-d_b.r) > r_hdiff) && y_crv.r > 0)
     ) {
         terr.r = (terr.r + l.r + r.r + t.r + b.r) / 5.0; // Set height to average
     }
 
-    if (((abs(d_l.g) > g_hdiff || abs(d_r.g) > g_hdiff) && x_crv.g > 0)
-        || ((abs(d_t.g) > g_hdiff || abs(d_b.g) > g_hdiff) && y_crv.g > 0)
+    if ((((-d_l.g) > g_hdiff || (-d_r.g) > g_hdiff) && x_crv.g > 0)
+        || (((-d_t.g) > g_hdiff || (-d_b.g) > g_hdiff) && y_crv.g > 0)
     ) {
         terr.g = (terr.g + l.g + r.g + t.g + b.g) / 5.0; // Set height to average
     }
@@ -71,11 +71,11 @@ void main() {
     // water display on particles
 #if defined(PARTICLE_COUNT)
     vec4 momentum = imageLoad(momentmap, pos);
-    momentum.xy *= clamp(1 - (1e-7 * PARTICLE_COUNT), 0, 1);
-    momentum.xy += (1e-7 * PARTICLE_COUNT) * momentum.zw;
+    momentum.xy *= clamp(1 - (1e-12 * PARTICLE_COUNT), 0, 1);
+    momentum.xy += (1e-12 * PARTICLE_COUNT) * momentum.zw;
     momentum.zw = vec2(0);
 
-    terrain.b *= clamp(1 - (1e-7 * PARTICLE_COUNT), 0, 1);
+    terrain.b *= clamp(1 - (8e-8 * PARTICLE_COUNT), 0, 1);
     if (pos.x == 0 || pos.y == 0 || 
         pos.x == (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
         pos.y == (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1) ||
@@ -83,7 +83,7 @@ void main() {
     ) {
         terrain.b = 0;
     }
-    if (length(momentum.xy) < 1e-8) {
+    if (length(momentum.xy) < 1e-12) {
         momentum.xy = vec2(0);
     }
     imageStore(momentmap, pos, momentum);

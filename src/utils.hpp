@@ -8,6 +8,7 @@
 #include <glm/fwd.hpp>
 #include <optional>
 #include <vector>
+#include <memory>
 
 using u64 = uint_fast64_t;
 using u32 = uint_fast32_t;

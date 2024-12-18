@@ -56,15 +56,16 @@ void del_buffer(Buffer& buff);
 // TODO: Refactor
 // texture pairs for swapping
 struct Tex_pair {
-    gl::Texture t1; 
-    gl::Texture t2; 
-
-    GLuint r_bind;
-    GLuint w_bind;
+    gl::Texture tex[2]; 
+    u32 idx_write = 1;
+    u32 idx_read = 0;
 
     u32 cntr = 0;
     void swap(bool read_write = false);
-    Tex_pair(GLenum access, GLuint width, GLuint height, GLuint bind_r, GLuint bind_w);
+    Tex_pair(GLenum access, GLuint width, GLuint height);
+    const gl::Texture& get_write_tex() const;
+    const gl::Texture& get_read_tex() const;
+
     void delete_textures();
 };
 
@@ -100,7 +101,16 @@ private:
     GLuint compute;
 public:
     void bind_uniform_block(const char* var, gl::Buffer &buff) const;
+
+    void bind_texture(const char* var_name, const gl::Texture &tex);
+    void unbind_texture(const char* var_name);
+    void listActiveUniforms();
+
+    void bind_image(const char* var_name, const gl::Texture &tex);
+    void unbind_image(const char* var_name);
+
     void bind_storage_buffer(const char* variable, gl::Buffer &buff) const;
+
     Compute_program(std::string comput_files);
     ~Compute_program();
 };

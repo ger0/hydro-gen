@@ -1,18 +1,17 @@
 #version 460
 
 #include "bindings.glsl"
-#line 5
+#line 4
 
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
-layout (binding = BIND_HEIGHTMAP, rgba32f)   
-	uniform readonly image2D heightmap;
+layout (binding = 3) uniform sampler2D heightmap;
+layout (binding = 1, rgba32f) uniform writeonly image2D out_thflux_c;
+layout (binding = 2, rgba32f) uniform writeonly image2D out_thflux_d;
 
-layout (binding = BIND_WRITE_THERMALFLUX_C, rgba32f)   
-	uniform writeonly image2D out_thflux_c;
-
-layout (binding = BIND_WRITE_THERMALFLUX_D, rgba32f)   
-	uniform writeonly image2D out_thflux_d;
+layout (std140, binding = BIND_UNIFORM_EROSION) uniform erosion_data {
+    Erosion_data set;
+};
 
 uniform int t_layer;
 
@@ -23,7 +22,7 @@ vec4 get_height(ivec2 pos) {
     pos.y < 0 || pos.y > (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1)) {
         return vec4(999999999999.0);
     }
-    return imageLoad(heightmap, pos);
+    return texelFetch(heightmap, pos, 0);
 }
 
 void store_outflow(ivec2 pos, vec4 terrain, int layer) {
@@ -74,8 +73,8 @@ void store_outflow(ivec2 pos, vec4 terrain, int layer) {
                 d *= sqrt(2.0);
             }
             float alph = atan(b / (d / WORLD_SCALE));
-            float Kl_alph = Kalpha[layer];
-            // float Kl_alph = Kalpha;
+            float Kl_alph = set.Kalpha[layer];
+            // float Kl_alph = set.Kalpha;
             if (alph > Kl_alph) {
                 // speed up when the angle is too big
                 float newsh = 1.0 + alph - Kl_alph;
@@ -91,10 +90,10 @@ void store_outflow(ivec2 pos, vec4 terrain, int layer) {
         }
     }
     sharpness *= sharpness * sharpness;
-    float Klspeed = Kspeed[layer];
+    float Klspeed = set.Kspeed[layer];
 
-    float S = d_t * Klspeed * sharpness * a * H / 2.0;
-    // float S = d_t * Kspeed * a * H / 2.0;
+    float S = set.d_t * Klspeed * sharpness * a * H / 2.0;
+    // float S = set.d_t * set.Kspeed * a * H / 2.0;
 
     for (uint j = 0; j < 2; j++) {
         for (uint i = 0; i < 4; i++) {
@@ -111,6 +110,6 @@ void store_outflow(ivec2 pos, vec4 terrain, int layer) {
 
 void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
-    vec4 terrain = imageLoad(heightmap, pos);
+    vec4 terrain = texelFetch(heightmap, pos, 0);
     store_outflow(pos, terrain, t_layer);
 }

@@ -24,6 +24,10 @@ layout (binding = BIND_WRITE_SEDIMENTMAP, rgba32f)
 layout (binding = BIND_VELOCITYMAP, rgba32f)   
 	uniform readonly image2D velocitymap;
 
+layout (std140, binding = BIND_UNIFORM_EROSION) uniform erosion_data {
+    Erosion_data set;
+};
+
 vec3 get_terr_normal(ivec2 pos) {
     vec2 r = imageLoad(heightmap, pos + ivec2( 1, 0)).rg;
     vec2 l = imageLoad(heightmap, pos + ivec2(-1, 0)).rg;
@@ -69,10 +73,10 @@ void main() {
     float sin_a = length(abs(sqrt(1.0 - norm.y * norm.y)));
     for (int i = (SED_LAYERS - 1); i >= 0; i--) {
         // sediment capacity constant for a layer
-        float Kls = d_t * Ks[i];
-        float Kld = d_t * Kd[i];
+        float Kls = set.d_t * set.Ks[i];
+        float Kld = set.d_t * set.Kd[i];
         // sediment transport capacity
-        float c = max(0, Kc * max(0.02, sin_a) * ero_vel - cap);
+        float c = max(0, set.Kc * max(0.02, sin_a) * ero_vel - cap);
 
         // dissolve sediment
         if (c > sediment[i]) {
@@ -94,7 +98,7 @@ void main() {
         }
     }
     for (uint i = 0; i < (SED_LAYERS - 1); i++) {
-        float conv = sediment[i] * Kconv * d_t;
+        float conv = sediment[i] * set.Kconv * set.d_t;
         sediment[i + 1] += conv;
         sediment[i] -= conv;
     }

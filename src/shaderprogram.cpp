@@ -1,5 +1,6 @@
 #include "shaderprogram.hpp"
 #include "utils.hpp"
+#include <csignal>
 #include <glm/gtc/type_ptr.hpp>
 
 using namespace glm;
@@ -13,28 +14,8 @@ namespace gl {
             const void* pixels) {
         glGenTextures(1, &tex.texture);
         glBindTexture(tex.target, tex.texture);
-        glTexImage2D(
-            tex.target,
-            tex.level,
-            tex.format,
-            tex.width, tex.height,
-            0,  // border
-            format, type,
-            pixels
-        );
-    }
-    void bind_texture(Texture& tex, GLuint bind) {
-        glActiveTexture(GL_TEXTURE0 + bind); 
-        glBindTexture(tex.target, tex.texture);
-        glBindImageTexture(
-            bind, 
-            tex.texture, 
-            tex.level, 
-            tex.layered, 
-            tex.layer, 
-            tex.access, 
-            tex.format 
-        );
+        glTexStorage2D(tex.target, 1, tex.format, (GLsizei)tex.width, (GLsizei)tex.height);
+        glBindTexture(tex.target, 0);
     }
     void delete_texture(Texture& tex) {
         glDeleteTextures(1, &tex.texture);
@@ -62,64 +43,67 @@ namespace gl {
 
     void Tex_pair::swap(bool read_write) {
         cntr++;
+        idx_read = cntr % 2;
+        idx_write = (cntr + 1) % 2;
         if (cntr % 2) {
             if (read_write) {
-                t1.access = GL_READ_WRITE;
-                t2.access = GL_READ_WRITE;
+                tex[0].access = GL_READ_WRITE;
+                tex[1].access = GL_READ_WRITE;
             } else {
-                t1.access = GL_WRITE_ONLY;
-                t2.access = GL_READ_ONLY;
+                tex[0].access = GL_WRITE_ONLY;
+                tex[1].access = GL_READ_ONLY;
             }
-            gl::bind_texture(t1, w_bind);
-            gl::bind_texture(t2, r_bind);
         } else {
             if (read_write) {
-                t1.access = GL_READ_WRITE;
-                t2.access = GL_READ_WRITE;
+                tex[0].access = GL_READ_WRITE;
+                tex[1].access = GL_READ_WRITE;
             } else {
-                t1.access = GL_READ_ONLY;
-                t2.access = GL_WRITE_ONLY;
+                tex[0].access = GL_READ_ONLY;
+                tex[1].access = GL_WRITE_ONLY;
             }
-            gl::bind_texture(t1, r_bind);
-            gl::bind_texture(t2, w_bind);
         }
-        glBindTexture(GL_TEXTURE_2D, 0);
     }
 
-    Tex_pair::Tex_pair(GLenum access, GLuint width, GLuint height, GLuint bind_r, GLuint bind_w) {
-        this->t1 = gl::Texture {
-            .access = access,
-            .width = width,
-            .height = height
-        };
-        this->t2 = gl::Texture {
-            .access = access,
-            .width = width,
-            .height = height
-        };
-        this->r_bind = bind_r;
-        this->w_bind = bind_w;
+    const gl::Texture& Tex_pair::get_write_tex() const {
+    if (idx_write > 1 || idx_write < 0) { LOG_ERR("Texpair getter failure."); assert(false); }
+        return tex[idx_write];
+    }
 
-        gl::gen_texture(t1);
+    const gl::Texture& Tex_pair::get_read_tex() const {
+    if (idx_read > 1 || idx_read < 0) { LOG_ERR("Texpair getter failure."); assert(false); }
+        return tex[idx_read];
+    }
+
+    Tex_pair::Tex_pair(GLenum access, GLuint width, GLuint height) {
+        this->tex[0] = gl::Texture {
+            .access = access,
+            .width = width,
+            .height = height
+        };
+        this->tex[1] = gl::Texture {
+            .access = access,
+            .width = width,
+            .height = height
+        };
+
+        gl::gen_texture(tex[0]);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-        gl::gen_texture(t2);
+        gl::gen_texture(tex[1]);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-        gl::bind_texture(t1, r_bind);
-        gl::bind_texture(t2, w_bind);
         glBindTexture(GL_TEXTURE_2D, 0);
     }
 
     void Tex_pair::delete_textures() {
-        gl::delete_texture(t1);
-        gl::delete_texture(t2);
+        gl::delete_texture(tex[0]);
+        gl::delete_texture(tex[1]);
     }
 }
 
@@ -198,12 +182,28 @@ void resolve_includes(std::string& buff) {
 GLuint Shader_core::load_shader(GLenum shader_type, std::string filename) {
     // handle
     GLuint shader = glCreateShader(shader_type);
-
     auto source_str = load_shader_file(filename);
     const GLchar* shader_source = source_str.c_str();
     glShaderSource(shader, 1, &shader_source, NULL);
     glCompileShader(shader);
 
+    GLint success;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        // Get the length of the error log
+        GLint logLength;
+        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logLength);
+
+        // Retrieve the error log
+        std::string infoLog(logLength, ' ');
+        glGetShaderInfoLog(shader, logLength, nullptr, &infoLog[0]);
+        LOG_ERR("Shader compilation failed: {}", infoLog);
+        raise(SIGTRAP);
+
+        // Cleanup the failed shader
+        glDeleteShader(shader);
+        return 0; // Indicate failure
+    }
     return shader;
 }
 
@@ -216,7 +216,16 @@ Compute_program::Compute_program(std::string filename) {
     glAttachShader(program, compute);
     glLinkProgram(program);
 
-    LOG_DBG("Compute shader program created");
+    GLint success;
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetProgramInfoLog(program, 512, nullptr, infoLog);
+        LOG_ERR("ERROR::SHADER::PROGRAM::LINKING_FAILED {}", infoLog);
+        raise(SIGTRAP);
+    } else {
+        LOG_DBG("Compute shader program created");
+    }
 }
 
 Shader_program::Shader_program(std::string vert_file, std::string frag_file) {
@@ -243,14 +252,14 @@ Shader_program::~Shader_program() {
     glDeleteShader(fragment);
 
     glDeleteProgram(program);
-    LOG_DBG("Shader program deleted");
+    // LOG_DBG("Shader program deleted");
 }
 
 Compute_program::~Compute_program() {
     glDetachShader(program, compute);
     glDeleteShader(compute);
     glDeleteProgram(program);
-    LOG_DBG("Compute shader program deleted");
+    // LOG_DBG("Compute shader program deleted");
 }
 
 void Shader_core::use() const {
@@ -261,14 +270,54 @@ void Compute_program::bind_uniform_block(const char* variable, gl::Buffer &buff)
     GLuint idx = glGetUniformBlockIndex(program, variable);
     if (idx == GL_INVALID_INDEX) {
         LOG_ERR("ERROR: Invalid buffer block index");
+        raise(SIGTRAP);
     }
     glUniformBlockBinding(program, idx, buff.binding);
+}
+
+void Compute_program::bind_image(const char* var_name, const gl::Texture &tex) {
+    GLuint location = get_uniform_location(std::string(var_name));
+    GLint bind;    
+    glGetUniformiv(this->program, location, &bind);
+    glBindTexture(tex.target, tex.texture);
+    glBindImageTexture(
+        bind, 
+        tex.texture, 
+        tex.level, 
+        tex.layered, 
+        tex.layer, 
+        tex.access, 
+        tex.format 
+    );
+}
+
+void Compute_program::unbind_image(const char* var_name) {
+    GLuint location = get_uniform_location(std::string(var_name));
+    GLint bind;    
+    glGetUniformiv(this->program, location, &bind);
+    glBindImageTexture(bind, 0, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+}
+
+void Compute_program::bind_texture(const char* var_name, const gl::Texture& tex) {
+    GLuint location = get_uniform_location(std::string(var_name));
+    GLint bind;    
+    glGetUniformiv(this->program, location, &bind);
+    glBindTextureUnit(bind, tex.texture);
+}
+
+void Compute_program::unbind_texture(const char* var_name) {
+    GLuint location = get_uniform_location(std::string(var_name));
+    GLint bind;    
+    glGetUniformiv(this->program, location, &bind);
+    glActiveTexture(GL_TEXTURE0 + bind);
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void Compute_program::bind_storage_buffer(const char* variable, gl::Buffer &buff) const {
     GLuint idx = glGetProgramResourceIndex(program, GL_SHADER_STORAGE_BLOCK, variable);
     if (idx == GL_INVALID_INDEX) {
-        LOG_ERR("ERROR: Invalid shader buffer index");
+        LOG_ERR("ERROR: Invalid shader storage buffer index");
+        raise(SIGTRAP);
     }
     glShaderStorageBlockBinding(program, idx, buff.binding);
 }
@@ -277,12 +326,36 @@ void Compute_program::bind_storage_buffer(const char* variable, gl::Buffer &buff
     return glGetAttribLocation(program, attribute);
 } */
 
+void Compute_program::listActiveUniforms() {
+    GLint numUniforms = 0;
+    glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &numUniforms);
+    LOG_DBG("Number of active uniforms: {}", numUniforms);
+    for (GLint i = 0; i < numUniforms; ++i) {
+        char name[256];
+        GLsizei length = 0;
+        GLint size = 0;
+        GLenum type = 0;
+
+        // Query uniform information
+        glGetActiveUniform(program, i, sizeof(name), &length, &size, &type, name);
+
+        // Print uniform details
+        LOG_DBG("Uniform # {} : {}", i, name);
+        LOG_DBG("Type: {}, size: {}, ", type, size);
+    }
+}
+
+
 GLuint Shader_core::get_uniform_location(std::string name) {
     auto count = cached_bindings.count(name);
     if (count < 1) {
-        GLuint binding = glGetUniformLocation(this->program, name.c_str());
-        cached_bindings[name] = binding;
-        return binding;
+        GLuint location = glGetUniformLocation(this->program, name.c_str());
+        if (location == GL_INVALID_INDEX) {
+            LOG_ERR("ERROR: Invalid shader uniform index: {}", name);
+            raise(SIGTRAP);
+        }
+        cached_bindings[name] = location;
+        return location;
     } else {
         return cached_bindings[name];
     }

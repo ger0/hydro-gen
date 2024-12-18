@@ -29,20 +29,19 @@ Programs Erosion::setup_shaders(State::Settings& set, State::World::Textures& da
 
     for (int i = 0; i < SED_LAYERS; i++) {
         prog.thermal.flux[i].use();
-        prog.thermal.flux[i].bind_uniform_block("Erosion_data", set.erosion.buffer);
+        prog.thermal.flux[i].bind_uniform_block("erosion_data", set.erosion.buffer);
         prog.thermal.flux[i].set_uniform("t_layer", i);
         prog.thermal.transport[i].use();
-        prog.thermal.transport[i].bind_uniform_block("Erosion_data", set.erosion.buffer);
         prog.thermal.transport[i].set_uniform("t_layer", i);
         glUseProgram(0);
     }
 
-    prog.grid.flux.bind_uniform_block("Erosion_data", set.erosion.buffer);
-    prog.grid.erosion.bind_uniform_block("Erosion_data", set.erosion.buffer);
-    prog.grid.sediment.bind_uniform_block("Erosion_data", set.erosion.buffer);
+    prog.grid.flux.bind_uniform_block("erosion_data", set.erosion.buffer);
+    prog.grid.erosion.bind_uniform_block("erosion_data", set.erosion.buffer);
+    prog.grid.sediment.bind_uniform_block("erosion_data", set.erosion.buffer);
 
     prog.particle.movement.bind_uniform_block("map_settings", set.map.buffer);
-    prog.particle.erosion.bind_uniform_block("Erosion_data", set.erosion.buffer);
+    prog.particle.erosion.bind_uniform_block("erosion_data", set.erosion.buffer);
 
     prog.particle.movement.bind_storage_buffer("ParticleBuffer", data.particle_buffer);
     prog.particle.erosion.bind_storage_buffer("ParticleBuffer", data.particle_buffer);
@@ -76,10 +75,19 @@ void run(Compute_program& program) {
 
 void run_thermal_erosion(Programs& prog, State::World::Textures& data) {
     for (int i = 0; i < SED_LAYERS; i++) {
+        prog.thermal.flux[i].use();
+        prog.thermal.flux[i].bind_texture("heightmap", data.heightmap.get_read_tex());
+        prog.thermal.flux[i].bind_image("out_thflux_c", data.thermal_c.get_write_tex());
+        prog.thermal.flux[i].bind_image("out_thflux_d", data.thermal_d.get_write_tex());
         run(prog.thermal.flux[i]);
         data.thermal_c.swap();
         data.thermal_d.swap();
 
+        prog.thermal.transport[i].use();
+        prog.thermal.transport[i].bind_texture("heightmap", data.heightmap.get_read_tex());
+        prog.thermal.transport[i].bind_image("out_heightmap", data.heightmap.get_write_tex());
+        prog.thermal.transport[i].bind_texture("thflux_c", data.thermal_c.get_read_tex());
+        prog.thermal.transport[i].bind_texture("thflux_d", data.thermal_d.get_read_tex());
         run(prog.thermal.transport[i]);
         data.heightmap.swap();
     }
@@ -99,12 +107,26 @@ void Erosion::dispatch_particle(Programs& prog, State::World::Textures& data, bo
     prog.particle.movement.use();
     prog.particle.movement.set_uniform("time", data.time);
     prog.particle.movement.set_uniform("should_rain", should_rain);
+    prog.particle.movement.bind_texture("heightmap", data.heightmap.get_read_tex());
+    prog.particle.movement.bind_texture("momentmap", data.velocity.get_read_tex());
     run_particles(prog.particle.movement);
+
+    prog.particle.erosion.use();
+    prog.particle.erosion.bind_image("lockmap", data.lockmap);
+    prog.particle.erosion.bind_image("heightmap", data.heightmap.get_read_tex());
+    prog.particle.erosion.bind_image("momentmap", data.velocity.get_read_tex());
     run_particles(prog.particle.erosion);
+
     run_thermal_erosion(prog, data);
 
+    prog.thermal.smooth.use();
+    prog.thermal.smooth.bind_image("heightmap", data.heightmap.get_read_tex());
+    prog.thermal.smooth.bind_image("momentmap", data.velocity.get_read_tex());
+    prog.thermal.smooth.bind_image("out_heightmap", data.heightmap.get_write_tex());
+    prog.thermal.smooth.bind_image("out_momentmap", data.velocity.get_write_tex());
     run(prog.thermal.smooth);
     data.heightmap.swap(true);
+    data.velocity.swap(true);
 }
 #endif
 

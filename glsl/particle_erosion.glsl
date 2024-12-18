@@ -5,14 +5,14 @@
 #line 6
 
 layout (local_size_x = WRKGRP_SIZE_X * WRKGRP_SIZE_Y) in;
-layout (binding = BIND_LOCKMAP, r32ui)   
-	uniform volatile coherent uimage2D lockmap;
 
-layout (binding = BIND_HEIGHTMAP, rgba32f)   
-	uniform volatile coherent image2D heightmap;
+layout (binding = 0, r32ui) uniform volatile coherent uimage2D lockmap;
+layout (binding = 1, rgba32f) uniform volatile coherent image2D heightmap;
+layout (binding = 2, rgba32f) uniform volatile coherent image2D momentmap;
 
-layout (binding = BIND_VELOCITYMAP, rgba32f)
-    uniform volatile coherent image2D momentmap;
+layout (std140, binding = BIND_UNIFORM_EROSION) uniform erosion_data {
+    Erosion_data set;
+};
 
 layout(std430, binding = BIND_PARTICLE_BUFFER) buffer ParticleBuffer {
     Particle particles[];
@@ -38,8 +38,8 @@ void erode_layers(uint id, ivec2 pos, vec2 offset, vec2 old_sediment) {
             continue;
         }
 
-        float Kls = d_t * Ks[i];
-        float Kld = d_t * Kd[i];
+        float Kls = set.d_t * set.Ks[i];
+        float Kld = set.d_t * set.Kd[i];
 
         // sediment transport capacity
         float c = max(0.0, part.sc - cap);
@@ -70,7 +70,7 @@ void erode_layers(uint id, ivec2 pos, vec2 offset, vec2 old_sediment) {
         part.sediment[i] = s1;
     }
     for (uint i = 0; i < (SED_LAYERS - 1); i++) {
-        float conv = part.sediment[i] * Kconv * d_t;
+        float conv = part.sediment[i] * set.Kconv * set.d_t;
         part.sediment[i + 1] += conv;
         part.sediment[i] -= conv;
     }

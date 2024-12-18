@@ -5,18 +5,24 @@
 #line 6
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
-layout (binding = BIND_HEIGHTMAP, rgba32f)   
+layout (binding = 3, rgba32f)   
 	uniform readonly image2D heightmap;
-layout (binding = BIND_WRITE_HEIGHTMAP, rgba32f)   
+layout (binding = 4, rgba32f)   
 	uniform writeonly image2D out_heightmap;
 
+layout (std140, binding = BIND_UNIFORM_EROSION) uniform erosion_data {
+    Erosion_data set;
+};
+
 #if defined(PARTICLE_COUNT)
-layout (binding = BIND_VELOCITYMAP, rgba32f)   
+layout (binding = 5, rgba32f)   
 	uniform image2D momentmap;
+layout (binding = 6, rgba32f)   
+	uniform image2D out_momentmap;
 #endif
 
 void main() {
-    float d_time = d_t;
+    float d_time = set.d_t;
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
     vec4 terrain = imageLoad(heightmap, pos);
     vec2 terr = terrain.rg;
@@ -46,9 +52,9 @@ void main() {
     float r_hdiff = (d_l.r + d_r.r + d_t.r + d_b.r) / (4.0);
 
     g_hdiff = abs(g_hdiff);
-    // g_hdiff = Kalpha.g / 2.0;
+    // g_hdiff = set.Kalpha.g / 2.0;
     r_hdiff = abs(r_hdiff);
-    // r_hdiff = Kalpha.r / 2.0;
+    // r_hdiff = set.Kalpha.r / 2.0;
 
     // Only do this at a minimum/maximum -- we can tell we're at a min/max if the sign of the derivative suddenly changes
     // In this case, it happens when they're the same, since the vectors are pointing in different directions
@@ -67,7 +73,7 @@ void main() {
         terr.g = (terr.g + l.g + r.g + t.g + b.g) / 5.0; // Set height to average
     }
 
-    float multip = clamp(Kspeed[1] * d_time, 0, 1);
+    float multip = clamp(set.Kspeed[1] * d_time, 0, 1);
     // water display on particles
 #if defined(PARTICLE_COUNT)
     vec4 momentum = imageLoad(momentmap, pos);
@@ -86,8 +92,8 @@ void main() {
     if (length(momentum.xy) < 1e-12) {
         momentum.xy = vec2(0);
     }
-    imageStore(momentmap, pos, momentum);
-    multip = clamp(Kspeed[1] * d_time, 0, 1);
+    imageStore(out_momentmap, pos, momentum);
+    multip = clamp(set.Kspeed[1] * d_time, 0, 1);
 #endif
 
     // multip = 1.0;

@@ -1,5 +1,6 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <csignal>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -21,7 +22,6 @@ void GLAPIENTRY gl_error_callback(
     (void)id;
     (void)length;
     (void)user;
-
     if(severity == GL_DEBUG_SEVERITY_NOTIFICATION) {
         return;
     }
@@ -62,12 +62,13 @@ void GLAPIENTRY gl_error_callback(
                 source_str,
                 message);
     }
+    raise(SIGTRAP);
 }
 
 GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title, bool* error_bool) {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 #ifdef DEBUG
@@ -83,6 +84,7 @@ GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title, bool* 
     glfwSwapInterval(0);
     glViewport(0, 0, window_size.x, window_size.y);
     glEnable(GL_ARB_uniform_buffer_object);
+    glEnable(GL_EXT_shader_image_load_formatted);
 
     if (glewInit() != GLEW_OK) {
         LOG_ERR("Failed to initialise GLEW!");

@@ -1,21 +1,23 @@
 #include "state.hpp"
 
 State::World::Textures State::World::gen_textures(const GLuint width, const GLuint height) {
-    gl::Tex_pair heightmap(GL_READ_WRITE, width, height, BIND_HEIGHTMAP, BIND_WRITE_HEIGHTMAP);
-    gl::Tex_pair flux(GL_READ_WRITE, width, height, BIND_FLUXMAP, BIND_WRITE_FLUXMAP);
-    gl::Tex_pair velocity(GL_READ_WRITE, width, height, BIND_VELOCITYMAP, BIND_WRITE_VELOCITYMAP);
-    gl::Tex_pair sediment(GL_READ_WRITE, width, height, BIND_SEDIMENTMAP, BIND_WRITE_SEDIMENTMAP);
     gl::Texture lockmap {
         .access = GL_READ_WRITE,
         .format = GL_R32UI,
+        .width = width,
+        .height = height
     };
     gl::gen_texture(lockmap, GL_RED_INTEGER, GL_UNSIGNED_INT);
-    gl::bind_texture(lockmap, BIND_LOCKMAP);
+    gl::Tex_pair heightmap(GL_READ_WRITE, width, height);
+    gl::Tex_pair flux(GL_READ_WRITE, width, height);
+    gl::Tex_pair velocity(GL_READ_WRITE, width, height);
+    gl::Tex_pair sediment(GL_READ_WRITE, width, height);
 
     // ------------- cross    flux for thermal erosion -----------
-    gl::Tex_pair thermal_c(GL_READ_WRITE, width, height, BIND_THERMALFLUX_C, BIND_WRITE_THERMALFLUX_C);
+    gl::Tex_pair thermal_c(GL_READ_WRITE, width, height);
     // ------------- diagonal flux for thermal erosion -----------
-    gl::Tex_pair thermal_d(GL_READ_WRITE, width, height, BIND_THERMALFLUX_D, BIND_WRITE_THERMALFLUX_D);
+    gl::Tex_pair thermal_d(GL_READ_WRITE, width, height);
+
 #if defined(PARTICLE_COUNT)
     gl::Buffer particle_buffer {
         .binding = BIND_PARTICLE_BUFFER,
@@ -80,11 +82,29 @@ void State::World::gen_heightmap(
     Compute_program& program
 ) {
     program.use();
+
     settings.map.push_data();
     program.bind_uniform_block("map_settings", settings.map.buffer);
     program.bind_storage_buffer("ParticleBuffer", world.particle_buffer);
+
+    program.bind_image("dest_heightmap", world.heightmap.get_write_tex());
+    program.bind_image("dest_vel", world.velocity.get_write_tex());
+    program.bind_image("dest_flux", world.flux.get_write_tex());
+    program.bind_image("dest_sediment", world.sediment.get_write_tex());
+
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
     glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+    world.heightmap.swap(true);
+    world.velocity.swap(true);
+    world.flux.swap(true);
+    world.sediment.swap(true);
+
+    program.unbind_image("dest_heightmap");
+    program.unbind_image("dest_vel");
+    program.unbind_image("dest_flux");
+    program.unbind_image("dest_sediment");
+
     glUseProgram(0);
 }

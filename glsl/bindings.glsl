@@ -4,7 +4,7 @@
 #define WORLD_SCALE (1.00)
 #define SED_LAYERS (2)
 
-// #define PARTICLE_COUNT (65536)
+#define PARTICLE_COUNT (65536)
 // #define PARTICLE_COUNT (262144)
 // #define PARTICLE_COUNT (1048576)
 
@@ -20,18 +20,18 @@
 #define BIND_VELOCITYMAP 3 
 #define BIND_SEDIMENTMAP 4 
 
-#define BIND_THERMALFLUX_C 5 
+#define BIND_THERMALFLUX_C 5
 #define BIND_THERMALFLUX_D 6 
 
 #define BIND_WRITE_HEIGHTMAP 7 
-#define BIND_WRITE_FLUXMAP 8 
-#define BIND_WRITE_VELOCITYMAP 9
-#define BIND_WRITE_SEDIMENTMAP 10
+#define BIND_WRITE_FLUXMAP 0 
+#define BIND_WRITE_VELOCITYMAP 0
+#define BIND_WRITE_SEDIMENTMAP 0
 
-#define BIND_WRITE_THERMALFLUX_C 11
-#define BIND_WRITE_THERMALFLUX_D 12
+#define BIND_WRITE_THERMALFLUX_C 0
+#define BIND_WRITE_THERMALFLUX_D 0
 
-#define BIND_LOCKMAP 13
+#define BIND_LOCKMAP 5
 
 #define BIND_UNIFORM_EROSION 1
 #define BIND_UNIFORM_MAP_SETTINGS 2
@@ -43,7 +43,6 @@
 #endif
 
 #if defined(GL_core_profile)
-    #define BLOCK layout (std140, binding = BIND_UNIFORM_EROSION) uniform
     #define GL(X) X
     #define FLOAT float
     #define INT int
@@ -52,7 +51,6 @@
     #define IVEC2 ivec2
     #define BOOL bool
 #else 
-    #define BLOCK struct
     #define FLOAT GLfloat
     #define INT GLint
     #define UINT GLuint
@@ -62,7 +60,7 @@
     #define BOOL GLboolean
 #endif
 
-BLOCK Erosion_data {
+struct Erosion_data {
     GL(FLOAT) Kc;
     GL(VEC2) Kalpha;
     GL(FLOAT) Kconv;
@@ -82,14 +80,6 @@ BLOCK Erosion_data {
     GL(FLOAT) min_velocity;
     GL(UINT)  ttl; // time to live
 };
-
-#undef BLOCK
-
-#if defined(GL_core_profile)
-    #define BLOCK layout (std140, binding = BIND_UNIFORM_RAIN_SETTINGS) uniform
-#else 
-    #define BLOCK struct
-#endif
 
 struct Rain_data {
     GL(FLOAT)   amount;

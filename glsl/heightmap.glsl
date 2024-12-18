@@ -2,22 +2,15 @@
 
 #include "bindings.glsl"
 #include "simplex_noise.glsl"
-#line 6
+#line 5
 
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
 // (dirt, rock, water, total)
-layout (binding = BIND_HEIGHTMAP, rgba32f)
-    uniform writeonly image2D dest_tex;
-
-layout (binding = BIND_VELOCITYMAP, rgba32f)
-    uniform writeonly image2D dest_vel;
-
-layout (binding = BIND_FLUXMAP, rgba32f)
-    uniform writeonly image2D dest_flux;
-
-layout (binding = BIND_SEDIMENTMAP, rgba32f)
-    uniform writeonly image2D dest_sediment;
+layout (rgba32f, binding = 0) uniform writeonly image2D dest_heightmap;
+layout (rgba32f, binding = 1) uniform writeonly image2D dest_vel;
+layout (rgba32f, binding = 2) uniform writeonly image2D dest_flux;
+layout (rgba32f, binding = 3) uniform writeonly image2D dest_sediment;
 
 layout(std430, binding = BIND_PARTICLE_BUFFER) buffer ParticleBuffer {
     Particle particles[];
@@ -58,7 +51,7 @@ float distort(float x, float y) {
 
 void main() {
     ivec2 store_pos = ivec2(gl_GlobalInvocationID.xy);
-    vec2 uv = gl_GlobalInvocationID.xy / vec2(imageSize(dest_tex).xy);
+    vec2 uv = gl_GlobalInvocationID.xy / vec2(imageSize(dest_heightmap).xy);
     gln_tFBMOpts opts = gln_tFBMOpts(
         cfg.seed,
         cfg.persistance,
@@ -145,7 +138,7 @@ void main() {
         }
     }
 #endif
-    imageStore(dest_tex, store_pos, terrain);
+    imageStore(dest_heightmap, store_pos, terrain);
     imageStore(dest_vel, store_pos, vec4(0));
     imageStore(dest_flux, store_pos, vec4(0));
     imageStore(dest_sediment, store_pos, vec4(0));

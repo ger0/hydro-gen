@@ -9,7 +9,7 @@ constexpr auto render_comput_file = "rendering.glsl";
 Render::Data::~Data() {
     glDeleteFramebuffers(1, &framebuffer);
     gl::delete_texture(output_texture);
-    LOG_DBG("Render data buffers deleted!");
+    // LOG_DBG("Render data buffers deleted!");
 }
 
 Render::Data::Data(
@@ -36,8 +36,11 @@ Render::Data::Data(
     shader.use();
     LOG_DBG("Setting up rendering shader!");
 
-    gl::gen_texture(output_texture);
-    gl::bind_texture(output_texture, BIND_DISPLAY_TEXTURE);
+    std::vector<float> test(1600*900*4);
+    for (int i = 0; i < 15000; i++) {
+        test[i] = 1.f;
+    }
+    gl::gen_texture(output_texture, GL_RGBA, GL_FLOAT, test.data());
     glGenFramebuffers(1, &framebuffer);
     // output image rendered to framebuffer
     shader.bind_uniform_block("map_settings", set.map.buffer);
@@ -61,6 +64,19 @@ Render::Data::Data(
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void CheckBoundImageUnits(GLuint maxUnits) {
+    for (GLuint i = 0; i < maxUnits; ++i) {
+        GLint boundTexture = 0;
+        glGetIntegeri_v(GL_IMAGE_BINDING_NAME, i, &boundTexture);
+
+        if (boundTexture != 0) {
+            LOG_DBG("Image unit {} has texture bound with ID: {}", i, boundTexture);
+        } else {
+            LOG_DBG("Image unit {} is unbound.", i);
+        }
+    }
+}
+
 bool Render::Data::dispatch(
     State::World::Textures& data,
     State::Settings& set,
@@ -68,9 +84,6 @@ bool Render::Data::dispatch(
 ) {
     using glm::perspective, glm::lookAt, glm::radians;
     shader.use();
-
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
     // TODO: change to a uniform buffer
     glm::mat4 mat_v = lookAt(
@@ -85,18 +98,25 @@ bool Render::Data::dispatch(
 	    Z_NEAR, Z_FAR
 	);
 
+    // CheckBoundImageUnits(8);
+    shader.use();
+    shader.bind_image("out_tex", output_texture);
+    shader.bind_texture("sedimentmap", data.sediment.get_read_tex());
+    shader.bind_texture("heightmap", data.heightmap.get_read_tex());
+
     shader.set_uniform("view", mat_v);
     shader.set_uniform("perspective", mat_p);
-    shader.set_uniform("dir", cam.dir);
     shader.set_uniform("pos", cam.pos);
-    shader.set_uniform("time", data.time);
     shader.set_uniform("prec", prec);
+
 #if not defined(PARTICLE_COUNT)
     shader.set_uniform("display_sediment", display_sediment);
 #endif
-    shader.set_uniform("sediment_max_cap", set.erosion.data.Kc);
-    shader.set_uniform("DEBUG_PREVIEW", debug_preview);
+    //shader.set_uniform("sediment_max_cap", set.erosion.data.Kc);
+    //shader.set_uniform("DEBUG_PREVIEW", debug_preview);
     shader.set_uniform("should_draw_water", display_water);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
 #ifdef LOW_RES_DIV3
     glDispatchCompute(
@@ -113,6 +133,10 @@ bool Render::Data::dispatch(
 #endif
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+    shader.unbind_image("out_tex");
+    shader.unbind_texture("sedimentmap");
+    shader.unbind_texture("heightmap");
     return true;
 }
 

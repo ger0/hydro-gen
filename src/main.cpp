@@ -169,7 +169,6 @@ int main(int argc, char* argv[]) {
     while (!glfwWindowShouldClose(window.get()) && (!state.shader_error)) {
         glfwPollEvents();
         world_data.time = glfwGetTime();
-
         if (
             (world_data.time - state.last_frame + state.erosion_mean_t) >= (1 / state.target_fps) &&
             state.should_render

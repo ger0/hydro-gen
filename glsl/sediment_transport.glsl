@@ -5,51 +5,34 @@
 
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
-layout (binding = BIND_HEIGHTMAP, rgba32f)   
-	uniform readonly image2D heightmap;
+layout (binding = BIND_HEIGHTMAP) uniform sampler2D heightmap;
 
 layout (binding = BIND_WRITE_HEIGHTMAP, rgba32f)   
 	uniform writeonly image2D out_heightmap;
 
 // velocity + suspended sediment vector
 // vec3((u, v), suspended)
-layout (binding = BIND_VELOCITYMAP, rgba32f)   
-	uniform readonly image2D velocitymap;
+layout (binding = BIND_VELOCITYMAP) uniform sampler2D velocitymap;
 
-layout (binding = BIND_SEDIMENTMAP, rgba32f)   
-	uniform readonly image2D sedimap;
+layout (binding = BIND_SEDIMENTMAP) uniform sampler2D sedimap;
 layout (binding = BIND_WRITE_SEDIMENTMAP, rgba32f)   
 	uniform writeonly image2D out_sedimap;
 
-vec4 img_bilinear(readonly image2D img, vec2 sample_pos) {
-    ivec2 pos = ivec2(sample_pos);
-    vec2 s_pos = fract(sample_pos);
-    vec4 v1 = mix(
-        imageLoad(img, ivec2(pos)), 
-        imageLoad(img, ivec2(pos) + ivec2(1, 0)),
-        s_pos.x
+layout (std140, binding = BIND_UNIFORM_EROSION) uniform erosion_data {
+    Erosion_data set;
+};
+
+vec2 pos_to_uv(vec2 pos) {
+    return vec2(
+        pos.x / float(gl_WorkGroupSize.x * gl_NumWorkGroups.x),
+        pos.y / float(gl_WorkGroupSize.y * gl_NumWorkGroups.y)
     );
-    vec4 v2 = mix(
-        imageLoad(img, ivec2(pos) + ivec2(0, 1)), 
-        imageLoad(img, ivec2(pos) + ivec2(1, 1)),
-        s_pos.x
-    );
-    vec4 value = mix(
-        v1, 
-        v2, 
-        s_pos.y
-    );
-    return value;
 }
 
 vec4 get_lerp_sed(vec2 back_coords) {
     back_coords.x = clamp(back_coords.x, 0, gl_NumWorkGroups.x * WRKGRP_SIZE_X - 1);
     back_coords.y = clamp(back_coords.y, 0, gl_NumWorkGroups.y * WRKGRP_SIZE_Y - 1);
-    return img_bilinear(sedimap, back_coords);
-}
-
-vec4 get_img(readonly image2D img, ivec2 pos) {
-    return imageLoad(img, pos);
+    return texture(sedimap, pos_to_uv(back_coords));
 }
 
 vec2 advect_coords(vec2 coords, vec2 vel, float d_t) {
@@ -74,13 +57,13 @@ vec2 advect_coords(vec2 coords, vec2 vel, float d_t) {
 }
 
 // Semi-Lagrangian MacCormack method for backward advection
-vec2 mac_cormack_backward(vec2 currentCoords, readonly image2D velocityField, float dt) {
+vec2 mac_cormack_backward(vec2 currentCoords, sampler2D velocityField, float dt) {
     // Forward advection
-    vec2 velocity = img_bilinear(velocityField, currentCoords).xy;
+    vec2 velocity = texture(velocityField, pos_to_uv(currentCoords)).xy;
     vec2 advectedCoords = advect_coords(currentCoords, velocity, dt);
 
     // Backward advection
-    vec2 advectedVelocity = img_bilinear(velocityField, advectedCoords).xy;
+    vec2 advectedVelocity = texture(velocityField, pos_to_uv(advectedCoords)).xy;
     vec2 correctorCoords = advect_coords(advectedCoords, -advectedVelocity, dt);
 
     return (advectedCoords) + (currentCoords - correctorCoords) / 2.0;
@@ -89,13 +72,13 @@ vec2 mac_cormack_backward(vec2 currentCoords, readonly image2D velocityField, fl
 void main() {
     ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
 
-    vec4 vel = imageLoad(velocitymap, pos);
-    vec2 back_coords = vec2(pos.x - vel.x * d_t, pos.y - vel.y * d_t);
-    // vec2 back_coords = mac_cormack_backward(gl_GlobalInvocationID.xy, velocitymap, d_t);
+    vec4 vel = texelFetch(velocitymap, pos, 0);
+    vec2 back_coords = vec2(pos.x - vel.x * set.d_t, pos.y - vel.y * set.d_t);
+    // vec2 back_coords = mac_cormack_backward(gl_GlobalInvocationID.xy, velocitymap, set.d_t);
     vec4 st = get_lerp_sed(back_coords);
 
-    vec4 terrain = imageLoad(heightmap, pos);
-    terrain.b *= (1 - Ke * d_t);
+    vec4 terrain = texelFetch(heightmap, pos, 0);
+    terrain.b *= (1 - set.Ke * set.d_t);
 
     if (vel.z == 0) {
         terrain.rg += st.rg;
@@ -103,7 +86,7 @@ void main() {
     }
 
     /* // NEW, some sediment gets deposited on water evaporation
-    vec2 d_st = st.rg * vec2(Ke * d_t);
+    vec2 d_st = st.rg * vec2(set.Ke * set.d_t);
     terrain.r += d_st.r;
     terrain.g += d_st.g;
 

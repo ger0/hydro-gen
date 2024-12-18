@@ -7,38 +7,27 @@
 
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
-layout (std140, binding = BIND_UNIFORM_MAP_SETTINGS)
-uniform map_settings {
-    Map_settings_data set;
-};
+layout (binding = 3) uniform sampler2D sedimentmap;
+layout (binding = 4) uniform sampler2D heightmap;
 
-layout(std430, binding = BIND_PARTICLE_BUFFER) buffer ParticleBuffer {
-    Particle particles[];
-};
+layout (rgba32f, binding = 1) uniform writeonly image2D out_tex;
 
 // TODO: Move this out to a special buffer
-uniform mat4 perspective;
 uniform mat4 view;
-uniform vec3 dir;
+uniform mat4 perspective;
 uniform vec3 pos;
-uniform float time;
-uniform bool should_draw_particles;
-uniform bool should_draw_water;
-uniform bool DEBUG_PREVIEW;
-
 uniform float prec = 0.35;
+uniform bool should_draw_particles;
+uniform bool DEBUG_PREVIEW;
+uniform bool should_draw_water;
 
 uniform bool  display_sediment = false;
 uniform float  sediment_max_cap = 0.1;
 
-layout (rgba32f, binding = BIND_HEIGHTMAP) 
-	uniform readonly image2D heightmap;
-
-layout (rgba32f, binding = BIND_SEDIMENTMAP) 
-	uniform readonly image2D sedimentmap;
-
-layout (rgba32f, binding = BIND_DISPLAY_TEXTURE) 
-	uniform writeonly image2D out_tex;
+layout (std140, binding = BIND_UNIFORM_MAP_SETTINGS)
+uniform map_settings {
+    Map_settings_data set;
+};
 
 // HEIGHTMAP VARIABLES
 const int ROCK      = 0x00;
@@ -98,7 +87,7 @@ float water_mix(float water);
 // returns a color depending on the heightmap
 vec3 get_material_color(Ray ray, vec3 norm, Material_colors material);
 // get a interpolated normal based on image2D
-vec3 get_img_normal(readonly image2D img, vec2 pos);
+vec3 get_img_normal(sampler2D img, vec2 pos);
 // retrieve color from the material hit by the ray
 vec4 get_shade(Ray ray, vec3 normal, bool is_water);
 // retrieve color from the terrain hit by the ray 
@@ -113,6 +102,11 @@ vec3 get_pixel_color(vec3 origin, vec3 direction);
 Ray raymarch(vec3 orig, vec3 dir, const float max_dst, const int max_iter, const int terr_type);
 // convert coords to world coordinates
 vec4 to_world(vec4 coord);
+
+vec2 pos_to_uv(vec2 pos) {
+    return vec2(pos / vec2(set.hmap_dims));
+}
+
 
 // TODO: remove
 float fog_mix(float fog) {
@@ -131,7 +125,7 @@ vec3 get_material_color(Ray ray, vec3 norm, Material_colors material) {
 	float rock = smoothstep(0.0, 1.0, min(1.0, ray.terr.r));
 	float dirt = smoothstep(0.0, 1.0, min(1.0, ray.terr.g));
 
-	/* vec4 sediment = img_bilinear(sedimentmap, ray.pos.xz);
+	/* vec4 sediment = texture(sedimentmap, ray.pos.xz);
 	float sed_rock = clamp(sediment.r / sediment_max_cap, 0.0, 1.0);
 	float sed_dirt = clamp(sediment.g / sediment_max_cap, 0.0, 1.0); */
     
@@ -158,24 +152,24 @@ vec3 get_material_color(Ray ray, vec3 norm, Material_colors material) {
 	return col;
 }
 
-vec3 get_img_normal_w(readonly image2D img, vec2 pos) {
+vec3 get_img_normal_w(sampler2D img, vec2 pos) {
         float dx = (
-            img_bilinear_w(img, pos + vec2( 1.0, 0)) - 
-            img_bilinear_w(img, pos + vec2(-1.0, 0))
+            texture(img, pos_to_uv(pos + vec2( 1.0, 0))).w - 
+            texture(img, pos_to_uv(pos + vec2(-1.0, 0))).w
         );
         float dz = (
-            img_bilinear_w(img, pos + vec2(0, 1.0)) -
-            img_bilinear_w(img, pos + vec2(0,-1.0))
+            texture(img, pos_to_uv(pos + vec2(0, 1.0))).w -
+            texture(img, pos_to_uv(pos + vec2(0,-1.0))).w
         );
     return normalize(cross(vec3(2.0, dx, 0), vec3(0, dz, 2.0)));
 }
 
 // terrain normal
-vec3 get_img_normal(readonly image2D img, vec2 pos) {
-    vec2 r = img_bilinear(img, pos + vec2( 1.0, 0)).rg;
-    vec2 l = img_bilinear(img, pos + vec2(-1.0, 0)).rg;
-    vec2 b = img_bilinear(img, pos + vec2( 0,-1.0)).rg;
-    vec2 t = img_bilinear(img, pos + vec2( 0, 1.0)).rg;
+vec3 get_img_normal(sampler2D img, vec2 pos) {
+    vec2 r = texture(img, pos_to_uv(pos + vec2( 1.0, 0))).rg;
+    vec2 l = texture(img, pos_to_uv(pos + vec2(-1.0, 0))).rg;
+    vec2 b = texture(img, pos_to_uv(pos + vec2( 0,-1.0))).rg;
+    vec2 t = texture(img, pos_to_uv(pos + vec2( 0, 1.0))).rg;
     float dx = (
         r.r + r.g - l.r - l.g
     );
@@ -390,13 +384,13 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
 	float sundot = clamp(dot(direction, -light_dir), 0.0, 1.0);
 
 	vec2 pos = ray.pos.xz * WORLD_SCALE;
-	// float water_h = img_bilinear_b(heightmap, ray.pos.xz);
+	// float water_h = texture_b(heightmap, ray.pos.xz);
 
 	float water_h = ray.terr.b;
     water_h = min(1.0, smoothstep(1e-4, 1.0, water_h));
 
-	if (pos.x < 0 || pos.x >= float(imageSize(heightmap).x) ||
-	pos.y < 0 || pos.y >= float(imageSize(heightmap).y)) {
+	if (pos.x < 0 || pos.x >= float(textureSize(heightmap, 0).x) ||
+	pos.y < 0 || pos.y >= float(textureSize(heightmap, 0).y)) {
 	    water_h = max_dist;
 	}
 
@@ -441,8 +435,8 @@ vec3 get_pixel_color(vec3 origin, vec3 direction) {
     }
 
     if (display_sediment) {
-        float r = min(1.0, img_bilinear_r(sedimentmap, ray.pos.xz) / sediment_max_cap);
-        float g = min(1.0, img_bilinear_g(sedimentmap, ray.pos.xz) / sediment_max_cap);
+        float r = min(1.0, texture(sedimentmap, pos_to_uv(ray.pos.xz)).r / sediment_max_cap);
+        float g = min(1.0, texture(sedimentmap, pos_to_uv(ray.pos.xz)).g / sediment_max_cap);
         color = mix(color, vec3(1,0,0), r);
         color = mix(color, vec3(0,1,0), g);
     }
@@ -470,7 +464,7 @@ Ray raymarch(
     for (int i = 0; i < max_steps; ++i) {
         vec3 sample_pos = origin + direction * dist;
 
-        terr = img_bilinear(heightmap, sample_pos.xz);
+        terr = texture(heightmap, pos_to_uv(sample_pos.xz));
 
         if (terr_type == TERRAIN) {
             t_height = terr.r + terr.g;
@@ -492,7 +486,7 @@ Ray raymarch(
             return Ray(
                 vec4(sample_pos - (0.05 * direction), 0.0),
                 dist - (0.05),
-                img_bilinear(heightmap, (sample_pos - (0.05 * direction)).xz)
+                texture(heightmap, pos_to_uv((sample_pos - (0.05 * direction)).xz))
             );
         }
         else if (d_height < 0) {
@@ -556,8 +550,8 @@ void main() {
     if (DEBUG_PREVIEW && pixel.x < set.hmap_dims.x && pixel.y < set.hmap_dims.y) {
         imageStore(
             out_tex, pixel, vec4(
-                (img_bilinear_r(heightmap, vec2(set.hmap_dims.x - pixel.x, pixel.y)) + 
-                img_bilinear_g(heightmap, vec2(set.hmap_dims.x - pixel.x, pixel.y))) / set.max_height
+                (texture(heightmap, pos_to_uv(vec2(set.hmap_dims.x - pixel.x, pixel.y))).r + 
+                texture(heightmap, pos_to_uv(vec2(set.hmap_dims.x - pixel.x, pixel.y))).g) / set.max_height
             )
         );
     }

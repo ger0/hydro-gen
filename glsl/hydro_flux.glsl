@@ -6,19 +6,19 @@
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
 // (dirt height, rock height, water height, total height)
-layout (binding = BIND_HEIGHTMAP) uniform sampler2D heightmap;
-layout (binding = BIND_WRITE_HEIGHTMAP, rgba32f)   
+layout (binding = 0) uniform sampler2D heightmap;
+layout (binding = 1, rgba32f)   
 	uniform writeonly image2D out_heightmap;
 
 // (fL, fR, fT, fB) left, right, top, bottom
-layout (binding = BIND_FLUXMAP) uniform sampler2D fluxmap;
-layout (binding = BIND_WRITE_FLUXMAP, rgba32f)   
+layout (binding = 2) uniform sampler2D fluxmap;
+layout (binding = 3, rgba32f)   
 	uniform writeonly image2D out_fluxmap;
 
 // velocity + suspended sediment vector
 // vec3((u, v), )
-layout (binding = BIND_VELOCITYMAP) uniform sampler2D velocitymap;
-layout (binding = BIND_WRITE_VELOCITYMAP, rgba32f)   
+layout (binding = 4) uniform sampler2D velocitymap;
+layout (binding = 5, rgba32f)   
 	uniform writeonly image2D out_velocitymap;
 
 layout (std140, binding = BIND_UNIFORM_EROSION) uniform erosion_data {

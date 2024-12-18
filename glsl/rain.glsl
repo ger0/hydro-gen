@@ -6,8 +6,8 @@
 
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
-layout (binding = BIND_HEIGHTMAP, rgba32f)   
-	uniform image2D heightmap;
+layout (binding = 0, rgba32f) uniform readonly image2D heightmap;
+layout (binding = 1, rgba32f) uniform writeonly image2D out_heightmap;
 
 uniform float time;
 layout (std140, binding = BIND_UNIFORM_RAIN_SETTINGS) 
@@ -51,6 +51,6 @@ void main() {
         incr += mountain * set.mountain_multip * r / ((1.0 - set.mountain_thresh) * map_set.max_height);
     }
     terr.b += incr;
-    terr.w = terr.r + terr.b;
-    imageStore(heightmap, pos, terr);
+    terr.w = terr.r + terr.g + terr.b;
+    imageStore(out_heightmap, pos, terr);
 }

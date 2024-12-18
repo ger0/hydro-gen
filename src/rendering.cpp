@@ -113,7 +113,7 @@ bool Render::Data::dispatch(
     shader.set_uniform("display_sediment", display_sediment);
 #endif
     //shader.set_uniform("sediment_max_cap", set.erosion.data.Kc);
-    //shader.set_uniform("DEBUG_PREVIEW", debug_preview);
+    shader.set_uniform("DEBUG_PREVIEW", debug_preview);
     shader.set_uniform("should_draw_water", display_water);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);

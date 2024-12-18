@@ -5,17 +5,17 @@
 
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
-layout (binding = BIND_HEIGHTMAP) uniform sampler2D heightmap;
+layout (binding = 0) uniform sampler2D heightmap;
 
-layout (binding = BIND_WRITE_HEIGHTMAP, rgba32f)   
+layout (binding = 1, rgba32f)   
 	uniform writeonly image2D out_heightmap;
 
 // velocity + suspended sediment vector
 // vec3((u, v), suspended)
-layout (binding = BIND_VELOCITYMAP) uniform sampler2D velocitymap;
+layout (binding = 2) uniform sampler2D velocitymap;
 
-layout (binding = BIND_SEDIMENTMAP) uniform sampler2D sedimap;
-layout (binding = BIND_WRITE_SEDIMENTMAP, rgba32f)   
+layout (binding = 3) uniform sampler2D sedimap;
+layout (binding = 4, rgba32f)   
 	uniform writeonly image2D out_sedimap;
 
 layout (std140, binding = BIND_UNIFORM_EROSION) uniform erosion_data {
@@ -79,11 +79,11 @@ void main() {
 
     vec4 terrain = texelFetch(heightmap, pos, 0);
     terrain.b *= (1 - set.Ke * set.d_t);
-
+/*
     if (vel.z == 0) {
         terrain.rg += st.rg;
         st.rg = vec2(0);
-    }
+    } */
 
     /* // NEW, some sediment gets deposited on water evaporation
     vec2 d_st = st.rg * vec2(set.Ke * set.d_t);

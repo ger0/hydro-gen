@@ -49,9 +49,11 @@ Programs Erosion::setup_shaders(State::Settings& set, State::World::Textures& da
     return prog;
 }
 
-void Erosion::dispatch_grid_rain(Programs& prog, const State::World::Textures& data) {
+void Erosion::dispatch_grid_rain(Programs& prog, State::World::Textures& data) {
     prog.grid.rain.use();
     prog.grid.rain.set_uniform("time", data.time);
+    prog.grid.rain.bind_image("heightmap", data.heightmap.get_read_tex());
+    prog.grid.rain.bind_image("out_heightmap", data.heightmap.get_write_tex());
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glDispatchCompute(
         State::NOISE_SIZE / WRKGRP_SIZE_X,
@@ -59,6 +61,7 @@ void Erosion::dispatch_grid_rain(Programs& prog, const State::World::Textures& d
         1
     );
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    data.heightmap.swap();
 }
 
 // helper functions
@@ -131,21 +134,43 @@ void Erosion::dispatch_particle(Programs& prog, State::World::Textures& data, bo
 #endif
 
 void Erosion::dispatch_grid(Programs& prog, State::World::Textures& data) {
+    prog.grid.flux.use();
+    prog.grid.flux.bind_texture("heightmap", data.heightmap.get_read_tex());
+    prog.grid.flux.bind_texture("fluxmap", data.flux.get_read_tex());
+    prog.grid.flux.bind_texture("velocitymap", data.velocity.get_read_tex());
+    prog.grid.flux.bind_image("out_heightmap", data.heightmap.get_write_tex());
+    prog.grid.flux.bind_image("out_fluxmap", data.flux.get_write_tex());
+    prog.grid.flux.bind_image("out_velocitymap", data.velocity.get_write_tex());
     run(prog.grid.flux);
     data.heightmap.swap();
     data.flux.swap();
     data.velocity.swap();
 
+    prog.grid.erosion.use();
+    prog.grid.erosion.bind_image("heightmap", data.heightmap.get_read_tex());
+    prog.grid.erosion.bind_image("sedimap", data.sediment.get_read_tex());
+    prog.grid.erosion.bind_image("velocitymap", data.velocity.get_read_tex());
+    prog.grid.erosion.bind_image("out_heightmap", data.heightmap.get_write_tex());
+    prog.grid.erosion.bind_image("out_sedimap", data.sediment.get_write_tex());
     run(prog.grid.erosion);
     data.heightmap.swap();
     data.sediment.swap();
 
+    prog.grid.sediment.use();
+    prog.grid.sediment.bind_texture("heightmap", data.heightmap.get_read_tex());
+    prog.grid.sediment.bind_texture("velocitymap", data.velocity.get_read_tex());
+    prog.grid.sediment.bind_texture("sedimap", data.sediment.get_read_tex());
+    prog.grid.sediment.bind_image("out_heightmap", data.heightmap.get_write_tex());
+    prog.grid.sediment.bind_image("out_sedimap", data.sediment.get_write_tex());
     run(prog.grid.sediment);
     data.heightmap.swap();
     data.sediment.swap();
 
     run_thermal_erosion(prog, data);
 
+    prog.thermal.smooth.use();
+    prog.thermal.smooth.bind_image("heightmap", data.heightmap.get_read_tex());
+    prog.thermal.smooth.bind_image("out_heightmap", data.heightmap.get_write_tex());
     run(prog.thermal.smooth);
     data.heightmap.swap();
 }

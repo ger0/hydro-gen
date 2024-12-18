@@ -5,23 +5,15 @@
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 
 // (dirt height, rock height, water height, total height)
-layout (binding = BIND_HEIGHTMAP, rgba32f)   
-	uniform readonly image2D heightmap;
-layout (binding = BIND_WRITE_HEIGHTMAP, rgba32f)   
-	uniform writeonly image2D out_heightmap;
+layout (binding = 0, rgba32f) uniform readonly image2D heightmap;
+layout (binding = 1, rgba32f) uniform writeonly image2D out_heightmap;
 
-// (fL, fR, fT, fB) left, right, top, bottom
-layout (binding = BIND_FLUXMAP, rgba32f)   
-	uniform readonly image2D fluxmap;
-
-layout (binding = BIND_SEDIMENTMAP, rgba32f)   
-	uniform readonly image2D sedimap;
-layout (binding = BIND_WRITE_SEDIMENTMAP, rgba32f)   
-	uniform writeonly image2D out_sedimap;
+layout (binding = 3, rgba32f) uniform readonly image2D sedimap;
+layout (binding = 4, rgba32f) uniform writeonly image2D out_sedimap;
 
 // velocity + suspended sediment vector
 // vec3((u, v), suspended)
-layout (binding = BIND_VELOCITYMAP, rgba32f)   
+layout (binding = 5, rgba32f)   
 	uniform readonly image2D velocitymap;
 
 layout (std140, binding = BIND_UNIFORM_EROSION) uniform erosion_data {
@@ -40,14 +32,6 @@ vec3 get_terr_normal(ivec2 pos) {
         t.r + t.g - b.r - b.g
     );
     return normalize(cross(vec3(2.0 * L, dx, 0), vec3(0, dz, 2.0 * L)));
-}
-
-vec4 get_flux(ivec2 pos) {
-    if (pos.x <= 0 || pos.x >= (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
-    pos.y <= 0 || pos.y >= (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1)) {
-       return vec4(0, 0, 0, 0); 
-    }
-    return imageLoad(fluxmap, pos);
 }
 
 void main() {

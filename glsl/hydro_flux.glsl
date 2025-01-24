@@ -1,6 +1,7 @@
 #version 460
 
 #include "bindings.glsl"
+#include "img_interpolation.glsl"
 #line 5
 
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
@@ -28,13 +29,6 @@ layout (std140, binding = BIND_UNIFORM_EROSION) uniform erosion_data {
 
 // cross-section area of a pipe
 const float A = 1.0;
-
-vec2 pos_to_uv(vec2 pos) {
-    return vec2(
-        pos.x / float(gl_WorkGroupSize.x * gl_NumWorkGroups.x),
-        pos.y / float(gl_WorkGroupSize.y * gl_NumWorkGroups.y)
-    );
-}
 
 float get_wheight(ivec2 pos) {
     if (pos.x < 0 || pos.x > (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
@@ -76,7 +70,7 @@ vec2 advect_coords(vec2 coords, vec2 vel, float d_t) {
 vec2 get_lerp_vel(vec2 back_coords) {
     back_coords.x = clamp(back_coords.x, 0, gl_NumWorkGroups.x * WRKGRP_SIZE_X - 1);
     back_coords.y = clamp(back_coords.y, 0, gl_NumWorkGroups.y * WRKGRP_SIZE_Y - 1);
-    return texture(velocitymap, pos_to_uv(back_coords)).xy;
+    return img_bilinear(velocitymap, back_coords).xy;
 }
 
 

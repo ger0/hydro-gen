@@ -13,8 +13,8 @@
 #include "erosion.hpp"
 #include "state.hpp"
 
-constexpr u32 WINDOW_W = 1600;
-constexpr u32 WINDOW_H = 900;
+constexpr u32 WINDOW_W = 1920;
+constexpr u32 WINDOW_H = 1080;
 
 constexpr auto noise_comput_file  = "heightmap.glsl";
 
@@ -159,13 +159,6 @@ int main(int argc, char* argv[]) {
             state,
             world_data);
 
-
-    GLuint64 query_time;
-    GLuint queryID;
-    glGenQueries(1, &queryID);
-
-    static float dong = 0.0;
-
     while (!glfwWindowShouldClose(window.get()) && (!state.shader_error)) {
         glfwPollEvents();
         world_data.time = glfwGetTime();
@@ -190,8 +183,7 @@ int main(int argc, char* argv[]) {
         if (state.should_erode) {
             state.erosion_steps++;
 
-            // float erosion_d_time = glfwGetTime();
-            glBeginQuery(GL_TIME_ELAPSED, queryID);
+            float erosion_d_time = glfwGetTime();
 
 #if not defined(PARTICLE_COUNT) 
             if (state.should_rain) {
@@ -204,30 +196,13 @@ int main(int argc, char* argv[]) {
             Erosion::dispatch_particle(erosion_progs, world_data, state.should_rain);
 #endif
 
-            glEndQuery(GL_TIME_ELAPSED);
-            glGetQueryObjectui64v(queryID, GL_QUERY_RESULT, &query_time);
-            int done = 0;
-            while (!done) {
-                glGetQueryObjectiv(queryID, 
-                        GL_QUERY_RESULT_AVAILABLE, 
-                        &done);
-            }
-
-            // erosion_d_time = glfwGetTime() - erosion_d_time;
-            state.erosion_time += query_time * 10e-9;
-            dong += query_time * 10e-6;
-            //state.erosion_time += erosion_d_time;
+            erosion_d_time = glfwGetTime() - erosion_d_time;
+            state.erosion_time += erosion_d_time;
             // calculate average erosion update time
             if (!(state.erosion_steps % 100)) {
                 state.erosion_mean_t = state.erosion_time / 100.f;
                 state.erosion_time = 0;
             }
-
-            /* if (state.erosion_steps == 20000) {
-                dong /= state.erosion_steps;
-                LOG_DBG("Total Erosion Time Average: {} {}", dong, state.erosion_steps);
-                return EXIT_SUCCESS;
-            } */
         }
         renderer.blit();
         renderer.handle_ui(

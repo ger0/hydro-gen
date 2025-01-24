@@ -36,7 +36,7 @@ struct Program_state {
     float erosion_time;
     float erosion_mean_t = 0.f;
 
-    float target_fps = 60.f;
+    float target_fps = 66.f;
     struct Camera {
         glm::vec3 pos    = glm::vec3(0.f, State::MAX_HEIGHT, 0.f);
         glm::vec3 dir    = glm::vec3(0.f, State::MAX_HEIGHT, -1.f);

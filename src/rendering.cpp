@@ -24,7 +24,7 @@ Render::Data::Data(
         output_texture({
             .target = GL_TEXTURE_2D, 
             .access = GL_WRITE_ONLY,
-            .format = GL_RGBA32F, 
+            .format = GL_RGBA8, 
             .width  = window_w,
             .height = window_h
         }),
@@ -283,7 +283,7 @@ void Render::Data::handle_ui(
     ImGui::Text("Frame time (ms): {%.2f}", state.frame_t);
     ImGui::Text("FPS: {%.2f}", 1000.0 / state.frame_t);
     ImGui::Text("Total erosion updates: {%lu}", state.erosion_steps);
-    ImGui::Text("Avg erosion time: {%f}", state.erosion_mean_t);
+    // ImGui::Text("Avg erosion time: {%f}", state.erosion_mean_t);
     ImGui::Text("Total Time: {%f}", world.time);
     ImGui::End();
 

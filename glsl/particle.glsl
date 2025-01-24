@@ -43,19 +43,15 @@ float rand(vec2 p) {
                  (0.1 + abs(sin(p.y * 13.0 + p.x))));
 }
 
-vec2 pos_to_uv(vec2 pos) {
-    return vec2(pos.x / float(map_set.hmap_dims.x), pos.y / float(map_set.hmap_dims.y));
-}
-
 vec2 get_momentum(vec2 pos) {
-    return texture(momentmap, pos_to_uv(pos)).xy;
+    return img_bilinear(momentmap, pos).xy;
 }
 
 vec3 get_terr_normal(vec2 pos) {
-    vec2 r = texture(heightmap, pos_to_uv(pos + vec2( 1.0, 0))).rg;
-    vec2 l = texture(heightmap, pos_to_uv(pos + vec2(-1.0, 0))).rg;
-    vec2 b = texture(heightmap, pos_to_uv(pos + vec2( 0, -1.0))).rg;
-    vec2 t = texture(heightmap, pos_to_uv(pos + vec2( 0,  1.0))).rg;
+    vec2 r = img_bilinear(heightmap, pos + vec2( 1.0, 0)).rg;
+    vec2 l = img_bilinear(heightmap, pos + vec2(-1.0, 0)).rg;
+    vec2 b = img_bilinear(heightmap, pos + vec2( 0, -1.0)).rg;
+    vec2 t = img_bilinear(heightmap, pos + vec2( 0,  1.0)).rg;
     float dx = (
         r.r + r.g - l.r - l.g
     );
@@ -95,7 +91,7 @@ void main() {
     }
     vec3 norm = get_terr_normal(p.position);
     vec2 momentum = get_momentum(p.position);
-    float water = texture(heightmap, pos_to_uv(p.position)).b;
+    float water = img_bilinear(heightmap, p.position).b;
 
     p.velocity -= (set.d_t * norm.xz) / (p.volume) * set.G;
 

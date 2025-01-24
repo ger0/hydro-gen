@@ -56,13 +56,13 @@ void GLAPIENTRY gl_error_callback(
                 type_str,
                 source_str,
                 message);
+        raise(SIGTRAP);
     } else {
         LOG_DBG("GL_{}, source = {}, message = {}", 
                 type_str,
                 source_str,
                 message);
     }
-    raise(SIGTRAP);
 }
 
 GLFWwindow* init_window(glm::uvec2 window_size, const char* window_title, bool* error_bool) {

@@ -9,7 +9,7 @@ namespace State {
 
 constexpr float MAX_HEIGHT = 256.f;
 constexpr float WATER_HEIGHT = 96.f;
-constexpr GLuint NOISE_SIZE = 1024;
+constexpr GLuint NOISE_SIZE = 1536;
 
 struct Rain_settings {
     gl::Buffer buffer;

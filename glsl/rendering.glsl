@@ -516,15 +516,15 @@ void main() {
     color = pow(color, vec3(1.0 / 2.2));
 
 #ifdef LOW_RES_DIV3
-    imageStore(out_tex, pixel * 3, vec4(color, set.hmap_dims.x));
-    imageStore(out_tex, pixel * 3 + ivec2(1, 0), vec4(color, set.hmap_dims.x));
-    imageStore(out_tex, pixel * 3 + ivec2(2, 0), vec4(color, set.hmap_dims.x));
-    imageStore(out_tex, pixel * 3 + ivec2(0, 1), vec4(color, set.hmap_dims.x));
-    imageStore(out_tex, pixel * 3 + ivec2(0, 2), vec4(color, set.hmap_dims.x));
-    imageStore(out_tex, pixel * 3 + ivec2(1, 1), vec4(color, set.hmap_dims.x));
-    imageStore(out_tex, pixel * 3 + ivec2(2, 1), vec4(color, set.hmap_dims.x));
-    imageStore(out_tex, pixel * 3 + ivec2(1, 2), vec4(color, set.hmap_dims.x));
-    imageStore(out_tex, pixel * 3 + ivec2(2, 2), vec4(color, set.hmap_dims.x));
+    for (uint oy = 0; oy < 3; ++oy) {
+        for (uint ox = 0; ox < 3; ++ox) {
+            imageStore(
+                out_tex, 
+                pixel * 3 + ivec2(ox, oy), 
+                vec4(color, set.hmap_dims.x)
+            );
+        }
+    }
 #else
     imageStore(out_tex, pixel, vec4(color, 0));
 #endif

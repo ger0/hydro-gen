@@ -1,0 +1,8 @@
+{
+  "dependencies": [
+    "fmt",
+    "glfw3",
+    "opengl",
+    "glew"
+  ]
+}

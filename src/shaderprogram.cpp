@@ -114,7 +114,7 @@ enum Log_type {
 
 std::string load_shader_file(std::string filename) {
     char path[1 << 8];
-    snprintf(path, sizeof(path), "../glsl/%s", filename.c_str());
+    snprintf(path, sizeof(path), "glsl/%s", filename.c_str());
 
     FILE* file = fopen(path, "r");
     assert(file != nullptr);

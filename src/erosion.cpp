@@ -1,6 +1,23 @@
 #include "erosion.hpp"
 using namespace Erosion;
 
+// shader filenames
+
+// grid based
+constexpr auto grid_rain_comput_file    = "rain.glsl";
+constexpr auto grid_hydro_flux_file     = "hydro_flux.glsl";
+constexpr auto grid_hydro_erosion_file  = "hydro_erosion.glsl";
+constexpr auto grid_sediment_file       = "sediment_transport.glsl";
+
+// thermal erosion - grid based
+constexpr auto thermal_flux_file        = "thermal_erosion.glsl";
+constexpr auto thermal_transport_file   = "thermal_transport.glsl";
+constexpr auto smooth_file              = "smoothing.glsl";
+
+// particle based
+constexpr auto particle_move_file       = "particle.glsl";
+constexpr auto particle_erosion_file    = "particle_erosion.glsl";
+
 Programs Erosion::setup_shaders(State::Settings& set, State::World::Textures& data) {
     // compile compute shaders
     Programs prog = {

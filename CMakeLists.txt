@@ -38,3 +38,10 @@ target_link_libraries(hydro-gen PRIVATE fmt::fmt)
 target_link_libraries(hydro-gen PRIVATE glfw)
 target_link_libraries(hydro-gen PRIVATE GLEW::GLEW)
 target_link_libraries(hydro-gen PRIVATE OpenGL::GL)
+
+add_custom_command(TARGET hydro-gen POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_SOURCE_DIR}/glsl
+            $<TARGET_FILE_DIR:hydro-gen>/glsl
+    COMMENT "Copying GLSL files to output directory"
+)

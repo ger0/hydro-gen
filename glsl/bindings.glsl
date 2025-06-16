@@ -111,4 +111,4 @@ struct Particle {
     // sediment layers
     GL(BOOL)    to_kill;
 };
-#endif // HYDR_GL_BINDINGS_HPP``
+#endif // HYDR_GL_BINDINGS_HPP

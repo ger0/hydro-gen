@@ -1,7 +1,7 @@
 #version 460
 
-#include "bindings.glsl"
-#include "simplex_noise.glsl"
+#include <bindings>
+#include <simplex_noise>
 #line 6
 
 layout (local_size_x = WRKGRP_SIZE_X * WRKGRP_SIZE_Y) in;

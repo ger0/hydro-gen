@@ -1,7 +1,7 @@
 // based on: https://github.com/Huw-man/Interactive-Erosion-Simulator-on-GPU/
 #version 460 core
 
-#include "bindings.glsl"
+#include <bindings>
 #line 6
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;
 

@@ -1,6 +1,6 @@
 #version 460
 
-#include "bindings.glsl"
+#include <bindings>
 #line 4
 
 layout (local_size_x = WRKGRP_SIZE_X, local_size_y = WRKGRP_SIZE_Y) in;

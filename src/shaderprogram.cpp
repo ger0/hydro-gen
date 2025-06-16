@@ -121,7 +121,7 @@ std::string load_shader_file(std::string filename) {
     snprintf(path, sizeof(path), "glsl\\%s", filename.c_str());
 #endif
 
-    FILE* file = fopen(path, "r");
+    FILE* file = fopen(path, "rb");
     assert(file != nullptr);
     defer { fclose(file); };
 
@@ -134,45 +134,55 @@ std::string load_shader_file(std::string filename) {
 
     assert(fseek(file, 0, SEEK_SET) == 0);
     const auto ret_val = fread(&buffer[0], size, 1, file);
-    if (ret_val <= 0) {
-        if (ferror(file)) {
-            LOG_ERR("Failed to load shader source code!, path: {}", path);
-            exit(-1);
-        }
+    if (ret_val != 1) {
+		LOG_ERR("Failed to load shader source code!, path: {}", path);
+		exit(-1);
     }
     resolve_includes(buffer);
-    if (filename == "heightmap.glsl") {
-        LOG("{}", buffer.c_str());
-    }
 
     return buffer;
 }
 
 void resolve_includes(std::string& buff) {
-    std::regex includeRegex(R"(#include\s+\"([^"]+)\"\s*\n?)");
+    for(uint i = 0; buff[i] != '\0'; i++) {
+        if(buff[i] == '#' && (i == 0 || buff[i - 1] == '\n')) {
+            uint include_start = i;
+            const char* word = "include <";
+            uint word_i = 0;
+            // skip hash
+            i++;
+            while(word[word_i] != '\0' && buff[i] != '\0' && buff[i] == word[word_i]) {
+                word_i++;
+                i++;
+            }
+            if(word[word_i] != '\0') {
+                continue;
+            }
+            uint path_start = i;
+            while(
+                buff[i] != '\0' &&
+                buff[i] != '\n' &&
+                buff[i] != '>'
+            ) {
+                i++;
+            }
+            if(buff[i] != '>') {
+                continue;
+            }
+            uint path_end = i;
 
-    struct MatchInfo {
-        size_t pos;
-        size_t len;
-        std::string replacement;
-    };
+            i++;
+            if(buff[i] != '\n') {
+                continue;
+            }
+            uint include_end = i;
 
-    std::vector<MatchInfo> replacements;
+            std::string include_path = buff.substr(path_start, path_end - path_start) + ".glsl";
+            buff.erase(include_start, include_end - include_start);
 
-    for (std::sregex_iterator it(buff.begin(), buff.end(), includeRegex), end; it != end; ++it) {
-        std::smatch match = *it;
-
-        std::string fullInclude = match[0].str();     // Whole match
-        std::string filename = match[1].str();        // Group 1
-
-        std::string replacement = load_shader_file(filename.c_str());
-		LOG_DBG("    Included shader: \t {:30}", filename);
-          
-        replacements.push_back(MatchInfo{ (size_t)match.position(), (size_t)match.length(), replacement });
-    }
-
-    for (auto it = replacements.rbegin(); it != replacements.rend(); ++it) {
-        buff.replace(it->pos, it->len, it->replacement);
+            std::string include = load_shader_file(include_path.c_str());
+            buff.insert(include_start, include);
+        }
     }
 }
 
@@ -182,7 +192,6 @@ GLuint Shader_core::load_shader(GLenum shader_type, std::string filename) {
     auto source_str = load_shader_file(filename);
     const GLint len = source_str.length();
     const GLchar* shader_source = source_str.c_str();
-    LOG_DBG("source2: \n{}", (char*)shader_source);
     glShaderSource(shader, 1, &shader_source, &len);
     glCompileShader(shader);
 
@@ -268,7 +277,7 @@ Compute_program::~Compute_program() {
     glDetachShader(program, compute);
     glDeleteShader(compute);
     glDeleteProgram(program);
-    // LOG_DBG("Compute shader program deleted");
+    LOG_DBG("Compute shader program deleted");
 }
 
 void Shader_core::use() const {

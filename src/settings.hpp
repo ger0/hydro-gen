@@ -38,16 +38,16 @@ struct Map_settings {
         .seed           = 10000.f * rand() / (float)RAND_MAX,
         .persistance    = 0.44,
         .lacunarity     = 2.0,
-        .scale          = 0.0015,
+        .scale          = 0.00075,
         .redistribution = 1, // doesn't work
         .octaves        = 8,
         .mask_round     = false,
-        .mask_exp       = false,
+        .mask_exp       = true,
         .mask_power     = true,
         .mask_slope     = false,
 
         .uplift         = 0,
-        .uplift_scale   = 1,
+        .uplift_scale   = 1.16,
 
         .domain_warp    = 1,
         .domain_warp_scale = 100.f,

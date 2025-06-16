@@ -615,6 +615,46 @@ float perlfbm(vec2 v, gln_tFBMOpts opts) {
     v += (opts.seed * 100.0);
     float persistance = opts.persistance;
     float lacunarity = opts.lacunarity;
+    float scale = opts.scale;
+    float redistribution = opts.redistribution;
+    int octaves = opts.octaves;
+    bool terbulance = opts.terbulance;
+    bool ridge = opts.terbulance && opts.ridge;
+
+    float result = 0.0;
+    float amplitude = 1;
+    float frequency = 1.00;
+    float maximum = amplitude;
+
+    for (int i = 0; i < MAX_FBM_ITERATIONS; i++) {
+        if (i >= octaves)
+            break;
+
+        vec2 p = v * frequency * scale;
+
+        vec3 res = noised(p);
+
+        float noiseVal = (res.x + 1.0) / 2.0;
+
+        if (terbulance)
+            noiseVal = abs(noiseVal);
+
+        if (ridge)
+            noiseVal = 1.0 - noiseVal;
+
+        result += noiseVal * amplitude;
+        frequency *= lacunarity;
+        amplitude *= persistance;
+        maximum += amplitude;
+    }
+    float redistributed = pow(result, redistribution);
+    return redistributed / maximum;
+}
+
+float erosion_perlfbm(vec2 v, gln_tFBMOpts opts) {
+    v += (opts.seed * 100.0);
+    float persistance = opts.persistance;
+    float lacunarity = opts.lacunarity;
     float redistribution = opts.redistribution;
     int octaves = opts.octaves;
     bool terbulance = opts.terbulance;
@@ -634,6 +674,11 @@ float perlfbm(vec2 v, gln_tFBMOpts opts) {
         vec2 p = v * frequency * opts.scale;
 
         vec3 res = noised(p);
+        if (terbulance)
+            res = abs(res);
+
+        if (ridge)
+            res = 1.0 - res;
         dsum += res.yz;
 
         float noiseVal = (res.x + 1.0) / 2.0;

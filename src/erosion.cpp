@@ -18,9 +18,9 @@ constexpr auto smooth_file              = "smoothing.glsl";
 constexpr auto particle_move_file       = "particle.glsl";
 constexpr auto particle_erosion_file    = "particle_erosion.glsl";
 
-Programs Erosion::setup_shaders(State::Settings& set, State::World::Textures& data) {
+Programs* Erosion::setup_shaders(State::Settings& set, State::World::Textures& data) {
     // compile compute shaders
-    Programs prog = {
+    auto prog = new Programs{
         .particle = {
             .movement   = Compute_program(particle_move_file),
             .erosion    = Compute_program(particle_erosion_file)
@@ -45,23 +45,23 @@ Programs Erosion::setup_shaders(State::Settings& set, State::World::Textures& da
     };
 
     for (int i = 0; i < SED_LAYERS; i++) {
-        prog.thermal.flux[i].use();
-        prog.thermal.flux[i].bind_uniform_block("erosion_data", set.erosion.buffer);
-        prog.thermal.flux[i].set_uniform("t_layer", i);
-        prog.thermal.transport[i].use();
-        prog.thermal.transport[i].set_uniform("t_layer", i);
+        prog->thermal.flux[i].use();
+        prog->thermal.flux[i].bind_uniform_block("erosion_data", set.erosion.buffer);
+        prog->thermal.flux[i].set_uniform("t_layer", i);
+        prog->thermal.transport[i].use();
+        prog->thermal.transport[i].set_uniform("t_layer", i);
         glUseProgram(0);
     }
 
-    prog.grid.flux.bind_uniform_block("erosion_data", set.erosion.buffer);
-    prog.grid.erosion.bind_uniform_block("erosion_data", set.erosion.buffer);
-    prog.grid.sediment.bind_uniform_block("erosion_data", set.erosion.buffer);
+    prog->grid.flux.bind_uniform_block("erosion_data", set.erosion.buffer);
+    prog->grid.erosion.bind_uniform_block("erosion_data", set.erosion.buffer);
+    prog->grid.sediment.bind_uniform_block("erosion_data", set.erosion.buffer);
 
-    prog.particle.movement.bind_uniform_block("map_settings", set.map.buffer);
-    prog.particle.erosion.bind_uniform_block("erosion_data", set.erosion.buffer);
+    prog->particle.movement.bind_uniform_block("map_settings", set.map.buffer);
+    prog->particle.erosion.bind_uniform_block("erosion_data", set.erosion.buffer);
 
-    prog.particle.movement.bind_storage_buffer("ParticleBuffer", data.particle_buffer);
-    prog.particle.erosion.bind_storage_buffer("ParticleBuffer", data.particle_buffer);
+    prog->particle.movement.bind_storage_buffer("ParticleBuffer", data.particle_buffer);
+    prog->particle.erosion.bind_storage_buffer("ParticleBuffer", data.particle_buffer);
 
     return prog;
 }

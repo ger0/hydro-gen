@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.7)
 project(hydro-gen)
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
@@ -12,6 +12,7 @@ find_package(fmt CONFIG REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
+find_package(glm CONFIG REQUIRED)
 
 file(GLOB SRC_FILES src/*.cpp)
 include_directories(${CMAKE_SOURCE_DIR})
@@ -38,6 +39,7 @@ target_link_libraries(hydro-gen PRIVATE fmt::fmt)
 target_link_libraries(hydro-gen PRIVATE glfw)
 target_link_libraries(hydro-gen PRIVATE GLEW::GLEW)
 target_link_libraries(hydro-gen PRIVATE OpenGL::GL)
+target_link_libraries(hydro-gen PRIVATE glm::glm)
 
 add_custom_command(TARGET hydro-gen POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory

@@ -65,23 +65,24 @@ void main() {
     vec2 dist = vec2(1, 1);
     if (cfg.domain_warp != 0) {
         dist = vec2(
-            gln_sfbm(vec2(store_pos.x + 2.3, store_pos.y + 2.9), opts),
-            gln_sfbm(vec2(store_pos.x - 3.1, store_pos.y - 4.3), opts)
+            perlfbm(vec2(store_pos.x + 2.3, store_pos.y + 2.9), opts),
+            perlfbm(vec2(store_pos.x - 3.1, store_pos.y - 4.3), opts)
         );
         if (cfg.domain_warp == 2) {
             dist = vec2(
-                gln_sfbm(vec2(store_pos.x + cfg.domain_warp_scale* dist.x - 5.7, store_pos.y + cfg.domain_warp_scale*dist.y + 27.9), opts),
-                gln_sfbm(vec2(store_pos.x + cfg.domain_warp_scale* dist.x + 11.5, store_pos.y + cfg.domain_warp_scale*dist.y - 23.7), opts)
+                perlfbm(vec2(store_pos.x + cfg.domain_warp_scale* dist.x - 5.7, store_pos.y + cfg.domain_warp_scale*dist.y + 27.9), opts),
+                perlfbm(vec2(store_pos.x + cfg.domain_warp_scale* dist.x + 11.5, store_pos.y + cfg.domain_warp_scale*dist.y - 23.7), opts)
             );
         }
     }
     float val = 0.0;
     if (cfg.fake_erosion != 0) {
-        val = perlfbm(vec2(store_pos) + cfg.domain_warp_scale * dist, opts);
+        val = erosion_perlfbm(vec2(store_pos) + cfg.domain_warp_scale * dist, opts);
     } else {
-        val = (gln_sfbm(vec2(store_pos) + cfg.domain_warp_scale * dist, opts) + 1.0) / 2.0;
+        val = (erosion_perlfbm(vec2(store_pos) + cfg.domain_warp_scale * dist, opts));
     }
 
+    float height_multiplier = cfg.height_mult;
     if (cfg.uplift != 0) {
         gln_tFBMOpts up_opts = gln_tFBMOpts(
             cfg.seed,
@@ -94,15 +95,27 @@ void main() {
             true
         );
         float up = gln_sfbm(vec2(store_pos.x - 7.3, store_pos.y + 19.9), up_opts);
+        if (cfg.mask_exp != 0) {
+            height_multiplier += 2.5;
+        }
+        height_multiplier += 1.0;
         val *= up;
     }
     if (cfg.mask_round != 0) {
+        if (cfg.mask_exp != 0) {
+            height_multiplier += 16.0;
+        }
         val = round_mask(val, uv);
     }
     if (cfg.mask_exp != 0) {
+        height_multiplier += 2.0;
         val = exp_mask(val);
     }
     if (cfg.mask_power != 0) {
+        height_multiplier += 1.25;
+        if (cfg.mask_exp != 0) {
+            height_multiplier += 2.0;
+        }
         val = power_mask(val);
     }
     if (cfg.mask_slope != 0) {
@@ -112,14 +125,14 @@ void main() {
     val = val + 4 * cfg.mask_round * val;
     if (cfg.terrace > 0) {
         int levels = cfg.terrace;
-        float lol = floor(val / (1.0 / (levels * cfg.height_mult)));
+        float lol = floor(val / (1.0 / (levels * height_multiplier)));
         float t_scl = cfg.terrace_scale;
-        val = (t_scl * lol * (1.0 / (levels * cfg.height_mult))) + val * (1 - t_scl);
+        val = (t_scl * lol * (1.0 / (levels * height_multiplier))) + val * (1 - t_scl);
     }
 
-    float rock_val = min(cfg.max_height, val * cfg.max_height * cfg.height_mult);
+    float rock_val = min(cfg.max_height, val * cfg.max_height * height_multiplier);
     float dirt_val = 2.0;
-    dirt_val = gln_sfbm(store_pos + vec2(13.7, 27.1), opts) + 1.5;
+    dirt_val = perlfbm(store_pos + vec2(13.7, 27.1), opts) + 1.5;
     dirt_val *= cfg.max_dirt;
 
     vec4 terrain = vec4(

@@ -175,7 +175,7 @@ void heightmap_ui(
     ImGui::SliderFloat("Domain Scale", &map.data.domain_warp_scale, 20.f, 1000.f);
 
     ImGui::SeparatorText("Options");
-    ImGui::Checkbox("Fake erosion", (bool*)&map.data.fake_erosion);
+    //ImGui::Checkbox("Fake erosion", (bool*)&map.data.fake_erosion);
     ImGui::Checkbox("Mask Circular", (bool*)&map.data.mask_round);
     ImGui::Checkbox("Mask Exp", (bool*)&map.data.mask_exp);
     ImGui::Checkbox("Mask Power3", (bool*)&map.data.mask_power);

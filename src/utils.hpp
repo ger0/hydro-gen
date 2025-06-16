@@ -54,6 +54,7 @@ template <class F> deferrer<F> operator*(defer_dummy, F f) { return {f}; }
 #define LOG_ERR(...) \
     fmt::print(stderr, "\033[1;31m{}\033[0m\n", fmt::format(__VA_ARGS__))
 
+#define DEBUG 
 #ifdef DEBUG 
 #define LOG_DBG(...) \
     fmt::print(stderr, "\033[1;33m{}\033[0m\n", fmt::format(__VA_ARGS__))

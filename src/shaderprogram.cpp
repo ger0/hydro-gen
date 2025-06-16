@@ -2,6 +2,7 @@
 #include "utils.hpp"
 #include <csignal>
 #include <glm/gtc/type_ptr.hpp>
+#include <regex>
 
 using namespace glm;
 std::string load_shader_file(std::string filename);
@@ -114,7 +115,11 @@ enum Log_type {
 
 std::string load_shader_file(std::string filename) {
     char path[1 << 8];
-    snprintf(path, sizeof(path), "glsl/%s", filename.c_str());
+#ifdef __linux__
+    snprintf(path, sizeof(path), "./glsl/%s", filename.c_str());
+#elif defined(_WIN32)
+    snprintf(path, sizeof(path), "glsl\\%s", filename.c_str());
+#endif
 
     FILE* file = fopen(path, "r");
     assert(file != nullptr);
@@ -128,54 +133,46 @@ std::string load_shader_file(std::string filename) {
     buffer.resize(size);
 
     assert(fseek(file, 0, SEEK_SET) == 0);
-    assert(fread(&buffer[0], size, 1, file) == 1);
-
+    const auto ret_val = fread(&buffer[0], size, 1, file);
+    if (ret_val <= 0) {
+        if (ferror(file)) {
+            LOG_ERR("Failed to load shader source code!, path: {}", path);
+            exit(-1);
+        }
+    }
     resolve_includes(buffer);
+    if (filename == "heightmap.glsl") {
+        LOG("{}", buffer.c_str());
+    }
 
     return buffer;
 }
 
 void resolve_includes(std::string& buff) {
-    for(uint i = 0; buff[i] != '\0'; i++) {
-        if(buff[i] == '#' && (i == 0 || buff[i - 1] == '\n')) {
-            uint include_start = i;
-            const char* word = "include \"";
-            uint word_i = 0;
-            // skip hash
-            i++;
-            while(word[word_i] != '\0' && buff[i] != '\0' && buff[i] == word[word_i]) {
-                word_i++;
-                i++;
-            }
-            if(word[word_i] != '\0') {
-                continue;
-            }
-            uint path_start = i;
-            while(
-                buff[i] != '\0' &&
-                buff[i] != '\n' &&
-                buff[i] != '\"'
-            ) {
-                i++;
-            }
-            if(buff[i] != '\"') {
-                continue;
-            }
-            uint path_end = i;
+    std::regex includeRegex(R"(#include\s+\"([^"]+)\"\s*\n?)");
 
-            i++;
-            if(buff[i] != '\n') {
-                continue;
-            }
-            uint include_end = i;
+    struct MatchInfo {
+        size_t pos;
+        size_t len;
+        std::string replacement;
+    };
 
-            std::string include_path = buff.substr(path_start, path_end - path_start);
-            buff.erase(include_start, include_end - include_start);
+    std::vector<MatchInfo> replacements;
 
-            std::string include = load_shader_file(include_path.c_str());
-            LOG_DBG("    Included shader: \t {:30}", include_path);
-            buff.insert(include_start, include);
-        }
+    for (std::sregex_iterator it(buff.begin(), buff.end(), includeRegex), end; it != end; ++it) {
+        std::smatch match = *it;
+
+        std::string fullInclude = match[0].str();     // Whole match
+        std::string filename = match[1].str();        // Group 1
+
+        std::string replacement = load_shader_file(filename.c_str());
+		LOG_DBG("    Included shader: \t {:30}", filename);
+          
+        replacements.push_back(MatchInfo{ (size_t)match.position(), (size_t)match.length(), replacement });
+    }
+
+    for (auto it = replacements.rbegin(); it != replacements.rend(); ++it) {
+        buff.replace(it->pos, it->len, it->replacement);
     }
 }
 
@@ -183,8 +180,10 @@ GLuint Shader_core::load_shader(GLenum shader_type, std::string filename) {
     // handle
     GLuint shader = glCreateShader(shader_type);
     auto source_str = load_shader_file(filename);
+    const GLint len = source_str.length();
     const GLchar* shader_source = source_str.c_str();
-    glShaderSource(shader, 1, &shader_source, NULL);
+    LOG_DBG("source2: \n{}", (char*)shader_source);
+    glShaderSource(shader, 1, &shader_source, &len);
     glCompileShader(shader);
 
     GLint success;
@@ -198,7 +197,12 @@ GLuint Shader_core::load_shader(GLenum shader_type, std::string filename) {
         std::string infoLog(logLength, ' ');
         glGetShaderInfoLog(shader, logLength, nullptr, &infoLog[0]);
         LOG_ERR("Shader compilation failed: {}", infoLog);
+#ifdef __linux__
         raise(SIGTRAP);
+#elif defined(_WIN32)
+		#include <intrin.h>
+		__debugbreak();
+#endif
 
         // Cleanup the failed shader
         glDeleteShader(shader);
@@ -221,8 +225,13 @@ Compute_program::Compute_program(std::string filename) {
     if (!success) {
         char infoLog[512];
         glGetProgramInfoLog(program, 512, nullptr, infoLog);
-        LOG_ERR("ERROR::SHADER::PROGRAM::LINKING_FAILED {}", infoLog);
+        LOG_ERR("ERROR (LINKING): {}", infoLog);
+#ifdef __linux__
         raise(SIGTRAP);
+#elif defined(_WIN32)
+		#include <intrin.h>
+		__debugbreak();
+#endif
     } else {
         LOG_DBG("Compute shader program created");
     }
@@ -270,7 +279,12 @@ void Compute_program::bind_uniform_block(const char* variable, gl::Buffer &buff)
     GLuint idx = glGetUniformBlockIndex(program, variable);
     if (idx == GL_INVALID_INDEX) {
         LOG_ERR("ERROR: Invalid buffer block index");
+#ifdef __linux__
         raise(SIGTRAP);
+#elif defined(_WIN32)
+		#include <intrin.h>
+		__debugbreak();
+#endif
     }
     glUniformBlockBinding(program, idx, buff.binding);
 }
@@ -317,7 +331,12 @@ void Compute_program::bind_storage_buffer(const char* variable, gl::Buffer &buff
     GLuint idx = glGetProgramResourceIndex(program, GL_SHADER_STORAGE_BLOCK, variable);
     if (idx == GL_INVALID_INDEX) {
         LOG_ERR("ERROR: Invalid shader storage buffer index");
+#ifdef __linux__
         raise(SIGTRAP);
+#elif defined(_WIN32)
+		#include <intrin.h>
+		__debugbreak();
+#endif
     }
     glShaderStorageBlockBinding(program, idx, buff.binding);
 }
@@ -352,7 +371,12 @@ GLuint Shader_core::get_uniform_location(std::string name) {
         GLuint location = glGetUniformLocation(this->program, name.c_str());
         if (location == GL_INVALID_INDEX) {
             LOG_ERR("ERROR: Invalid shader uniform index: {}", name);
-            raise(SIGTRAP);
+#ifdef __linux__
+			raise(SIGTRAP);
+#elif defined(_WIN32)
+			#include <intrin.h>
+			__debugbreak();
+#endif
         }
         cached_bindings[name] = location;
         return location;

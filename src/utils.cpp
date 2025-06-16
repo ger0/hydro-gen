@@ -58,9 +58,9 @@ void GLAPIENTRY gl_error_callback(
                 message);
 #ifdef __linux__
         raise(SIGTRAP);
-#elif _WIN32
-    #include <intrin.h>
-    __debugbreak();
+#elif defined(_WIN32)
+		#include <intrin.h>
+		__debugbreak();
 #endif
     } else {
         LOG_DBG("GL_{}, source = {}, message = {}", 

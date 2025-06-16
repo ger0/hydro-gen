@@ -3,6 +3,7 @@
     "fmt",
     "glfw3",
     "opengl",
-    "glew"
+    "glew",
+    "glm"
   ]
 }

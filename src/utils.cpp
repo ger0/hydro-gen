@@ -6,9 +6,9 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "utils.hpp"
-#include "imgui.h"
-#include "backends/imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
 
 void GLAPIENTRY gl_error_callback(
     GLenum source,

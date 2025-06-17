@@ -23,6 +23,7 @@ get_target_property(IMGUI_INCLUDE_DIR imgui::imgui INTERFACE_INCLUDE_DIRECTORIES
 if(CMAKE_BUILD_TYPE MATCHES DEBUG)
     add_definitions(-DDEBUG)
 endif()
+
 add_executable(hydro-gen ${SRC_FILES})
 target_include_directories(hydro-gen PRIVATE ${IMGUI_INCLUDE_DIR}/backends)
 

@@ -120,7 +120,7 @@ int main(int argc, char* argv[]) {
 
     // GLFW Window
     Uq_ptr<GLFWwindow, decltype(&destroy_window)> window(
-        init_window(glm::uvec2{WINDOW_W, WINDOW_H}, "Game", &state.shader_error),
+        init_window(glm::uvec2{WINDOW_W, WINDOW_H}, "hydro-gen", &state.shader_error),
         destroy_window
     );
 

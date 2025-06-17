@@ -3,6 +3,13 @@
 #include <csignal>
 #include <glm/gtc/type_ptr.hpp>
 #include <regex>
+#include <string>
+#include <filesystem>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <intrin.h>
+#endif
 
 using namespace glm;
 std::string load_shader_file(std::string filename);
@@ -114,29 +121,44 @@ enum Log_type {
 };
 
 std::string load_shader_file(std::string filename) {
-    char path[1 << 8];
+    std::string path;
 #ifdef __linux__
-    snprintf(path, sizeof(path), "./glsl/%s", filename.c_str());
+    path = "./glsl/" + filename;
 #elif defined(_WIN32)
-    snprintf(path, sizeof(path), "glsl\\%s", filename.c_str());
+    auto cwd = std::filesystem::current_path().string();
+    path = cwd + "\\glsl\\" + filename;
 #endif
 
-    FILE* file = fopen(path, "rb");
-    assert(file != nullptr);
+    FILE* file = fopen(path.c_str(), "rb");
+    if (!file) {
+        LOG_ERR("FAILED TO LOAD FILE: {}", path.c_str());
+        exit(1);
+    }
     defer { fclose(file); };
 
-    assert(fseek(file, 0, SEEK_END) == 0);
+    if (fseek(file, 0, SEEK_END) != 0) {
+        LOG_ERR("fseek error!");
+		exit(1);
+    }
     long int size = ftell(file);
-    assert(size > 0);
+    if (size <= 0) {
+        LOG_ERR("ftell error!");
+		exit(1);
+    }
 
     std::string buffer;
     buffer.resize(size);
 
-    assert(fseek(file, 0, SEEK_SET) == 0);
-    const auto ret_val = fread(&buffer[0], size, 1, file);
+    if (fseek(file, 0, SEEK_SET) != 0) {
+        LOG_ERR("fseek back!");
+		exit(1);
+    }
+    const auto ret_val = fread(buffer.data(), size, 1, file);
     if (ret_val != 1) {
-		LOG_ERR("Failed to load shader source code!, path: {}", path);
-		exit(-1);
+		LOG_ERR("Failed to load shader source code!, path: {}", path.c_str());
+		LOG_ERR("error: {}, size: {}", ret_val, size);
+		LOG_ERR("{}", buffer);
+		exit(1);
     }
     resolve_includes(buffer);
 
@@ -209,7 +231,6 @@ GLuint Shader_core::load_shader(GLenum shader_type, std::string filename) {
 #ifdef __linux__
         raise(SIGTRAP);
 #elif defined(_WIN32)
-		#include <intrin.h>
 		__debugbreak();
 #endif
 
@@ -238,7 +259,6 @@ Compute_program::Compute_program(std::string filename) {
 #ifdef __linux__
         raise(SIGTRAP);
 #elif defined(_WIN32)
-		#include <intrin.h>
 		__debugbreak();
 #endif
     } else {
@@ -291,7 +311,6 @@ void Compute_program::bind_uniform_block(const char* variable, gl::Buffer &buff)
 #ifdef __linux__
         raise(SIGTRAP);
 #elif defined(_WIN32)
-		#include <intrin.h>
 		__debugbreak();
 #endif
     }
@@ -343,7 +362,6 @@ void Compute_program::bind_storage_buffer(const char* variable, gl::Buffer &buff
 #ifdef __linux__
         raise(SIGTRAP);
 #elif defined(_WIN32)
-		#include <intrin.h>
 		__debugbreak();
 #endif
     }
@@ -383,7 +401,6 @@ GLuint Shader_core::get_uniform_location(std::string name) {
 #ifdef __linux__
 			raise(SIGTRAP);
 #elif defined(_WIN32)
-			#include <intrin.h>
 			__debugbreak();
 #endif
         }

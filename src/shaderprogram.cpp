@@ -2,7 +2,6 @@
 #include "utils.hpp"
 #include <csignal>
 #include <glm/gtc/type_ptr.hpp>
-#include <regex>
 #include <string>
 #include <filesystem>
 
@@ -122,10 +121,10 @@ enum Log_type {
 
 std::string load_shader_file(std::string filename) {
     std::string path;
-#ifdef __linux__
-    path = "./glsl/" + filename;
-#elif defined(_WIN32)
     auto cwd = std::filesystem::current_path().string();
+#ifdef __linux__
+    path = cwd + "/glsl/" + filename;
+#elif defined(_WIN32)
     path = cwd + "\\glsl\\" + filename;
 #endif
 
@@ -156,8 +155,6 @@ std::string load_shader_file(std::string filename) {
     const auto ret_val = fread(buffer.data(), size, 1, file);
     if (ret_val != 1) {
 		LOG_ERR("Failed to load shader source code!, path: {}", path.c_str());
-		LOG_ERR("error: {}, size: {}", ret_val, size);
-		LOG_ERR("{}", buffer);
 		exit(1);
     }
     resolve_includes(buffer);

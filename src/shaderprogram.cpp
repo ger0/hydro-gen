@@ -205,10 +205,15 @@ void resolve_includes(std::string& buff) {
     }
 }
 
-GLuint Shader_core::load_shader(GLenum shader_type, std::string filename) {
+GLuint Shader_core::load_shader(
+    GLenum shader_type, 
+    std::string filename,
+    std::string custom_defines
+) {
     // handle
     GLuint shader = glCreateShader(shader_type);
     auto source_str = load_shader_file(filename);
+    source_str = custom_defines + source_str;
     const GLint len = source_str.length();
     const GLchar* shader_source = source_str.c_str();
     glShaderSource(shader, 1, &shader_source, &len);
@@ -238,9 +243,9 @@ GLuint Shader_core::load_shader(GLenum shader_type, std::string filename) {
     return shader;
 }
 
-Compute_program::Compute_program(std::string filename) {
+Compute_program::Compute_program(std::string filename, std::string custom_defines) {
     LOG_DBG("Loading compute shader: {}", filename);
-    compute = load_shader(GL_COMPUTE_SHADER, filename);
+    compute = load_shader(GL_COMPUTE_SHADER, filename, custom_defines);
 
     program = glCreateProgram();
 
@@ -263,12 +268,12 @@ Compute_program::Compute_program(std::string filename) {
     }
 }
 
-Shader_program::Shader_program(std::string vert_file, std::string frag_file) {
+Shader_program::Shader_program(std::string vert_file, std::string frag_file, std::string custom_defines) {
     LOG_DBG("Loading vertex shader...");
-    vertex = load_shader(GL_VERTEX_SHADER, vert_file);
+    vertex = load_shader(GL_VERTEX_SHADER, vert_file, custom_defines);
 
     LOG_DBG("Loading fragment shader...");
-    fragment = load_shader(GL_FRAGMENT_SHADER, frag_file);
+    fragment = load_shader(GL_FRAGMENT_SHADER, frag_file, custom_defines);
 
     program = glCreateProgram();
 

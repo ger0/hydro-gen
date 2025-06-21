@@ -13,7 +13,7 @@ struct Settings {
     Map_settings map;
 };
 
-Settings setup_settings();
+Settings setup_settings(bool is_particle = false, u32 particle_count = 0);
 void delete_settings(Settings& settings);
 
 struct Program_state {

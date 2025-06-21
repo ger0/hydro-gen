@@ -1,8 +1,11 @@
 #include <cstddef>
+#include <filesystem>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
+#include <INIReader.h>
 
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
@@ -12,9 +15,6 @@
 #include "utils.hpp"
 #include "erosion.hpp"
 #include "state.hpp"
-
-constexpr u32 WINDOW_W = 1920;
-constexpr u32 WINDOW_H = 1080;
 
 constexpr auto noise_comput_file  = "heightmap.glsl";
 
@@ -180,6 +180,37 @@ void key_callback(GLFWwindow *window,
 
 int main(int argc, char* argv[]) { 
     srand(time(NULL));
+    // load config...
+    auto cwd = std::filesystem::current_path().string();
+#ifdef __linux__
+    cwd += "/config.ini";
+#elif defined(_WIN32)
+    cwd += "\\config.ini";
+#endif
+    auto write_to_ini = [](std::string path, const std::string& buffer) {
+        FILE* file = fopen(path.c_str(), "wb");
+        if (!file) {
+            LOG_ERR("FAILED TO WRITE TO FILE: {}", path.c_str());
+            exit(1);
+        }
+        defer { fclose(file); };
+        const auto ret_val = fwrite(buffer.c_str(), buffer.length(), 1, file);
+        if (ret_val != 1) {
+		    LOG_ERR("Failed to write to config.ini!, path: {}", path.c_str());
+		    exit(1);
+        }
+    };
+    auto ini_config = INIReader(cwd);    
+    if (ini_config.ParseError() < 0) {
+        LOG("Failed to load config.ini, creating a new default config file...");
+        const std::string config = "[window]\n"\
+            "width = 1280\n"\
+            "height = 720";
+        write_to_ini(cwd, config);
+        ini_config = INIReader(cwd);    
+    }
+    const u32 WINDOW_W = ini_config.GetUnsigned("window", "width", 1280);
+    const u32 WINDOW_H = ini_config.GetUnsigned("window", "height", 720);
 
     // GLFW Window
     Uq_ptr<GLFWwindow, decltype(&destroy_window)> window(

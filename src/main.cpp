@@ -205,12 +205,28 @@ int main(int argc, char* argv[]) {
         LOG("Failed to load config.ini, creating a new default config file...");
         const std::string config = "[window]\n"\
             "width = 1280\n"\
-            "height = 720";
+            "height = 720\n\n"\
+            "[erosion]\n"\
+            "; type = grid or type = particle\n"\
+            "type = grid\n"\
+            "; particle_count works only when the erosion type is \"particle\"\n"\
+            "particle_count = 262144";
         write_to_ini(cwd, config);
         ini_config = INIReader(cwd);    
     }
     const u32 WINDOW_W = ini_config.GetUnsigned("window", "width", 1280);
     const u32 WINDOW_H = ini_config.GetUnsigned("window", "height", 720);
+
+    Erosion::Programs::Erosion_type erosion_type;
+
+    const std::string erosion_type_str = ini_config.Get("erosion", "type", "grid");
+    const u32 particle_count = ini_config.GetUnsigned("erosion", "particle_count", 262144);
+    
+    if (erosion_type_str == "particle") {
+        erosion_type = Erosion::Programs::PARTICLES;
+    } else {
+        erosion_type = Erosion::Programs::GRID;
+    }
 
     // GLFW Window
     Uq_ptr<GLFWwindow, decltype(&destroy_window)> window(
@@ -228,7 +244,10 @@ int main(int argc, char* argv[]) {
 
     // map gen + erosion settings from the UI
     // Sending uniform data to GPU
-    auto settings = State::setup_settings();
+    auto settings = State::setup_settings(
+        erosion_type == Erosion::Programs::PARTICLES,
+        particle_count
+    );
     defer{ State::delete_settings(settings); };
 
     // TODO: MOVE THIS OUT OF MAIN.CPP
@@ -242,7 +261,14 @@ int main(int argc, char* argv[]) {
     defer{delete_textures(world_data);};
 
     State::World::gen_heightmap(settings, world_data, comput_map);
-    Uq_ptr<Erosion::Programs> erosion_progs_ptr(Erosion::setup_shaders(settings, world_data));
+    Uq_ptr<Erosion::Programs> erosion_progs_ptr(
+        Erosion::setup_shaders(
+            erosion_type, 
+            settings, 
+            world_data, 
+            particle_count
+        )
+    );
     auto& erosion_progs = *erosion_progs_ptr.get();
 
     // ---------- prepare textures and framebuffer for rendering  ---------------
@@ -277,20 +303,20 @@ int main(int argc, char* argv[]) {
 
         // ---------- erosion compute shader ------------
         if (state.should_erode) {
+
             state.erosion_steps++;
-
             float erosion_d_time = glfwGetTime();
-
-#if not defined(PARTICLE_COUNT) 
-            if (state.should_rain) {
-                if (!(state.erosion_steps % settings.rain.data.period)) {
-                    Erosion::dispatch_grid_rain(erosion_progs, world_data);
+            if (erosion_type == Erosion::Programs::GRID) {
+                if (state.should_rain) {
+                    if (!(state.erosion_steps % settings.rain.data.period)) {
+                        Erosion::dispatch_grid_rain(erosion_progs, world_data);
+                    }
                 }
+                Erosion::dispatch_grid(erosion_progs, world_data);
+            } 
+            else if (erosion_type == Erosion::Programs::PARTICLES) {
+                Erosion::dispatch_particle(erosion_progs, world_data, state.should_rain);
             }
-            Erosion::dispatch_grid(erosion_progs, world_data);
-#else
-            Erosion::dispatch_particle(erosion_progs, world_data, state.should_rain);
-#endif
 
             erosion_d_time = glfwGetTime() - erosion_d_time;
             state.erosion_time += erosion_d_time;

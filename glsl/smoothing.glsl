@@ -14,12 +14,10 @@ layout (std140, binding = BIND_UNIFORM_EROSION) uniform erosion_data {
     Erosion_data set;
 };
 
-#if defined(PARTICLE_COUNT)
 layout (binding = 5, rgba32f)   
 	uniform image2D momentmap;
 layout (binding = 6, rgba32f)   
 	uniform image2D out_momentmap;
-#endif
 
 void main() {
     float d_time = set.d_t;
@@ -75,26 +73,26 @@ void main() {
 
     float multip = clamp(set.Kspeed[1] * d_time, 0, 1);
     // water display on particles
-#if defined(PARTICLE_COUNT)
-    vec4 momentum = imageLoad(momentmap, pos);
-    momentum.xy *= clamp(1 - (1e-12 * PARTICLE_COUNT), 0, 1);
-    momentum.xy += (1e-12 * PARTICLE_COUNT) * momentum.zw;
-    momentum.zw = vec2(0);
+    if (set.is_particle != 0) {
+        vec4 momentum = imageLoad(momentmap, pos);
+        momentum.xy *= clamp(1 - (1e-12 * set.particle_count), 0, 1);
+        momentum.xy += (1e-12 * set.particle_count) * momentum.zw;
+        momentum.zw = vec2(0);
 
-    terrain.b *= clamp(1 - (8e-8 * PARTICLE_COUNT), 0, 1);
-    if (pos.x == 0 || pos.y == 0 || 
-        pos.x == (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
-        pos.y == (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1) ||
-        terrain.b < 1e-6
-    ) {
-        terrain.b = 0;
+        terrain.b *= clamp(1 - (8e-8 * set.particle_count), 0, 1);
+        if (pos.x == 0 || pos.y == 0 || 
+            pos.x == (gl_WorkGroupSize.x * gl_NumWorkGroups.x - 1) ||
+            pos.y == (gl_WorkGroupSize.y * gl_NumWorkGroups.y - 1) ||
+            terrain.b < 1e-6
+        ) {
+            terrain.b = 0;
+        }
+        if (length(momentum.xy) < 1e-12) {
+            momentum.xy = vec2(0);
+        }
+        imageStore(out_momentmap, pos, momentum);
+        multip = clamp(set.Kspeed[1] * d_time, 0, 1);
     }
-    if (length(momentum.xy) < 1e-12) {
-        momentum.xy = vec2(0);
-    }
-    imageStore(out_momentmap, pos, momentum);
-    multip = clamp(set.Kspeed[1] * d_time, 0, 1);
-#endif
 
     // multip = 1.0;
 

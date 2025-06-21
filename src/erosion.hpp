@@ -9,6 +9,7 @@ namespace Erosion {
 struct Particle {
     Compute_program movement;
     Compute_program erosion;
+    u32 count = 0;
 };
 
 struct Grid {
@@ -25,12 +26,22 @@ struct Thermal {
 };
 
 struct Programs {
-    Particle    particle;
-    Grid        grid;
+    enum Erosion_type {
+        GRID,
+        PARTICLES
+    } type;
+
+    Particle*   particle;
+    Grid*       grid;
     Thermal     thermal;
 };
 
-Programs* setup_shaders(State::Settings& set, State::World::Textures& data);
+Programs* setup_shaders(
+    Programs::Erosion_type type, 
+    State::Settings& set, 
+    State::World::Textures& data,
+    u32 particle_count
+);
 
 void dispatch_grid_rain(Programs& prog, State::World::Textures& data);
 void dispatch_grid(Programs& prog, State::World::Textures& data);

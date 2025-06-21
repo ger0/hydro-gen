@@ -4,10 +4,6 @@
 #define WORLD_SCALE (1.00)
 #define SED_LAYERS (2)
 
-// #define PARTICLE_COUNT (65536)
-// #define PARTICLE_COUNT (262144)
-// #define PARTICLE_COUNT (1048576)
-
 // #define LOW_RES_DIV3
 
 #define WRKGRP_SIZE_X 8
@@ -41,6 +37,9 @@
 #endif
 
 struct Erosion_data {
+    GL(INT) is_particle;
+    GL(UINT) particle_count;
+
     GL(FLOAT) Kc;
     GL(VEC2) Kalpha;
     GL(FLOAT) Kconv;

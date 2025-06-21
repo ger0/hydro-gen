@@ -16,7 +16,6 @@ uniform mat4 view;
 uniform mat4 perspective;
 uniform vec3 pos;
 uniform float prec = 0.35;
-uniform bool should_draw_particles;
 uniform bool DEBUG_PREVIEW;
 uniform bool should_draw_water;
 

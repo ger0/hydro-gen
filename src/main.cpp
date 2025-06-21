@@ -72,35 +72,56 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
 	state.camera.dir = normalize(direction);
 }
 
+struct Movement {
+    enum class Side {
+        NONE = 0,
+        LEFT,
+        RIGHT
+    } side;
+    enum class Front {
+        NONE = 0,
+        FORWARD,
+        BACKWARD
+    } front;
+    bool boost = false;
+
+    static constexpr float speed_cap = 100.0f;
+
+    // update camera position
+    void tick() {
+	    float speed = 100.f * state.delta_frame * (state.camera.boost ? 4.0f : 1.f);
+	    speed = speed > speed_cap ? speed_cap : speed;
+    
+	    if (front == Front::FORWARD)
+		    state.camera.pos += speed * state.camera.dir;
+	    else if (front == Front::BACKWARD)
+		    state.camera.pos -= speed * state.camera.dir;
+	    if (side == Side::LEFT)
+		    state.camera.pos -= 
+			    normalize(cross(state.camera.dir, state.camera.up)) * speed;
+	    else if (side == Side::RIGHT)
+    	    state.camera.pos += 
+    		    normalize(cross(state.camera.dir, state.camera.up)) * speed;
+    }
+} movement;
+
 void key_callback(GLFWwindow *window, 
         int key, int scancode, 
         int act, int mod) {
 
+	auto& mv = movement;
+	using mvf = Movement::Front;
+	using mvs = Movement::Side;
     auto& io = ImGui::GetIO();
     if (io.WantCaptureKeyboard) {
         return;
     }
-    constexpr float speed_cap = 100.0f;
-	float speed = 200.f * state.delta_frame * (state.camera.boost ? 8.f : 1.f);
-	speed = speed > speed_cap ? speed_cap : speed;
-    
 	constexpr auto& gkey = glfwGetKey;
-	if (gkey(window, GLFW_KEY_W) == GLFW_PRESS)
-		state.camera.pos += speed * state.camera.dir;
-	if (gkey(window, GLFW_KEY_S) == GLFW_PRESS)
-		state.camera.pos -= speed * state.camera.dir;
-	if (gkey(window, GLFW_KEY_A) == GLFW_PRESS)
-		state.camera.pos -= 
-			normalize(cross(state.camera.dir, state.camera.up)) * speed;
-	if (gkey(window, GLFW_KEY_D) == GLFW_PRESS)
-    	state.camera.pos += 
-    		normalize(cross(state.camera.dir, state.camera.up)) * speed;
-	if (gkey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-		state.camera.boost = true;
-	}
-	if (gkey(window, GLFW_KEY_SPACE) == GLFW_RELEASE) {
-		state.camera.boost = false;
-	}
+	bool moving_left = false;
+	bool moving_right = false;
+	bool moving_up = false;
+	bool moving_down = false;
+    // L ALT
 	if (gkey(window, GLFW_KEY_LEFT_ALT)) {
 	    auto curs = glfwGetInputMode(window, GLFW_CURSOR);
 	    if (curs == GLFW_CURSOR_DISABLED) {
@@ -108,10 +129,52 @@ void key_callback(GLFWwindow *window,
             io.ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
         } else {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            mv.front = mvf::NONE;
+            mv.side = mvs::NONE;
             io.ConfigFlags |= ImGuiConfigFlags_NoMouse;
         }
         state.mouse_disabled = !state.mouse_disabled;
+        return;
 	}
+
+	// W key
+	if (gkey(window, GLFW_KEY_W)) {
+	    moving_up = true;
+	} else {
+	    moving_up = false;
+	}
+    // S key
+	if (gkey(window, GLFW_KEY_S)) {
+	    moving_down = true;
+	} else {
+	    moving_down = false;
+	}
+    // A key
+	if (gkey(window, GLFW_KEY_A)) {
+	    moving_left = true;
+	} else {
+	    moving_left = false;
+	}
+    // D key
+	if (gkey(window, GLFW_KEY_D)) {
+	    moving_right = true;
+	} else {
+	    moving_right = false;
+	}
+    // spacebar
+	if (gkey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+		state.camera.boost = true;
+	} if (gkey(window, GLFW_KEY_SPACE) == GLFW_RELEASE) {
+		state.camera.boost = false;
+	}
+
+	if (moving_left && !moving_right)       mv.side = mvs::LEFT;
+	else if (moving_right && !moving_left)  mv.side = mvs::RIGHT;
+	else                                    mv.side = mvs::NONE;
+
+	if (moving_up && !moving_down)          mv.front = mvf::FORWARD;
+	else if (moving_down && !moving_up)     mv.front = mvf::BACKWARD;
+	else                                    mv.front = mvf::NONE;
 }
 };
 
@@ -179,6 +242,7 @@ int main(int argc, char* argv[]) {
             }
             state.last_frame = glfwGetTime();
         }
+        Input_handling::movement.tick();
 
         // ---------- erosion compute shader ------------
         if (state.should_erode) {

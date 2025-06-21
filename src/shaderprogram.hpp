@@ -75,7 +75,7 @@ struct Tex_pair {
 class Shader_core {
 protected:
     GLuint program;
-    GLuint load_shader(GLenum shader_type, std::string filename);
+    GLuint load_shader(GLenum shader_type, std::string filename, std::string custom_defines);
     std::unordered_map<std::string, GLuint> cached_bindings;
 
     // GLuint get_attrib_location(const char* attribute) const;
@@ -92,7 +92,7 @@ private:
     GLuint vertex;
     GLuint fragment;
 public:
-    Shader_program(std::string vert_file, std::string frag_file);
+    Shader_program(std::string vert_file, std::string frag_file, std::string custom_defines = "");
     ~Shader_program();
 };
 
@@ -111,7 +111,7 @@ public:
 
     void bind_storage_buffer(const char* variable, gl::Buffer &buff) const;
 
-    Compute_program(std::string comput_files);
+    Compute_program(std::string comput_files, std::string custom_defines = "");
     ~Compute_program();
 };
 

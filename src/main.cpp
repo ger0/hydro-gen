@@ -89,7 +89,7 @@ struct Movement {
 
     // update camera position
     void tick() {
-	    float speed = 100.f * state.delta_frame * (state.camera.boost ? 4.0f : 1.f);
+	    float speed = 500.f * state.delta_frame * (state.camera.boost ? 4.0f : 1.f);
 	    speed = speed > speed_cap ? speed_cap : speed;
     
 	    if (front == Front::FORWARD)
@@ -271,9 +271,9 @@ int main(int argc, char* argv[]) {
                 state.frame_count = 0;
                 state.last_frame_rounded += 1.f;
             }
+            Input_handling::movement.tick();
             state.last_frame = glfwGetTime();
         }
-        Input_handling::movement.tick();
 
         // ---------- erosion compute shader ------------
         if (state.should_erode) {

@@ -37,7 +37,6 @@
 #endif
 
 struct Erosion_data {
-    GL(INT) is_particle;
     GL(UINT) particle_count;
 
     GL(FLOAT) Kc;

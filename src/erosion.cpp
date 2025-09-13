@@ -135,13 +135,13 @@ void Erosion::dispatch_particle(Programs& prog, State::World::Textures& data, bo
     prog.particle->movement.set_uniform("should_rain", should_rain);
     prog.particle->movement.bind_texture("heightmap", data.heightmap.get_read_tex());
     prog.particle->movement.bind_texture("momentmap", data.velocity.get_read_tex());
-    run_particles(prog.particle->movement, prog.particle->count);
+    run_particles(prog.particle->movement, data.particle_count);
 
     prog.particle->erosion.use();
     prog.particle->erosion.bind_image("lockmap", data.lockmap);
     prog.particle->erosion.bind_image("heightmap", data.heightmap.get_read_tex());
     prog.particle->erosion.bind_image("momentmap", data.velocity.get_read_tex());
-    run_particles(prog.particle->erosion, prog.particle->count);
+    run_particles(prog.particle->erosion, data.particle_count);
 
     run_thermal_erosion(prog, data);
 

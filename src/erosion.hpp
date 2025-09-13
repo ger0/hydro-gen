@@ -9,7 +9,6 @@ namespace Erosion {
 struct Particle {
     Compute_program movement;
     Compute_program erosion;
-    u32 count = 0;
 };
 
 struct Grid {

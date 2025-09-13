@@ -73,7 +73,7 @@ void main() {
 
     float multip = clamp(set.Kspeed[1] * d_time, 0, 1);
     // water display on particles
-    if (set.is_particle != 0) {
+    if (set.particle_count != 0) {
         vec4 momentum = imageLoad(momentmap, pos);
         momentum.xy *= clamp(1 - (1e-12 * set.particle_count), 0, 1);
         momentum.xy += (1e-12 * set.particle_count) * momentum.zw;

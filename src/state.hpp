@@ -59,6 +59,7 @@ namespace World {
 struct Textures {
     GLfloat time;
     u32 map_size;
+    u32 particle_count;
     gl::Tex_pair heightmap;
 
     // hydraulic erosion
@@ -74,7 +75,7 @@ struct Textures {
     gl::Buffer particle_buffer;
 };
 
-Textures gen_textures(const GLuint size);
+Textures gen_textures(const GLuint size, const GLuint particle_count);
 void delete_textures(Textures& data);
 
 void gen_heightmap(

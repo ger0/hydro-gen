@@ -109,9 +109,9 @@ bool Render::Data::dispatch(
     shader.set_uniform("pos", cam.pos);
     shader.set_uniform("prec", prec);
 
-/* #if not defined(PARTICLE_COUNT)
-    shader.set_uniform("display_sediment", display_sediment);
-#endif */
+    if (data.particle_count == 0) {
+        shader.set_uniform("display_sediment", display_sediment);
+    }
     //shader.set_uniform("sediment_max_cap", set.erosion.data.Kc);
     shader.set_uniform("DEBUG_PREVIEW", debug_preview);
     shader.set_uniform("should_draw_water", display_water);
@@ -193,8 +193,9 @@ void heightmap_ui(
     if (ImGui::Button("Generate")) {
         bool old_erod = state.should_erode;
         state.should_erode = false;
+        u32 particle_count = world.particle_count;
         delete_textures(world);
-        world = State::World::gen_textures(size);
+        world = State::World::gen_textures(size, particle_count);
         State::World::gen_heightmap(set, world, map_generator);
         erosion.push_data();
         state.should_erode = old_erod;
@@ -215,7 +216,7 @@ void erosion_ui(State::Settings& set) {
                 ImGui::SliderFloat("Solubility", &erosion.data.Ks[i], 0.0001f, 0.50f, "%.4f");
                 ImGui::SliderFloat("Deposition", &erosion.data.Kd[i], 0.0001f, 0.50f, "%.4f");
                 ImGui::SliderAngle("Talus angle", &erosion.data.Kalpha[i], 0.00, 90.f);
-                if (erosion.data.is_particle) {
+                if (erosion.data.particle_count > 0) {
                   ImGui::SliderFloat("Slippage speed", &erosion.data.Kspeed[i],
                                      0.0001, 0.19f, "%.5f",
                                      ImGuiSliderFlags_Logarithmic);
@@ -307,11 +308,11 @@ void Render::Data::handle_ui(
         state.should_erode = !state.should_erode;
     }
 
-    rain_particle_ui(erosion.data.is_particle, set, state);
+    rain_particle_ui(erosion.data.particle_count != 0, set, state);
 
     ImGui::SeparatorText("General");
 
-    if (!erosion.data.is_particle) {
+    if (erosion.data.particle_count == 0) {
     // ImGui::SliderFloat("Energy Kept (%)", &erosion.data.ENERGY_KEPT, 0.998, 1.0, "%.5f");
         ImGui::Checkbox("Display sediment", &display_sediment);
     }

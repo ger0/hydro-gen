@@ -224,10 +224,11 @@ int main(int argc, char* argv[]) {
     Erosion::Programs::Erosion_type erosion_type;
 
     const std::string erosion_type_str = ini_config.Get("erosion", "type", "grid");
-    const u32 particle_count = ini_config.GetUnsigned("erosion", "particle_count", 262144);
+    u32 particle_count = 0;
     
     if (erosion_type_str == "particle") {
         erosion_type = Erosion::Programs::PARTICLES;
+        particle_count = ini_config.GetUnsigned("erosion", "particle_count", 262144);
     } else {
         erosion_type = Erosion::Programs::GRID;
     }
@@ -261,7 +262,7 @@ int main(int argc, char* argv[]) {
 
     // Ingame World Data (world state textures)
     State::World::Textures world_data = 
-        State::World::gen_textures(MAP_SIZE);
+        State::World::gen_textures(MAP_SIZE, particle_count);
     defer{delete_textures(world_data);};
 
     State::World::gen_heightmap(settings, world_data, comput_map);

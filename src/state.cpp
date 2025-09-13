@@ -1,6 +1,9 @@
 #include "state.hpp"
 
-State::World::Textures State::World::gen_textures(const GLuint size) {
+State::World::Textures State::World::gen_textures(
+    const GLuint size,
+    const GLuint particle_count
+) {
     gl::Texture lockmap {
         .access = GL_READ_WRITE,
         .format = GL_R32UI,
@@ -18,16 +21,17 @@ State::World::Textures State::World::gen_textures(const GLuint size) {
     // ------------- diagonal flux for thermal erosion -----------
     gl::Tex_pair thermal_d(GL_READ_WRITE, size, size);
 
-#if defined(PARTICLE_COUNT)
     gl::Buffer particle_buffer {
         .binding = BIND_PARTICLE_BUFFER,
         .type = GL_SHADER_STORAGE_BUFFER
     };
-    gl::gen_buffer(particle_buffer, PARTICLE_COUNT * sizeof(Particle));
-#endif
+    if (particle_count) {
+        gl::gen_buffer(particle_buffer, particle_count * sizeof(Particle));
+    }
 
     return State::World::Textures {
         .map_size = size,
+        .particle_count = particle_count,
         .heightmap = heightmap,
         .flux = flux,
         .velocity = velocity,
@@ -35,9 +39,7 @@ State::World::Textures State::World::gen_textures(const GLuint size) {
         .thermal_c = thermal_c,
         .thermal_d = thermal_d,
         .lockmap = lockmap,
-#if defined(PARTICLE_COUNT)
         .particle_buffer = particle_buffer
-#endif
     };
 };
 
@@ -55,8 +57,40 @@ void State::World::delete_textures(State::World::Textures& data) {
 State::Settings State::setup_settings(bool is_particle, u32 particle_count) {
     LOG_DBG("Generating settings buffers...");
     Settings set;
-    set.erosion.data.is_particle = is_particle ? 1 : 0;
-    set.erosion.data.particle_count = particle_count;
+    if (is_particle) {
+        set.erosion.data = {
+            .particle_count = GLuint(particle_count),
+            .Kc             = 0.2000,
+            .Kalpha         = VEC2(1.3f, 0.6f),
+            .Kconv          = 0.001,
+            .Ks             = VEC2(0.03, 0.09),
+            .Kd             = VEC2(0.01, 0.03),
+            .Ke             = 0.03,
+            .Kspeed         = VEC2(0.002f, 0.008f),
+            .G              = 9.81,
+            .d_t            = 0.25,
+            .density        = 1.0,
+            .init_volume    = 1.0,
+            .friction       = 0.20,
+            .inertia        = 1.00,
+            .min_volume     = 0.00,
+            .min_velocity   = 0.001,
+            .ttl            = 15000,
+        };
+    } else {
+        set.erosion.data = {
+            .Kc             = 0.2000,
+            .Kalpha         = VEC2(1.3f, 0.6f),
+            .Kconv          = 0.001,
+            .Ks             = VEC2(0.03, 0.09),
+            .Kd             = VEC2(0.01, 0.03),
+            .Ke             = 0.03,
+            .ENERGY_KEPT    = 1.0,
+            .Kspeed         = VEC2(0.5f, 2.0f),
+            .G              = 1.0,
+            .d_t            = 0.001,
+        };
+    }
     set.rain.buffer.binding     = BIND_UNIFORM_RAIN_SETTINGS;
     set.erosion.buffer.binding  = BIND_UNIFORM_EROSION;
     set.map.buffer.binding      = BIND_UNIFORM_MAP_SETTINGS;

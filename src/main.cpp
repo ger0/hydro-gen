@@ -206,6 +206,8 @@ int main(int argc, char* argv[]) {
         const std::string config = "[window]\n"\
             "width = 1280\n"\
             "height = 720\n\n"\
+            "[map]\n"\
+            "size=1024\n\n"\
             "[erosion]\n"\
             "; type = grid or type = particle\n"\
             "type = grid\n"\
@@ -216,6 +218,8 @@ int main(int argc, char* argv[]) {
     }
     const u32 WINDOW_W = ini_config.GetUnsigned("window", "width", 1280);
     const u32 WINDOW_H = ini_config.GetUnsigned("window", "height", 720);
+
+    const u32 MAP_SIZE = ini_config.GetUnsigned("map", "size", 1024);
 
     Erosion::Programs::Erosion_type erosion_type;
 
@@ -257,7 +261,7 @@ int main(int argc, char* argv[]) {
 
     // Ingame World Data (world state textures)
     State::World::Textures world_data = 
-        State::World::gen_textures(State::NOISE_SIZE, State::NOISE_SIZE);
+        State::World::gen_textures(MAP_SIZE);
     defer{delete_textures(world_data);};
 
     State::World::gen_heightmap(settings, world_data, comput_map);
@@ -275,7 +279,7 @@ int main(int argc, char* argv[]) {
     auto renderer = Render::Data(
             WINDOW_W,
             WINDOW_H,
-            State::NOISE_SIZE,
+            MAP_SIZE,
             settings,
             state,
             world_data);

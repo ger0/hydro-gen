@@ -192,7 +192,7 @@ void heightmap_ui(
         bool old_erod = state.should_erode;
         state.should_erode = false;
         delete_textures(world);
-        world = State::World::gen_textures(State::NOISE_SIZE, State::NOISE_SIZE);
+        world = State::World::gen_textures(world.map_size);
         State::World::gen_heightmap(set, world, map_generator);
         erosion.push_data();
         state.should_erode = old_erod;

@@ -159,6 +159,8 @@ void heightmap_ui(
     ImGui::End();
 
     ImGui::Begin("Heightmap");
+    static int size = world.map_size;
+    ImGui::SliderInt("Map size", &size, 32, 4096);
     ImGui::SliderFloat("Seed", &map.data.seed, 0.0f, 1e4);
     ImGui::SliderFloat("Height multiplier", &map.data.height_mult, 0.1f, 2.f);
 
@@ -192,7 +194,7 @@ void heightmap_ui(
         bool old_erod = state.should_erode;
         state.should_erode = false;
         delete_textures(world);
-        world = State::World::gen_textures(world.map_size);
+        world = State::World::gen_textures(size);
         State::World::gen_heightmap(set, world, map_generator);
         erosion.push_data();
         state.should_erode = old_erod;

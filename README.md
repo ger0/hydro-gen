@@ -11,7 +11,9 @@ There are two modes of hydraulic erosion available:
 
 By default hydro-gen uses shallow water model for simulation. 
 
-In order to change the model please uncomment PARTICLE_COUNT in glsl/bindings.glsl. This will enable particle based erosion and change the settings accordingly. 
+In order to change the model, change the erosion type in the `config.ini`. 
+You can also change the default particle count used by the program. 
+This will enable particle based erosion and change the settings accordingly. 
 
 Erosion parameters include:
 - Total transport capacity of a particle / unit of water
@@ -59,13 +61,13 @@ ninja all
 ./hydro-gen
 ```
 
-In order to change map size replace NOISE_SIZE in settings.hpp with a different value.
+In order to change dimensions of the window: change the width, and height values in te \[window\] 
+key in the `config.ini`.
 
 
-Dimensions of the window can be changed by changing WINDOW_W and WINDOW_H variables in main.cpp.
+The default map size can be changed by replacing the size value in the \[map\] key in the `config.ini`.
 
 
-(These settings along with the ability to change erosion method will be changed later).
 ## Screenshots
 
 <img src="https://github.com/ger0/external_repository/blob/main/pics/hydro-gen/new.webp" width="720"/>

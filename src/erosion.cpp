@@ -80,8 +80,8 @@ void Erosion::dispatch_grid_rain(Programs& prog, State::World::Textures& data) {
     prog.grid->rain.bind_image("out_heightmap", data.heightmap.get_write_tex());
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glDispatchCompute(
-        State::NOISE_SIZE / WRKGRP_SIZE_X,
-        State::NOISE_SIZE / WRKGRP_SIZE_Y, 
+        data.map_size / WRKGRP_SIZE_X,
+        data.map_size / WRKGRP_SIZE_Y, 
         1
     );
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -89,12 +89,12 @@ void Erosion::dispatch_grid_rain(Programs& prog, State::World::Textures& data) {
 }
 
 // helper functions
-void run(Compute_program& program) {
+void run(Compute_program& program, u32 size) {
     program.use();
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glDispatchCompute(
-        State::NOISE_SIZE / WRKGRP_SIZE_X,
-        State::NOISE_SIZE / WRKGRP_SIZE_Y,
+        size / WRKGRP_SIZE_X,
+        size / WRKGRP_SIZE_Y,
         1
     );
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -106,7 +106,7 @@ void run_thermal_erosion(Programs& prog, State::World::Textures& data) {
         prog.thermal.flux[i].bind_texture("heightmap", data.heightmap.get_read_tex());
         prog.thermal.flux[i].bind_image("out_thflux_c", data.thermal_c.get_write_tex());
         prog.thermal.flux[i].bind_image("out_thflux_d", data.thermal_d.get_write_tex());
-        run(prog.thermal.flux[i]);
+        run(prog.thermal.flux[i], data.map_size);
         data.thermal_c.swap();
         data.thermal_d.swap();
 
@@ -115,7 +115,7 @@ void run_thermal_erosion(Programs& prog, State::World::Textures& data) {
         prog.thermal.transport[i].bind_image("out_heightmap", data.heightmap.get_write_tex());
         prog.thermal.transport[i].bind_texture("thflux_c", data.thermal_c.get_read_tex());
         prog.thermal.transport[i].bind_texture("thflux_d", data.thermal_d.get_read_tex());
-        run(prog.thermal.transport[i]);
+        run(prog.thermal.transport[i], data.map_size);
         data.heightmap.swap();
     }
 }
@@ -150,7 +150,7 @@ void Erosion::dispatch_particle(Programs& prog, State::World::Textures& data, bo
     prog.thermal.smooth.bind_image("momentmap", data.velocity.get_read_tex());
     prog.thermal.smooth.bind_image("out_heightmap", data.heightmap.get_write_tex());
     prog.thermal.smooth.bind_image("out_momentmap", data.velocity.get_write_tex());
-    run(prog.thermal.smooth);
+    run(prog.thermal.smooth, data.map_size);
     data.heightmap.swap(true);
     data.velocity.swap(true);
 }
@@ -163,7 +163,7 @@ void Erosion::dispatch_grid(Programs& prog, State::World::Textures& data) {
     prog.grid->flux.bind_image("out_heightmap", data.heightmap.get_write_tex());
     prog.grid->flux.bind_image("out_fluxmap", data.flux.get_write_tex());
     prog.grid->flux.bind_image("out_velocitymap", data.velocity.get_write_tex());
-    run(prog.grid->flux);
+    run(prog.grid->flux, data.map_size);
     data.heightmap.swap();
     data.flux.swap();
     data.velocity.swap();
@@ -174,7 +174,7 @@ void Erosion::dispatch_grid(Programs& prog, State::World::Textures& data) {
     prog.grid->erosion.bind_image("velocitymap", data.velocity.get_read_tex());
     prog.grid->erosion.bind_image("out_heightmap", data.heightmap.get_write_tex());
     prog.grid->erosion.bind_image("out_sedimap", data.sediment.get_write_tex());
-    run(prog.grid->erosion);
+    run(prog.grid->erosion, data.map_size);
     data.heightmap.swap();
     data.sediment.swap();
 
@@ -184,7 +184,7 @@ void Erosion::dispatch_grid(Programs& prog, State::World::Textures& data) {
     prog.grid->sediment.bind_texture("sedimap", data.sediment.get_read_tex());
     prog.grid->sediment.bind_image("out_heightmap", data.heightmap.get_write_tex());
     prog.grid->sediment.bind_image("out_sedimap", data.sediment.get_write_tex());
-    run(prog.grid->sediment);
+    run(prog.grid->sediment, data.map_size);
     data.heightmap.swap();
     data.sediment.swap();
 
@@ -195,6 +195,6 @@ void Erosion::dispatch_grid(Programs& prog, State::World::Textures& data) {
     prog.thermal.smooth.bind_image("out_heightmap", data.heightmap.get_write_tex());
     prog.thermal.smooth.unbind_image("momentmap");
     prog.thermal.smooth.unbind_image("out_momentmap");
-    run(prog.thermal.smooth);
+    run(prog.thermal.smooth, data.map_size);
     data.heightmap.swap();
 }

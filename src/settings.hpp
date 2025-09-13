@@ -9,7 +9,6 @@ namespace State {
 
 constexpr float MAX_HEIGHT = 256.f;
 constexpr float WATER_HEIGHT = 96.f;
-constexpr GLuint NOISE_SIZE = 1536;
 
 struct Rain_settings {
     gl::Buffer buffer;
@@ -32,7 +31,7 @@ struct Map_settings {
             
         .max_dirt       = 2.0,
 
-        .hmap_dims      = glm::ivec2(NOISE_SIZE, NOISE_SIZE),
+        .hmap_dims      = glm::ivec2(1024, 1024),
         .height_mult    = 1.0,
         .water_lvl      = WATER_HEIGHT,
         .seed           = 10000.f * rand() / (float)RAND_MAX,

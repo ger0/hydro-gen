@@ -1,22 +1,22 @@
 #include "state.hpp"
 
-State::World::Textures State::World::gen_textures(const GLuint width, const GLuint height) {
+State::World::Textures State::World::gen_textures(const GLuint size) {
     gl::Texture lockmap {
         .access = GL_READ_WRITE,
         .format = GL_R32UI,
-        .width = width,
-        .height = height
+        .width = size,
+        .height = size
     };
     gl::gen_texture(lockmap, GL_RED_INTEGER, GL_UNSIGNED_INT);
-    gl::Tex_pair heightmap(GL_READ_WRITE, width, height);
-    gl::Tex_pair flux(GL_READ_WRITE, width, height);
-    gl::Tex_pair velocity(GL_READ_WRITE, width, height);
-    gl::Tex_pair sediment(GL_READ_WRITE, width, height);
+    gl::Tex_pair heightmap(GL_READ_WRITE, size, size);
+    gl::Tex_pair flux(GL_READ_WRITE, size, size);
+    gl::Tex_pair velocity(GL_READ_WRITE, size, size);
+    gl::Tex_pair sediment(GL_READ_WRITE, size, size);
 
     // ------------- cross    flux for thermal erosion -----------
-    gl::Tex_pair thermal_c(GL_READ_WRITE, width, height);
+    gl::Tex_pair thermal_c(GL_READ_WRITE, size, size);
     // ------------- diagonal flux for thermal erosion -----------
-    gl::Tex_pair thermal_d(GL_READ_WRITE, width, height);
+    gl::Tex_pair thermal_d(GL_READ_WRITE, size, size);
 
 #if defined(PARTICLE_COUNT)
     gl::Buffer particle_buffer {
@@ -27,6 +27,7 @@ State::World::Textures State::World::gen_textures(const GLuint width, const GLui
 #endif
 
     return State::World::Textures {
+        .map_size = size,
         .heightmap = heightmap,
         .flux = flux,
         .velocity = velocity,
@@ -95,7 +96,7 @@ void State::World::gen_heightmap(
     program.bind_image("dest_sediment", world.sediment.get_write_tex());
 
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
-    glDispatchCompute(NOISE_SIZE / WRKGRP_SIZE_X, NOISE_SIZE / WRKGRP_SIZE_Y, 1);
+    glDispatchCompute(world.map_size / WRKGRP_SIZE_X, world.map_size / WRKGRP_SIZE_Y, 1);
     glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
     world.heightmap.swap(true);

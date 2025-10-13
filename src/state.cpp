@@ -54,7 +54,7 @@ void State::World::delete_textures(State::World::Textures& data) {
     gl::delete_texture(data.lockmap);
 }
 
-State::Settings State::setup_settings(bool is_particle, u32 particle_count) {
+State::Settings State::setup_settings(u32 map_size, bool is_particle, u32 particle_count) {
     LOG_DBG("Generating settings buffers...");
     Settings set;
     if (is_particle) {
@@ -94,6 +94,7 @@ State::Settings State::setup_settings(bool is_particle, u32 particle_count) {
     set.rain.buffer.binding     = BIND_UNIFORM_RAIN_SETTINGS;
     set.erosion.buffer.binding  = BIND_UNIFORM_EROSION;
     set.map.buffer.binding      = BIND_UNIFORM_MAP_SETTINGS;
+    set.map.data.hmap_dims = glm::ivec2(map_size, map_size);
 
     gl::gen_buffer(set.rain.buffer);
     gl::gen_buffer(set.erosion.buffer);

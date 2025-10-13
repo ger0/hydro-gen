@@ -250,6 +250,7 @@ int main(int argc, char* argv[]) {
     // map gen + erosion settings from the UI
     // Sending uniform data to GPU
     auto settings = State::setup_settings(
+        MAP_SIZE,
         erosion_type == Erosion::Programs::PARTICLES,
         particle_count
     );
